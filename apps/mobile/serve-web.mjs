@@ -49,6 +49,7 @@ async function sendFile(response, filePath, fallbackToIndex = true, sendBody = t
     response.writeHead(200, {
       'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
       'Cache-Control': filePath === indexFile ? 'no-cache' : 'public, max-age=31536000, immutable',
+      'Content-Length': String(fileStat.size),
       'X-Content-Type-Options': 'nosniff',
     });
 
@@ -75,12 +76,19 @@ async function sendFile(response, filePath, fallbackToIndex = true, sendBody = t
 }
 
 createServer((request, response) => {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    response.writeHead(405, {
+      Allow: 'GET, HEAD',
+      'Content-Type': 'text/plain; charset=utf-8',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    response.end('Method not allowed');
+    return;
+  }
+
   const url = new URL(request.url ?? '/', 'http://localhost');
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
-  const allowSpaFallback =
-    (request.method === 'GET' || request.method === 'HEAD') &&
-    !url.pathname.startsWith('/_expo/') &&
-    !assetExtensions.has(extname(url.pathname));
+  const allowSpaFallback = !url.pathname.startsWith('/_expo/') && !assetExtensions.has(extname(url.pathname));
   const sendBody = request.method !== 'HEAD';
 
   if (!requestPath) {

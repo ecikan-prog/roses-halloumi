@@ -40,7 +40,7 @@ function resolveRequestPath(urlPath) {
 }
 
 function shouldFallbackToIndex(urlPath) {
-  return !urlPath.startsWith('/_expo/') && !assetExtensions.has(extname(urlPath));
+  return !urlPath.startsWith('/_expo/') && !urlPath.startsWith('/assets/') && !assetExtensions.has(extname(urlPath));
 }
 
 async function sendFile(response, filePath, urlPath, sendBody = true) {

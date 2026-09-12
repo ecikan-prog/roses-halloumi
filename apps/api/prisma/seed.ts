@@ -55,9 +55,11 @@ async function main() {
   });
 
   const products = [
-    { name: 'Halloumi Block', unit: 'pack', wholesalePrice: '7.80', retailPrice: '9.50' },
-    { name: 'Greek Yoghurt Tub', unit: 'tub', wholesalePrice: '4.40', retailPrice: '5.90' },
-    { name: 'Feta Crumble', unit: 'bag', wholesalePrice: '5.10', retailPrice: '6.80' },
+    { name: "Rose's Halloumi Cheese (Block)", unit: 'block', wholesalePrice: '6.50', retailPrice: '9.99' },
+    { name: "Rose's Halloumi Skewers", unit: 'pack', wholesalePrice: '5.80', retailPrice: '8.99' },
+    { name: "Rose's Halloumi Burger", unit: 'pack', wholesalePrice: '7.20', retailPrice: '10.99' },
+    { name: "Rose's Halloumi Salad Bowl", unit: 'pack', wholesalePrice: '6.90', retailPrice: '10.49' },
+    { name: "Rose's Halloumi Fries", unit: 'pack', wholesalePrice: '5.50', retailPrice: '8.49' },
   ];
 
   for (const product of products) {
@@ -68,7 +70,7 @@ async function main() {
     });
   }
 
-  const seededProduct = await prisma.product.findFirstOrThrow({ where: { name: 'Halloumi Block' } });
+  const seededProduct = await prisma.product.findFirstOrThrow({ where: { name: "Rose's Halloumi Cheese (Block)" } });
 
   await prisma.order.upsert({
     where: { id: 1 },

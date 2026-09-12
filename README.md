@@ -19,7 +19,7 @@ Dairy Sales is an internal order entry app for dairy products, used by staff and
 
 ## Getting started
 
-1. Copy `/home/runner/work/roses-halloumi/roses-halloumi/apps/api/.env.example` to `/home/runner/work/roses-halloumi/roses-halloumi/apps/api/.env` and set `DATABASE_URL` plus a secure `JWT_SECRET`.
+1. Copy `/home/runner/work/roses-halloumi/roses-halloumi/apps/api/.env.example` to `/home/runner/work/roses-halloumi/roses-halloumi/apps/api/.env` and set `DATABASE_URL`, a secure `JWT_SECRET`, and any allowed browser origins in `ALLOWED_ORIGINS`.
 2. Install dependencies from `/home/runner/work/roses-halloumi/roses-halloumi`:
    ```bash
    npm install

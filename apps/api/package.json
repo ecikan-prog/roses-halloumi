@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "types": "./index.d.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc --project tsconfig.json",

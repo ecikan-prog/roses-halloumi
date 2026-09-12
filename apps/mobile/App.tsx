@@ -177,6 +177,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
       <Text style={styles.appTitle}>Dairy Sales</Text>
       <Text style={styles.subtitle}>Order entry for dairy staff and customers</Text>
       <SegmentedControl
+        groupLabel="Authentication mode"
         value={mode}
         options={[
           { label: 'Customer', value: 'customer-login' },
@@ -225,6 +226,7 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         </Pressable>
       </View>
       <SegmentedControl
+        groupLabel="Main navigation"
         value={tab}
         options={[
           { label: 'Catalog', value: 'catalog' },
@@ -245,19 +247,20 @@ function CatalogScreen({ session }: { session: SessionState }) {
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_NOW);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.IN_APP);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const effectiveCustomerId = session.user?.kind === 'customer' ? session.user.id : selectedCustomerId;
   const customerQuery = trpc.staff.listCustomers.useQuery(undefined, { enabled: session.user?.kind === 'staff' });
   const productsQuery = trpc.catalog.listProducts.useQuery(
-    session.user?.kind === 'staff' ? { customerId: selectedCustomerId } : undefined,
-    { enabled: session.user?.kind === 'customer' || Boolean(selectedCustomerId) },
+    session.user?.kind === 'staff' ? { customerId: effectiveCustomerId } : undefined,
+    { enabled: session.user?.kind === 'customer' || Boolean(effectiveCustomerId) },
   );
   const createOrder = trpc.orders.create.useMutation();
   const utils = trpc.useUtils();
 
   useEffect(() => {
-    if (paymentTerm === PaymentTerm.PAY_30) {
-      setPaymentMethod(PaymentMethod.IN_APP);
+    if (session.user?.kind === 'customer') {
+      setSelectedCustomerId(session.user.id);
     }
-  }, [paymentTerm]);
+  }, [session.user]);
 
   const selectedItems = ((productsQuery.data ?? []) as ProductRecord[])
     .filter((product) => quantities[product.id] > 0)
@@ -272,14 +275,14 @@ function CatalogScreen({ session }: { session: SessionState }) {
       return;
     }
 
-    if (session.user?.kind === 'staff' && !selectedCustomerId) {
+    if (session.user?.kind === 'staff' && !effectiveCustomerId) {
       Alert.alert('Choose customer', 'Select a customer before creating a staff order.');
       return;
     }
 
     try {
       await createOrder.mutateAsync({
-        customerId: session.user?.kind === 'staff' ? selectedCustomerId : undefined,
+        customerId: session.user?.kind === 'staff' ? effectiveCustomerId : undefined,
         paymentTerm,
         ...(paymentTerm === PaymentTerm.PAY_NOW ? { paymentMethod } : {}),
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
@@ -300,7 +303,8 @@ function CatalogScreen({ session }: { session: SessionState }) {
           {customerQuery.isLoading ? <Text style={styles.metaText}>Loading customers…</Text> : null}
           {(customerQuery.data?.length ?? 0) > 0 ? (
             <SegmentedControl
-              value={String(selectedCustomerId ?? '')}
+              groupLabel="Select customer"
+              value={String(effectiveCustomerId ?? '')}
               options={(customerQuery.data ?? []).map((customer) => ({
                 label: `${customer.name} (${customer.type})`,
                 value: String(customer.id),
@@ -313,6 +317,7 @@ function CatalogScreen({ session }: { session: SessionState }) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Payment terms</Text>
         <SegmentedControl
+          groupLabel="Payment term"
           value={paymentTerm}
           options={[
             { label: 'Pay now (-10%)', value: PaymentTerm.PAY_NOW },
@@ -322,6 +327,7 @@ function CatalogScreen({ session }: { session: SessionState }) {
         />
         {paymentTerm === PaymentTerm.PAY_NOW ? (
           <SegmentedControl
+            groupLabel="Payment method"
             value={paymentMethod}
             options={[
               { label: 'In-app placeholder', value: PaymentMethod.IN_APP },
@@ -378,6 +384,7 @@ function OrdersScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Payment status</Text>
         <SegmentedControl
+          groupLabel="Payment status filter"
           value={statusFilter}
           options={paymentStatusOptions.map((status) => ({ label: status.replace('_', ' '), value: status }))}
           onChange={(value) => setStatusFilter(value as PaymentStatus | 'ALL')}
@@ -461,6 +468,7 @@ function CustomersScreen() {
         <Field label="Contact" value={contact} onChangeText={setContact} />
         <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
         <SegmentedControl
+          groupLabel="Customer tier"
           value={type}
           options={[
             { label: 'Retail', value: 'RETAIL' },
@@ -516,13 +524,30 @@ function Field(props: {
   );
 }
 
-function SegmentedControl({ options, value, onChange }: { options: Array<{ label: string; value: string }>; value: string; onChange: (value: string) => void }) {
+function SegmentedControl({
+  groupLabel,
+  options,
+  value,
+  onChange,
+}: {
+  groupLabel: string;
+  options: Array<{ label: string; value: string }>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
-    <View style={styles.segmentedControl}>
+    <View accessibilityLabel={groupLabel} accessibilityRole="tablist" style={styles.segmentedControl}>
       {options.map((option) => {
         const selected = option.value === value;
         return (
-          <Pressable key={option.value} style={[styles.segment, selected && styles.segmentSelected]} onPress={() => onChange(option.value)}>
+          <Pressable
+            key={option.value}
+            accessibilityLabel={option.label}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            style={[styles.segment, selected && styles.segmentSelected]}
+            onPress={() => onChange(option.value)}
+          >
             <Text style={[styles.segmentLabel, selected && styles.segmentLabelSelected]}>{option.label}</Text>
           </Pressable>
         );

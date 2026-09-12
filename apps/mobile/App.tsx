@@ -27,11 +27,14 @@ const halloumiChickenSkewersImage = require('./assets/grassland/halloumi-chicken
 const halloumiFigsImage = require('./assets/grassland/grilled-halloumi-figs.jpeg');
 const halloumiDinnerIdeasImage = require('./assets/grassland/halloumi-rice-dinner.jpeg');
 const halloumiSharingPlatterImage = require('./assets/grassland/halloumi-sharing-platter.jpeg');
-const storyCowsCalvesImage = require('./assets/grassland/grassland-cows-calves.jpeg');
-const storyFreshMilkImage = require('./assets/grassland/grassland-fresh-milk.jpeg');
-const storyCheeseMouldsImage = require('./assets/grassland/grassland-cheese-moulds.jpeg');
-const storyPressingTraysImage = require('./assets/grassland/grassland-pressing-trays.jpeg');
-const storyHalloumiCurdsImage = require('./assets/grassland/grassland-halloumi-curds.jpeg');
+const storySectionImages = {
+  '01': require('./assets/grassland/grassland-cows-calves.jpeg'),
+  '02': require('./assets/grassland/grassland-fresh-milk.jpeg'),
+  '03': require('./assets/grassland/grassland-cheese-moulds.jpeg'),
+  '04': require('./assets/grassland/grassland-pressing-trays.jpeg'),
+  '05': require('./assets/grassland/grassland-halloumi-curds.jpeg'),
+} as const;
+const storyHeroImage = storySectionImages['01'];
 
 const brandName = 'Grassland Cheese';
 const brandTagline = 'PURE GOODNESS FROM OUR PASTURES';
@@ -206,31 +209,31 @@ const storyJourneyStages: StoryJourneyStage[] = [
     number: '01',
     title: 'Where It Begins',
     description: 'The journey starts in open pasture, where the herd is cared for as the first step in bringing Grassland Cheese Halloumi to your table.',
-    image: storyCowsCalvesImage,
+    image: storySectionImages['01'],
   },
   {
     number: '02',
     title: 'Fresh Milk',
     description: 'Fresh milk moves into the cheesemaking process, connecting the farm stage to the careful production steps that follow.',
-    image: storyFreshMilkImage,
+    image: storySectionImages['02'],
   },
   {
     number: '03',
     title: 'Shaping the Cheese',
     description: 'The cheese is placed into moulds to form its structure, shaping each batch with consistency and care.',
-    image: storyCheeseMouldsImage,
+    image: storySectionImages['03'],
   },
   {
     number: '04',
     title: 'Pressing & Preparing',
     description: 'Pressing and preparation refine texture and readiness before the final stage of Halloumi production.',
-    image: storyPressingTraysImage,
+    image: storySectionImages['04'],
   },
   {
     number: '05',
     title: 'Creating Our Halloumi',
     description: 'The final stage shown here captures Halloumi curds as the process comes together into the cheese ready for customers.',
-    image: storyHalloumiCurdsImage,
+    image: storySectionImages['05'],
   },
 ];
 
@@ -1184,7 +1187,7 @@ function OurStoryPageSection() {
   return (
     <View style={styles.ourStoryPage}>
       <View style={[styles.storyHeroShell, { minHeight: heroHeight }]}>
-        <ImageBackground source={storyCowsCalvesImage} style={styles.storyHeroBackground} imageStyle={styles.storyHeroImage} resizeMode="cover">
+        <ImageBackground source={storyHeroImage} style={styles.storyHeroBackground} imageStyle={styles.storyHeroImage} resizeMode="cover">
           <View style={styles.storyHeroOverlay}>
             <View style={styles.storyHeroBadge}>
               <Text style={styles.storyHeroBadgeText}>New Zealand Product</Text>

@@ -1,0 +1,6 @@
+node_modules/
+**/node_modules/
+**/dist/
+apps/api/.env
+apps/mobile/.expo/
+.DS_Store

@@ -2,6 +2,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
@@ -58,31 +59,13 @@ async function sendFile(response, filePath, fallbackToIndex = true, sendBody = t
       return;
     }
 
-    await new Promise((resolvePromise, reject) => {
-      const stream = createReadStream(filePath);
-      let settled = false;
-
-      function resolveOnce() {
-        if (!settled) {
-          settled = true;
-          resolvePromise();
-        }
+    const stream = createReadStream(filePath);
+    response.once('close', () => {
+      if (!response.writableEnded) {
+        stream.destroy(new Error('Response closed before file streaming completed.'));
       }
-
-      function rejectOnce(error) {
-        if (!settled) {
-          settled = true;
-          reject(error);
-        }
-      }
-
-      stream.once('open', () => {
-        stream.pipe(response);
-      });
-      stream.once('error', rejectOnce);
-      response.once('finish', resolveOnce);
-      response.once('close', resolveOnce);
     });
+    await pipeline(stream, response);
   } catch (error) {
     const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
 
@@ -104,33 +87,41 @@ async function sendFile(response, filePath, fallbackToIndex = true, sendBody = t
 }
 
 createServer((request, response) => {
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    response.writeHead(405, {
-      Allow: 'GET, HEAD',
+  try {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      response.writeHead(405, {
+        Allow: 'GET, HEAD',
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      response.end('Method not allowed');
+      return;
+    }
+
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
+    const allowSpaFallback =
+      !url.pathname.startsWith('/_expo/') &&
+      !assetExtensions.has(extname(url.pathname));
+    const sendBody = request.method !== 'HEAD';
+
+    if (!requestPath) {
+      response.writeHead(404, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      response.end('Not found');
+      return;
+    }
+
+    void sendFile(response, requestPath, allowSpaFallback, sendBody);
+  } catch {
+    response.writeHead(400, {
       'Content-Type': 'text/plain; charset=utf-8',
       'X-Content-Type-Options': 'nosniff',
     });
-    response.end('Method not allowed');
-    return;
+    response.end('Bad request');
   }
-
-  const url = new URL(request.url ?? '/', 'http://localhost');
-  const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
-  const allowSpaFallback =
-    !url.pathname.startsWith('/_expo/') &&
-    !assetExtensions.has(extname(url.pathname));
-  const sendBody = request.method !== 'HEAD';
-
-  if (!requestPath) {
-    response.writeHead(404, {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'X-Content-Type-Options': 'nosniff',
-    });
-    response.end('Not found');
-    return;
-  }
-
-  void sendFile(response, requestPath, allowSpaFallback, sendBody);
 }).listen(port, '0.0.0.0', () => {
   console.log(`Serving Expo web build from ${distDir} on port ${port}`);
 });

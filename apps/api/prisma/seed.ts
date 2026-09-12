@@ -55,11 +55,10 @@ async function main() {
   });
 
   const products = [
-    { name: "Rose's Halloumi Cheese (Block)", unit: 'block', wholesalePrice: '6.50', retailPrice: '9.99' },
-    { name: "Rose's Halloumi Skewers", unit: 'pack', wholesalePrice: '5.80', retailPrice: '8.99' },
-    { name: "Rose's Halloumi Burger", unit: 'pack', wholesalePrice: '7.20', retailPrice: '10.99' },
-    { name: "Rose's Halloumi Salad Bowl", unit: 'pack', wholesalePrice: '6.90', retailPrice: '10.49' },
-    { name: "Rose's Halloumi Fries", unit: 'pack', wholesalePrice: '5.50', retailPrice: '8.49' },
+    { name: 'Halloumi Cheese — Single Block', unit: '250g block', wholesalePrice: '6.50', retailPrice: '9.99' },
+    { name: 'Halloumi Cheese — 2 Pack', unit: '2 x 250g blocks', wholesalePrice: '12.40', retailPrice: '18.99' },
+    { name: 'Halloumi Cheese — 5 Pack', unit: '5 x 250g blocks', wholesalePrice: '30.25', retailPrice: '46.99' },
+    { name: 'Halloumi Cheese — Wholesale Case', unit: '20 x 250g blocks', wholesalePrice: '114.00', retailPrice: '169.99' },
   ];
 
   for (const product of products) {
@@ -70,7 +69,67 @@ async function main() {
     });
   }
 
-  const seededProduct = await prisma.product.findFirstOrThrow({ where: { name: "Rose's Halloumi Cheese (Block)" } });
+  await prisma.product.updateMany({
+    where: { name: { notIn: products.map((product) => product.name) } },
+    data: { active: false },
+  });
+
+  const recipes = [
+    {
+      title: 'Halloumi Burger',
+      description: 'A juicy burger stacked with golden grilled halloumi and fresh salad.',
+      image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80',
+      steps: [
+        'Slice halloumi into thick pieces and pan-grill until golden.',
+        'Toast burger buns and spread with your favourite sauce.',
+        'Layer halloumi, tomato, lettuce, and onion in the bun.',
+        'Serve immediately with chips or a side salad.',
+      ],
+    },
+    {
+      title: 'Grilled Halloumi Skewers',
+      description: 'Quick skewers with halloumi, peppers, and zucchini for easy entertaining.',
+      image: 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=1200&q=80',
+      steps: [
+        'Cut halloumi, capsicum, and zucchini into bite-sized pieces.',
+        'Thread ingredients onto skewers, alternating colours and textures.',
+        'Brush lightly with olive oil and grill until charred in spots.',
+        'Finish with lemon juice and herbs before serving.',
+      ],
+    },
+    {
+      title: 'Halloumi Salad Bowl',
+      description: 'A fresh salad bowl topped with warm halloumi and a citrus dressing.',
+      image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80',
+      steps: [
+        'Prepare a base of greens, cucumber, tomato, and olives.',
+        'Sear halloumi slices in a hot pan until golden on both sides.',
+        'Whisk olive oil, lemon, and a pinch of salt for dressing.',
+        'Top the salad with warm halloumi and drizzle over dressing.',
+      ],
+    },
+    {
+      title: 'Crispy Pan-Fried Halloumi',
+      description: 'Simple crispy halloumi bites that pair perfectly with dips or wraps.',
+      image: 'https://images.unsplash.com/photo-1526318896980-cf78c088247c?auto=format&fit=crop&w=1200&q=80',
+      steps: [
+        'Slice halloumi into strips and pat dry with paper towel.',
+        'Heat a non-stick pan and fry halloumi until crisp and golden.',
+        'Turn once to brown both sides evenly.',
+        'Serve hot with chilli honey, yoghurt dip, or flatbread.',
+      ],
+    },
+  ] as const;
+
+  for (const recipe of recipes) {
+    await prisma.recipe.upsert({
+      where: { title: recipe.title },
+      update: recipe,
+      create: recipe,
+    });
+  }
+
+  const seededProduct = await prisma.product.findFirstOrThrow({ where: { name: 'Halloumi Cheese — Single Block' } });
 
   await prisma.order.upsert({
     where: { id: 1 },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
@@ -46,7 +46,7 @@ type StaffUser = {
 
 type SessionUser = CustomerUser | StaffUser;
 type AuthMode = 'customer-login' | 'staff-login' | 'customer-register';
-type AppTab = 'catalog' | 'orders' | 'customers';
+type AppTab = 'catalog' | 'recipes' | 'orders' | 'customers';
 
 type SessionState = {
   token: string | null;
@@ -62,6 +62,17 @@ type ProductRecord = {
   retailPrice: number;
   effectivePrice: number;
   customerType: 'WHOLESALE' | 'RETAIL';
+};
+
+type RecipeRecord = {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+};
+
+type RecipeDetailRecord = RecipeRecord & {
+  steps: string[];
 };
 
 const paymentStatusOptions: Array<PaymentStatus | 'ALL'> = ['ALL', PaymentStatus.PAID, PaymentStatus.OUTSTANDING, PaymentStatus.OVERDUE];
@@ -240,12 +251,14 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         value={tab}
         options={[
           { label: 'Catalog', value: 'catalog' },
+          { label: 'Recipes', value: 'recipes' },
           { label: 'Orders', value: 'orders' },
           ...(isStaff ? [{ label: 'Customers', value: 'customers' }] : []),
         ]}
         onChange={(value) => setTab(value as AppTab)}
       />
       {tab === 'catalog' ? <CatalogScreen session={session} /> : null}
+      {tab === 'recipes' ? <RecipesScreen /> : null}
       {tab === 'orders' ? <OrdersScreen /> : null}
       {tab === 'customers' && isStaff ? <CustomersScreen /> : null}
     </View>
@@ -423,6 +436,65 @@ function OrdersScreen() {
           ))}
         </View>
       ))}
+    </ScrollView>
+  );
+}
+
+function RecipesScreen() {
+  const [selectedRecipeId, setSelectedRecipeId] = useState<number | null>(null);
+  const recipesQuery = trpc.recipes.list.useQuery();
+  const recipeQuery = trpc.recipes.getById.useQuery(
+    { id: selectedRecipeId ?? 1 },
+    { enabled: selectedRecipeId !== null },
+  );
+
+  if (selectedRecipeId !== null) {
+    const recipe = recipeQuery.data as RecipeDetailRecord | undefined;
+
+    return (
+      <ScrollView style={styles.tabBody} contentContainerStyle={styles.contentContainer}>
+        <Pressable style={styles.secondaryButton} onPress={() => setSelectedRecipeId(null)}>
+          <Text style={styles.secondaryButtonLabel}>Back to recipes</Text>
+        </Pressable>
+        {recipeQuery.isLoading ? <Text style={styles.metaText}>Loading recipe…</Text> : null}
+        {recipeQuery.error ? <Text style={styles.metaText}>Unable to load recipe right now. Please try again.</Text> : null}
+        {recipe ? (
+          <View style={styles.card}>
+            <Image source={{ uri: recipe.image }} style={styles.recipeDetailImage} accessibilityLabel={`${recipe.title} recipe image`} accessibilityRole="image" />
+            <Text style={styles.cardTitle}>{recipe.title}</Text>
+            <Text style={styles.metaText}>{recipe.description}</Text>
+            <View style={styles.recipeStepsWrap}>
+              {recipe.steps.map((step, index) => (
+                <Text key={`${recipe.id}-${index + 1}`} style={styles.recipeStepText}>
+                  {index + 1}. {step}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.tabBody} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Recipes</Text>
+        <Text style={styles.metaText}>Browse halloumi inspiration from quick meals to entertaining ideas.</Text>
+      </View>
+      {recipesQuery.isLoading ? <Text style={styles.metaText}>Loading recipes…</Text> : null}
+      {recipesQuery.error ? <Text style={styles.metaText}>Unable to load recipes right now. Please try again.</Text> : null}
+      {(recipesQuery.data ?? []).map((recipe) => {
+        const recipeCard = recipe as RecipeRecord;
+
+        return (
+          <Pressable key={recipeCard.id} style={styles.card} onPress={() => setSelectedRecipeId(recipeCard.id)}>
+            <Image source={{ uri: recipeCard.image }} style={styles.recipeCardImage} accessibilityLabel={`${recipeCard.title} recipe image`} accessibilityRole="image" />
+            <Text style={styles.cardTitle}>{recipeCard.title}</Text>
+            <Text style={styles.metaText}>{recipeCard.description}</Text>
+          </Pressable>
+        );
+      })}
     </ScrollView>
   );
 }
@@ -781,5 +853,22 @@ const styles = StyleSheet.create({
   },
   orderItemText: {
     color: '#344e41',
+  },
+  recipeCardImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+  },
+  recipeDetailImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+  },
+  recipeStepsWrap: {
+    gap: 8,
+  },
+  recipeStepText: {
+    color: '#344e41',
+    lineHeight: 20,
   },
 });

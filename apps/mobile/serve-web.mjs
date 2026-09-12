@@ -43,6 +43,15 @@ function shouldFallbackToIndex(urlPath) {
   return !urlPath.startsWith('/_expo/') && !urlPath.startsWith('/assets/') && !assetExtensions.has(extname(urlPath));
 }
 
+function getCacheControl(filePath) {
+  if (filePath === indexFile || filePath.endsWith('metadata.json')) {
+    return 'no-cache';
+  }
+
+  const relativePath = filePath.slice(distRoot.length).replaceAll('\\', '/');
+  return relativePath.startsWith('/_expo/') ? 'public, max-age=31536000, immutable' : 'public, max-age=3600';
+}
+
 async function sendFile(response, filePath, urlPath, sendBody = true) {
   try {
     const fileStat = await stat(filePath);
@@ -53,7 +62,7 @@ async function sendFile(response, filePath, urlPath, sendBody = true) {
 
     response.writeHead(200, {
       'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
-      'Cache-Control': filePath === indexFile ? 'no-cache' : 'public, max-age=31536000, immutable',
+      'Cache-Control': getCacheControl(filePath),
       'Content-Length': String(fileStat.size),
       'X-Content-Type-Options': 'nosniff',
     });
@@ -73,7 +82,7 @@ async function sendFile(response, filePath, urlPath, sendBody = true) {
   } catch (error) {
     const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
 
-    if ((errorCode === 'ENOENT' || errorCode === 'ENOTDIR') && shouldFallbackToIndex(urlPath) && filePath !== indexFile) {
+    if (errorCode === 'ENOENT' && shouldFallbackToIndex(urlPath) && filePath !== indexFile) {
       return sendFile(response, indexFile, '/', sendBody);
     }
 

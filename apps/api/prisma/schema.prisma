@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomerType {
+  WHOLESALE
+  RETAIL
+}
+
+enum AccountSource {
+  SELF_REGISTERED
+  STAFF_CREATED
+}
+
+enum OrderStatus {
+  CONFIRMED
+  FULFILLED
+  CANCELLED
+}
+
+enum PaymentTerm {
+  PAY_NOW
+  PAY_30
+}
+
+enum PaymentStatus {
+  PAID
+  OUTSTANDING
+  OVERDUE
+}
+
+enum PaymentMethod {
+  IN_APP
+  EFTPOS
+}
+
+enum StaffRole {
+  STAFF
+  ADMIN
+}
+
+model Customer {
+  id             Int           @id @default(autoincrement())
+  name           String
+  email          String        @unique
+  passwordHash   String
+  type           CustomerType  @default(RETAIL)
+  contact        String?
+  accountSource  AccountSource
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  orders         Order[]
+}
+
+model Product {
+  id             Int         @id @default(autoincrement())
+  name           String      @unique
+  unit           String
+  wholesalePrice Decimal     @db.Decimal(10, 2)
+  retailPrice    Decimal     @db.Decimal(10, 2)
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  orderItems     OrderItem[]
+}
+
+model Order {
+  id               Int            @id @default(autoincrement())
+  customerId       Int
+  staffId          Int?
+  status           OrderStatus    @default(CONFIRMED)
+  paymentTerm      PaymentTerm
+  discountApplied  Decimal        @db.Decimal(10, 2)
+  total            Decimal        @db.Decimal(10, 2)
+  dueDate          DateTime?
+  paymentStatus    PaymentStatus  @default(OUTSTANDING)
+  paymentMethod    PaymentMethod
+  createdAt        DateTime       @default(now())
+  customer         Customer       @relation(fields: [customerId], references: [id])
+  staff            StaffUser?     @relation(fields: [staffId], references: [id])
+  orderItems       OrderItem[]
+
+  @@index([customerId, paymentStatus])
+  @@index([staffId])
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  productId  Int
+  qty        Decimal  @db.Decimal(10, 2)
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model StaffUser {
+  id           Int        @id @default(autoincrement())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         StaffRole  @default(STAFF)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  orders       Order[]
+}

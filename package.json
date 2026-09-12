@@ -1,0 +1,16 @@
+{
+  "name": "dairy-sales",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace @dairy-sales/api run dev",
+    "dev:mobile": "npm --workspace @dairy-sales/mobile run start",
+    "typecheck": "npm run db:generate && npm run typecheck --workspaces --if-present",
+    "db:generate": "npm --workspace @dairy-sales/api run db:generate",
+    "db:push": "npm --workspace @dairy-sales/api run db:push",
+    "db:seed": "npm --workspace @dairy-sales/api run db:seed"
+  }
+}

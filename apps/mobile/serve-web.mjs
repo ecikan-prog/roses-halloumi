@@ -70,7 +70,7 @@ async function sendFile(response, filePath, fallbackToIndex = true) {
 createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
-  const allowSpaFallback = extname(url.pathname) === '';
+  const allowSpaFallback = request.method !== 'OPTIONS' && (request.headers.accept?.includes('text/html') ?? false);
 
   if (!requestPath) {
     response.writeHead(404, {

@@ -24,7 +24,7 @@ function getApiUrl() {
     return apiUrl;
   }
 
-  if (Platform.OS === 'web' && !isLocalWebHost()) {
+  if (Platform.OS === 'web' && process.env.NODE_ENV === 'production' && !isLocalWebHost()) {
     return WEB_PRODUCTION_API_URL;
   }
 

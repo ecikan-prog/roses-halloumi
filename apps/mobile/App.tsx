@@ -20,7 +20,7 @@ import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
-const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg.jpg');
+const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg(1).jpg');
 const grilledHalloumiImage = require('./assets/grassland/halloumi-burger-grilled.jpeg');
 const halloumiBurgerImage = require('./assets/grassland/halloumi-burger-recipe.jpeg');
 const halloumiChickenSkewersImage = require('./assets/grassland/halloumi-chicken-skewers.jpeg');
@@ -1761,7 +1761,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.08 }, { translateX: -14 }, { translateY: -18 }],
   },
   heroImageDesktop: {
-    transform: [{ scale: 1.04 }, { translateX: -8 }, { translateY: -24 }],
+    transform: [{ scale: 1.02 }, { translateY: -72 }],
   },
   heroOverlay: {
     backgroundColor: 'rgba(15, 29, 20, 0.45)',

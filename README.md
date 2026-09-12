@@ -34,7 +34,7 @@ Dairy Sales is an internal order entry app for dairy products, used by staff and
    ```bash
    npm run dev:api
    ```
-5. In a second terminal, point Expo at the API and start the mobile app:
+5. In a second terminal, set `EXPO_PUBLIC_API_URL` to a reachable `/trpc` endpoint for your device or simulator and start the mobile app:
    ```bash
    export EXPO_PUBLIC_API_URL="http://YOUR-LAN-IP:4000/trpc"
    npm run dev:mobile

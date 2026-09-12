@@ -87,10 +87,14 @@ function AppContent({
   });
 
   useEffect(() => {
-    if (meQuery.data) {
-      setSession((current) => ({ ...current, user: meQuery.data as SessionUser }));
+    if (!session.token || !meQuery.data) {
+      return;
     }
-  }, [meQuery.data, setSession]);
+
+    setSession((current) =>
+      current.token === session.token ? { ...current, user: meQuery.data as SessionUser } : current,
+    );
+  }, [meQuery.data, session.token, setSession]);
 
   useEffect(() => {
     if (!meQuery.error) {
@@ -142,7 +146,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (token: string, user
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
 
   const customerLogin = trpc.auth.customerLogin.useMutation();
   const staffLogin = trpc.auth.staffLogin.useMutation();
@@ -429,7 +433,7 @@ function CustomersScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [contact, setContact] = useState('');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
   const [type, setType] = useState<'WHOLESALE' | 'RETAIL'>('RETAIL');
 
   async function submit() {
@@ -444,7 +448,7 @@ function CustomersScreen() {
       setName('');
       setEmail('');
       setContact('');
-      setPassword('password123');
+      setPassword('');
       setType('RETAIL');
     } catch (error) {
       Alert.alert('Unable to create customer', getErrorMessage(error));

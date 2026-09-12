@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -322,27 +322,28 @@ function renderPublicPage(
 }
 
 function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: () => Promise<void> }) {
+  const user = session.user as SessionUser;
   const [page, setPage] = useState<SignedInPage>('home');
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>(session.user?.kind === 'customer' ? session.user.id : undefined);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>(user.kind === 'customer' ? user.id : undefined);
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_NOW);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.IN_APP);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [selectedProductSlug, setSelectedProductSlug] = useState<ShopProductSpec['slug'] | null>(null);
-  const isStaff = session.user.kind === 'staff';
-  const effectiveCustomerId = session.user.kind === 'customer' ? session.user.id : selectedCustomerId;
+  const isStaff = user.kind === 'staff';
+  const effectiveCustomerId = user.kind === 'customer' ? user.id : selectedCustomerId;
   const customerQuery = trpc.staff.listCustomers.useQuery(undefined, { enabled: isStaff });
   const productsQuery = trpc.catalog.listProducts.useQuery(
-    session.user.kind === 'staff' && effectiveCustomerId ? { customerId: effectiveCustomerId } : undefined,
-    { enabled: session.user.kind === 'customer' || Boolean(effectiveCustomerId) },
+    user.kind === 'staff' && effectiveCustomerId ? { customerId: effectiveCustomerId } : undefined,
+    { enabled: user.kind === 'customer' || Boolean(effectiveCustomerId) },
   );
   const createOrder = trpc.orders.create.useMutation();
   const utils = trpc.useUtils();
 
   useEffect(() => {
-    if (session.user.kind === 'customer') {
-      setSelectedCustomerId(session.user.id);
+    if (user.kind === 'customer') {
+      setSelectedCustomerId(user.id);
     }
-  }, [session.user]);
+  }, [user]);
 
   useEffect(() => {
     if (!isStaff && page === 'customers') {
@@ -382,14 +383,14 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       return;
     }
 
-    if (session.user.kind === 'staff' && !effectiveCustomerId) {
+    if (user.kind === 'staff' && !effectiveCustomerId) {
       Alert.alert('Choose customer', 'Select a customer before creating a staff order.');
       return;
     }
 
     try {
       await createOrder.mutateAsync({
-        customerId: session.user.kind === 'staff' ? effectiveCustomerId : undefined,
+        customerId: user.kind === 'staff' ? effectiveCustomerId : undefined,
         paymentTerm,
         ...(paymentTerm === PaymentTerm.PAY_NOW ? { paymentMethod } : {}),
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
@@ -403,12 +404,12 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     }
   }
 
-  let content: JSX.Element;
+  let content;
   switch (page) {
     case 'shop':
       content = (
         <ShopPage
-          session={session}
+          session={{ ...session, user }}
           isStaff={isStaff}
           customerQuery={customerQuery}
           productsQuery={productsQuery}
@@ -498,7 +499,7 @@ function SiteScreen({
   session: SessionState | null;
   onSignOut?: () => Promise<void>;
   cartCount?: number;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const { width } = useWindowDimensions();
   const isCompact = width < 960;
@@ -732,6 +733,7 @@ function ShopPage({
   onNavigate: (page: SignedInPage) => void;
 }) {
   const featuredProduct = shopProducts.find((product) => product.slug === selectedProductSlug) ?? null;
+  const customers = (customerQuery.data ?? []) as Array<{ id: number; name: string; type: 'WHOLESALE' | 'RETAIL' }>;
 
   function adjustQuantity(productId: number, nextQuantity: number) {
     setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
@@ -744,11 +746,11 @@ function ShopPage({
           <View style={styles.inlineCard}>
             <Text style={styles.inlineCardTitle}>Order for customer</Text>
             {customerQuery.isLoading ? <Text style={styles.metaText}>Loading customers…</Text> : null}
-            {(customerQuery.data?.length ?? 0) > 0 ? (
+            {customers.length > 0 ? (
               <SegmentedControl
                 groupLabel="Select customer"
                 value={String(selectedCustomerId ?? '')}
-                options={(customerQuery.data ?? []).map((customer) => ({
+                options={customers.map((customer) => ({
                   label: `${customer.name} (${customer.type})`,
                   value: String(customer.id),
                 }))}
@@ -828,31 +830,32 @@ function ShopPage({
         {productsQuery.isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
         <View style={styles.productGrid}>
           {shopProducts.map((product) => {
-            const quantity = product.product ? quantities[product.product.id] ?? 0 : 0;
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (
               <ProductCard
                 key={product.slug}
                 product={product}
                 quantity={quantity}
                 onAdd={() => {
-                  if (!product.product) {
+                  if (!backendProduct) {
                     return;
                   }
-                  adjustQuantity(product.product.id, (quantities[product.product.id] ?? 0) + 1);
+                  adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
                 }}
                 onOpenDetails={() => setSelectedProductSlug(product.slug)}
                 onIncrease={
-                  product.product
-                    ? () => adjustQuantity(product.product.id, (quantities[product.product.id] ?? 0) + 1)
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
                     : undefined
                 }
                 onDecrease={
-                  product.product
-                    ? () => adjustQuantity(product.product.id, (quantities[product.product.id] ?? 0) - 1)
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
                     : undefined
                 }
-                disabled={!product.product}
-                ctaLabel={product.product ? 'Add to Cart' : 'Available Soon'}
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
               />
             );
           })}
@@ -1456,7 +1459,7 @@ function CustomersScreen() {
   );
 }
 
-function SectionShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: React.ReactNode }) {
+function SectionShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: ReactNode }) {
   return (
     <View style={styles.sectionShell}>
       <Text style={styles.sectionEyebrow}>{eyebrow}</Text>

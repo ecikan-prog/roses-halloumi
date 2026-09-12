@@ -1203,7 +1203,7 @@ function OurStoryPageSection() {
           return (
             <View key={stage.number} style={[styles.storyJourneyRow, reverseDesktop && styles.storyJourneyRowReverse]}>
               <View style={styles.storyJourneyImageColumn}>
-                <Image source={stage.image} style={styles.storyJourneyImage} resizeMode="cover" accessibilityLabel={`${stage.title} story image`} />
+                <Image source={stage.image} style={styles.storyJourneyImage} resizeMode="cover" />
               </View>
               <View style={styles.storyJourneyTextColumn}>
                 <View style={styles.storyJourneyDecorativeLeaf} />

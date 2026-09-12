@@ -26,8 +26,15 @@ export async function getStoredToken() {
 
 export async function setStoredToken(token: string) {
   if (Platform.OS === 'web') {
+    const webStorage = getWebStorage();
+
+    if (!webStorage) {
+      inMemoryWebToken = token;
+      return;
+    }
+
+    webStorage.setItem(TOKEN_KEY, token);
     inMemoryWebToken = token;
-    getWebStorage()?.setItem(TOKEN_KEY, token);
     return;
   }
 
@@ -36,8 +43,15 @@ export async function setStoredToken(token: string) {
 
 export async function clearStoredToken() {
   if (Platform.OS === 'web') {
+    const webStorage = getWebStorage();
+
+    if (!webStorage) {
+      inMemoryWebToken = null;
+      return;
+    }
+
+    webStorage.removeItem(TOKEN_KEY);
     inMemoryWebToken = null;
-    getWebStorage()?.removeItem(TOKEN_KEY);
     return;
   }
 

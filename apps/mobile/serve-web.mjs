@@ -48,6 +48,7 @@ async function sendFile(response, filePath, fallbackToIndex = true) {
     response.writeHead(200, {
       'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
       'Cache-Control': filePath === indexFile ? 'no-cache' : 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
     });
     createReadStream(filePath).pipe(response);
   } catch {
@@ -65,7 +66,10 @@ createServer((request, response) => {
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
 
   if (!requestPath) {
-    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.writeHead(404, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'X-Content-Type-Options': 'nosniff',
+    });
     response.end('Not found');
     return;
   }

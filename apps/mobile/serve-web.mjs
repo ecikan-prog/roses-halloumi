@@ -118,6 +118,15 @@ createServer(async (request, response) => {
       return;
     }
 
+    if ((request.url ?? '/').startsWith('//')) {
+      response.writeHead(400, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      response.end('Bad request');
+      return;
+    }
+
     const url = new URL(request.url ?? '/', 'http://localhost');
     const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
     const sendBody = request.method !== 'HEAD';

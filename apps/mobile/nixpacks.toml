@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["cd ../.. && npm ci"]
+
+[phases.build]
+cmds = ["cd ../.. && npm run build:mobile:web"]
+
+[start]
+cmd = "npm run serve:web"

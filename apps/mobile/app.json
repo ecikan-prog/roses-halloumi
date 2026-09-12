@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Dairy Sales",
+    "name": "Grassland Cheese",
     "slug": "dairy-sales",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,7 +18,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/grassland-cheese-logo.png"
     }
   }
 }

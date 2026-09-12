@@ -1,11 +1,12 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 const distDir = join(projectRoot, 'dist');
+const distRoot = resolve(distDir);
 const indexFile = join(distDir, 'index.html');
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
 
@@ -28,8 +29,12 @@ if (!existsSync(indexFile)) {
 }
 
 function resolveRequestPath(urlPath) {
-  const requestedPath = normalize(decodeURIComponent(urlPath)).replace(/^(\.\.(\/|\\|$))+/, '');
-  return join(distDir, requestedPath);
+  try {
+    const resolvedPath = resolve(distRoot, `.${decodeURIComponent(urlPath)}`);
+    return resolvedPath === distRoot || resolvedPath.startsWith(`${distRoot}${sep}`) ? resolvedPath : null;
+  } catch {
+    return null;
+  }
 }
 
 async function sendFile(response, filePath, fallbackToIndex = true) {
@@ -58,6 +63,13 @@ async function sendFile(response, filePath, fallbackToIndex = true) {
 createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
+
+  if (!requestPath) {
+    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Not found');
+    return;
+  }
+
   void sendFile(response, requestPath);
 }).listen(port, '0.0.0.0', () => {
   console.log(`Serving Expo web build from ${distDir} on port ${port}`);

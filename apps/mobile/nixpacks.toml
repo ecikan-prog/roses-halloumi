@@ -5,4 +5,4 @@ cmds = ["cd ../.. && npm ci"]
 cmds = ["cd ../.. && npm run build:mobile:web"]
 
 [start]
-cmd = "npm run serve:web"
+cmd = "cd ../.. && npm run start:mobile:web"

@@ -27,6 +27,11 @@ const halloumiChickenSkewersImage = require('./assets/grassland/halloumi-chicken
 const halloumiFigsImage = require('./assets/grassland/grilled-halloumi-figs.jpeg');
 const halloumiDinnerIdeasImage = require('./assets/grassland/halloumi-rice-dinner.jpeg');
 const halloumiSharingPlatterImage = require('./assets/grassland/halloumi-sharing-platter.jpeg');
+const storyCowsCalvesImage = require('./assets/grassland/grassland-cows-calves.jpeg');
+const storyFreshMilkImage = require('./assets/grassland/grassland-fresh-milk.jpeg');
+const storyCheeseMouldsImage = require('./assets/grassland/grassland-cheese-moulds.jpeg');
+const storyPressingTraysImage = require('./assets/grassland/grassland-pressing-trays.jpeg');
+const storyHalloumiCurdsImage = require('./assets/grassland/grassland-halloumi-curds.jpeg');
 
 const brandName = 'Grassland Cheese';
 const brandTagline = 'PURE GOODNESS FROM OUR PASTURES';
@@ -111,6 +116,13 @@ type RecipeFeature = {
   image: ImageSourcePropType;
 };
 
+type StoryJourneyStage = {
+  number: string;
+  title: string;
+  description: string;
+  image: ImageSourcePropType;
+};
+
 const paymentStatusOptions: Array<PaymentStatus | 'ALL'> = ['ALL', PaymentStatus.PAID, PaymentStatus.OUTSTANDING, PaymentStatus.OVERDUE];
 
 const shopProductSpecs: ShopProductSpec[] = [
@@ -186,6 +198,39 @@ const recipeFeatures: RecipeFeature[] = [
     title: 'Halloumi Sharing Platter',
     description: 'A platter-led inspiration card designed for entertaining and sharing occasions.',
     image: halloumiSharingPlatterImage,
+  },
+];
+
+const storyJourneyStages: StoryJourneyStage[] = [
+  {
+    number: '01',
+    title: 'Where It Begins',
+    description: 'The journey starts in open pasture, where the herd is cared for as the first step in bringing Grassland Cheese Halloumi to your table.',
+    image: storyCowsCalvesImage,
+  },
+  {
+    number: '02',
+    title: 'Fresh Milk',
+    description: 'Fresh milk moves into the cheesemaking process, connecting the farm stage to the careful production steps that follow.',
+    image: storyFreshMilkImage,
+  },
+  {
+    number: '03',
+    title: 'Shaping the Cheese',
+    description: 'The cheese is placed into moulds to form its structure, shaping each batch with consistency and care.',
+    image: storyCheeseMouldsImage,
+  },
+  {
+    number: '04',
+    title: 'Pressing & Preparing',
+    description: 'Pressing and preparation refine texture and readiness before the final stage of Halloumi production.',
+    image: storyPressingTraysImage,
+  },
+  {
+    number: '05',
+    title: 'Creating Our Halloumi',
+    description: 'The final stage shown here captures Halloumi curds as the process comes together into the cheese ready for customers.',
+    image: storyHalloumiCurdsImage,
   },
 ];
 
@@ -1130,10 +1175,56 @@ function StorySection() {
   );
 }
 
+function OurStoryPageSection() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 900;
+  const isSmallMobile = width < 640;
+  const heroHeight = width < 640 ? 340 : width < 1024 ? 430 : 520;
+
+  return (
+    <View style={styles.ourStoryPage}>
+      <View style={[styles.storyHeroShell, { minHeight: heroHeight }]}>
+        <ImageBackground source={storyCowsCalvesImage} style={styles.storyHeroBackground} imageStyle={styles.storyHeroImage} resizeMode="cover">
+          <View style={styles.storyHeroOverlay}>
+            <View style={styles.storyHeroBadge}>
+              <Text style={styles.storyHeroBadgeText}>New Zealand Product</Text>
+            </View>
+            <Text style={[styles.storyHeroTitle, isSmallMobile && styles.storyHeroTitleMobile]}>From Our Pastures to Your Table</Text>
+            <Text style={[styles.storyHeroSubtitle, isSmallMobile && styles.storyHeroSubtitleMobile]}>
+              Discover the journey behind our Halloumi, from the farm to the finished cheese.
+            </Text>
+          </View>
+        </ImageBackground>
+      </View>
+
+      <View style={styles.storyJourneyShell}>
+        {storyJourneyStages.map((stage, index) => {
+          const reverseDesktop = !isMobile && index % 2 === 1;
+          return (
+            <View key={stage.number} style={[styles.storyJourneyRow, reverseDesktop && styles.storyJourneyRowReverse]}>
+              <View style={styles.storyJourneyImageColumn}>
+                <Image source={stage.image} style={styles.storyJourneyImage} resizeMode="cover" />
+              </View>
+              <View style={styles.storyJourneyTextColumn}>
+                <View style={styles.storyJourneyDecorativeLeaf} />
+                <View style={styles.storyJourneyNumberCircle}>
+                  <Text style={styles.storyJourneyNumberText}>{stage.number}</Text>
+                </View>
+                <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>{stage.title}</Text>
+                <Text style={styles.storyJourneyDescription}>{stage.description}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function AboutPage() {
   return (
     <>
-      <StorySection />
+      <OurStoryPageSection />
       <WhyGrasslandSection />
     </>
   );
@@ -1947,6 +2038,134 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
     fontSize: 16,
     lineHeight: 27,
+  },
+  ourStoryPage: {
+    gap: 32,
+  },
+  storyHeroShell: {
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+  },
+  storyHeroBackground: {
+    justifyContent: 'flex-end',
+    flex: 1,
+  },
+  storyHeroImage: {
+    borderRadius: 32,
+  },
+  storyHeroOverlay: {
+    backgroundColor: 'rgba(18, 53, 36, 0.48)',
+    paddingVertical: 34,
+    paddingHorizontal: 28,
+    gap: 14,
+  },
+  storyHeroBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: '#f5e7b2',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  storyHeroBadgeText: {
+    color: '#6d5216',
+    fontWeight: '700',
+  },
+  storyHeroTitle: {
+    fontSize: 46,
+    lineHeight: 52,
+    fontWeight: '800',
+    color: '#fffdf8',
+    maxWidth: 700,
+  },
+  storyHeroTitleMobile: {
+    fontSize: 34,
+    lineHeight: 40,
+  },
+  storyHeroSubtitle: {
+    fontSize: 18,
+    lineHeight: 28,
+    color: '#f5f2ea',
+    maxWidth: 620,
+  },
+  storyHeroSubtitleMobile: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  storyJourneyShell: {
+    gap: 24,
+  },
+  storyJourneyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    backgroundColor: '#fffdf8',
+    overflow: 'hidden',
+  },
+  storyJourneyRowReverse: {
+    flexDirection: 'row-reverse',
+  },
+  storyJourneyImageColumn: {
+    flexBasis: 360,
+    flexGrow: 1,
+    minHeight: 280,
+  },
+  storyJourneyImage: {
+    width: '100%',
+    height: '100%',
+    minHeight: 280,
+  },
+  storyJourneyTextColumn: {
+    flexBasis: 320,
+    flexGrow: 1,
+    paddingVertical: 24,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    gap: 12,
+    position: 'relative',
+  },
+  storyJourneyDecorativeLeaf: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    top: -34,
+    right: -36,
+    backgroundColor: 'rgba(198, 220, 194, 0.28)',
+  },
+  storyJourneyNumberCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#1f5c43',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyJourneyNumberText: {
+    color: '#fffdf8',
+    fontWeight: '800',
+    fontSize: 17,
+    letterSpacing: 0.4,
+  },
+  storyJourneyTitle: {
+    color: '#123524',
+    fontWeight: '800',
+    fontSize: 32,
+    lineHeight: 38,
+  },
+  storyJourneyTitleMobile: {
+    fontSize: 28,
+    lineHeight: 34,
+  },
+  storyJourneyDescription: {
+    color: '#4d5c54',
+    fontSize: 16,
+    lineHeight: 26,
+    maxWidth: 520,
   },
   wholesaleCard: {
     backgroundColor: '#123524',

@@ -70,6 +70,7 @@ async function sendFile(response, filePath, fallbackToIndex = true) {
 createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
+  const allowSpaFallback = extname(url.pathname) === '';
 
   if (!requestPath) {
     response.writeHead(404, {
@@ -80,7 +81,7 @@ createServer((request, response) => {
     return;
   }
 
-  void sendFile(response, requestPath);
+  void sendFile(response, requestPath, allowSpaFallback);
 }).listen(port, '0.0.0.0', () => {
   console.log(`Serving Expo web build from ${distDir} on port ${port}`);
 });

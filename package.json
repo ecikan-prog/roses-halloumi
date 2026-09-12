@@ -1,0 +1,16 @@
+{
+  "name": "roses-halloumi",
+  "version": "1.0.0",
+  "description": "Internal order entry app for dairy products — used by staff and  external customers. Built with React Native/Expo (mobile) and  Express/tRPC + MySQL (Railway).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://localhost:26831/ecikan-prog/roses-halloumi"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

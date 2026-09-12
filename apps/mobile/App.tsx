@@ -254,7 +254,7 @@ function CatalogScreen({ session }: { session: SessionState }) {
   const effectiveCustomerId = session.user?.kind === 'customer' ? session.user.id : selectedCustomerId;
   const customerQuery = trpc.staff.listCustomers.useQuery(undefined, { enabled: session.user?.kind === 'staff' });
   const productsQuery = trpc.catalog.listProducts.useQuery(
-    session.user?.kind === 'staff' ? { customerId: effectiveCustomerId } : undefined,
+    session.user?.kind === 'staff' && effectiveCustomerId ? { customerId: effectiveCustomerId } : undefined,
     { enabled: session.user?.kind === 'customer' || Boolean(effectiveCustomerId) },
   );
   const createOrder = trpc.orders.create.useMutation();
@@ -540,14 +540,14 @@ function SegmentedControl({
   onChange: (value: string) => void;
 }) {
   return (
-    <View accessibilityLabel={groupLabel} accessibilityRole="tablist" style={styles.segmentedControl}>
+    <View accessibilityLabel={groupLabel} style={styles.segmentedControl}>
       {options.map((option) => {
         const selected = option.value === value;
         return (
           <Pressable
             key={option.value}
             accessibilityLabel={option.label}
-            accessibilityRole="tab"
+            accessibilityRole="button"
             accessibilityState={{ selected }}
             style={[styles.segment, selected && styles.segmentSelected]}
             onPress={() => onChange(option.value)}

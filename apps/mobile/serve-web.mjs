@@ -9,7 +9,7 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 const distDir = join(projectRoot, 'dist');
 const distRoot = resolve(distDir);
 const indexFile = join(distDir, 'index.html');
-const port = Number.parseInt(process.env.PORT ?? '3000', 10);
+const parsedPort = Number.parseInt(process.env.PORT ?? '3000', 10);
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -22,9 +22,16 @@ const contentTypes = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  '.woff2': 'font/woff2',
   '.webp': 'image/webp',
 };
 const assetExtensions = new Set(Object.keys(contentTypes));
+
+if (!Number.isInteger(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
+  throw new Error(`Invalid PORT value: ${process.env.PORT ?? ''}`);
+}
+
+const port = parsedPort;
 
 if (!existsSync(indexFile)) {
   throw new Error(`Missing Expo web build output at ${indexFile}. Run "npm run build:web" first.`);
@@ -82,7 +89,7 @@ async function sendFile(response, filePath, urlPath, sendBody = true) {
   } catch (error) {
     const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
 
-    if (errorCode === 'ENOENT' && shouldFallbackToIndex(urlPath) && filePath !== indexFile) {
+    if ((errorCode === 'ENOENT' || errorCode === 'ENOTDIR') && shouldFallbackToIndex(urlPath) && filePath !== indexFile) {
       return sendFile(response, indexFile, '/', sendBody);
     }
 

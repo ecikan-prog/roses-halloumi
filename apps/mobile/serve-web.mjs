@@ -23,6 +23,7 @@ const contentTypes = {
   '.txt': 'text/plain; charset=utf-8',
   '.webp': 'image/webp',
 };
+const assetExtensions = new Set(Object.keys(contentTypes));
 
 if (!existsSync(indexFile)) {
   throw new Error(`Missing Expo web build output at ${indexFile}. Run "npm run build:web" first.`);
@@ -77,7 +78,9 @@ createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
   const allowSpaFallback =
-    (request.method === 'GET' || request.method === 'HEAD') && (request.headers.accept?.includes('text/html') ?? false);
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    !url.pathname.startsWith('/_expo/') &&
+    !assetExtensions.has(extname(url.pathname));
   const sendBody = request.method !== 'HEAD';
 
   if (!requestPath) {

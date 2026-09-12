@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, skipToken } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
@@ -443,10 +443,7 @@ function OrdersScreen() {
 function RecipesScreen() {
   const [selectedRecipeId, setSelectedRecipeId] = useState<number | null>(null);
   const recipesQuery = trpc.recipes.list.useQuery();
-  const recipeQuery = trpc.recipes.getById.useQuery(
-    { id: selectedRecipeId ?? 0 },
-    { enabled: selectedRecipeId !== null },
-  );
+  const recipeQuery = trpc.recipes.getById.useQuery(selectedRecipeId ? { id: selectedRecipeId } : skipToken);
 
   if (selectedRecipeId !== null) {
     const recipe = recipeQuery.data as RecipeDetailRecord | undefined;

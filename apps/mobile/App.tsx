@@ -253,6 +253,12 @@ function CatalogScreen({ session }: { session: SessionState }) {
   const createOrder = trpc.orders.create.useMutation();
   const utils = trpc.useUtils();
 
+  useEffect(() => {
+    if (paymentTerm === PaymentTerm.PAY_30) {
+      setPaymentMethod(PaymentMethod.IN_APP);
+    }
+  }, [paymentTerm]);
+
   const selectedItems = ((productsQuery.data ?? []) as ProductRecord[])
     .filter((product) => quantities[product.id] > 0)
     .map((product) => ({ ...product, qty: quantities[product.id] }));
@@ -275,7 +281,7 @@ function CatalogScreen({ session }: { session: SessionState }) {
       await createOrder.mutateAsync({
         customerId: session.user?.kind === 'staff' ? selectedCustomerId : undefined,
         paymentTerm,
-        paymentMethod,
+        ...(paymentTerm === PaymentTerm.PAY_NOW ? { paymentMethod } : {}),
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
       });
       await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);

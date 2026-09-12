@@ -20,7 +20,7 @@ import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
-const heroImage = require('./assets/grassland/grassland-pasture-hero.jpeg');
+const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg.jpg');
 const grilledHalloumiImage = require('./assets/grassland/halloumi-burger-grilled.jpeg');
 const halloumiBurgerImage = require('./assets/grassland/halloumi-burger-recipe.jpeg');
 const halloumiChickenSkewersImage = require('./assets/grassland/halloumi-chicken-skewers.jpeg');

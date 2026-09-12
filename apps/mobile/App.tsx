@@ -642,10 +642,11 @@ function HomePage({ onNavigate }: { onNavigate: (page: any) => void }) {
 function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
   const { width } = useWindowDimensions();
   const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
+  const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
   return (
     <View style={[styles.heroShell, { minHeight: heroHeight }]}> 
-      <ImageBackground source={heroImage} style={styles.heroBackground} imageStyle={styles.heroImage} resizeMode="cover">
+      <ImageBackground source={heroImage} style={styles.heroBackground} imageStyle={[styles.heroImage, heroImageStyle]} resizeMode="cover">
         <View style={styles.heroOverlay}>
           <View style={styles.heroBadge}>
             <Text style={styles.heroBadgeText}>{brandStatement}</Text>
@@ -1658,6 +1659,15 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     borderRadius: 32,
+  },
+  heroImageMobile: {
+    transform: [{ translateX: -72 }, { translateY: -12 }],
+  },
+  heroImageTablet: {
+    transform: [{ translateX: -32 }, { translateY: -10 }],
+  },
+  heroImageDesktop: {
+    transform: [{ translateY: -16 }],
   },
   heroOverlay: {
     backgroundColor: 'rgba(15, 29, 20, 0.45)',

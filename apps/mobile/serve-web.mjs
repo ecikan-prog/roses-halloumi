@@ -88,7 +88,10 @@ createServer((request, response) => {
 
   const url = new URL(request.url ?? '/', 'http://localhost');
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
-  const allowSpaFallback = !url.pathname.startsWith('/_expo/') && !assetExtensions.has(extname(url.pathname));
+  const allowSpaFallback =
+    !url.pathname.startsWith('/_expo/') &&
+    !url.pathname.startsWith('/assets/') &&
+    !assetExtensions.has(extname(url.pathname));
   const sendBody = request.method !== 'HEAD';
 
   if (!requestPath) {

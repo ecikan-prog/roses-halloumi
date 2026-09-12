@@ -209,31 +209,31 @@ const storyJourneyStages: StoryJourneyStage[] = [
     number: '01',
     title: 'Where It Begins',
     description: 'The journey starts in open pasture, where the herd is cared for as the first step in bringing Grassland Cheese Halloumi to your table.',
-    image: storySectionImages['01'],
+    image: require('./assets/grassland/grassland-cows-calves.jpeg'),
   },
   {
     number: '02',
     title: 'Fresh Milk',
     description: 'Fresh milk moves into the cheesemaking process, connecting the farm stage to the careful production steps that follow.',
-    image: storySectionImages['02'],
+    image: require('./assets/grassland/grassland-fresh-milk.jpeg'),
   },
   {
     number: '03',
     title: 'Shaping the Cheese',
     description: 'The cheese is placed into moulds to form its structure, shaping each batch with consistency and care.',
-    image: storySectionImages['03'],
+    image: require('./assets/grassland/grassland-cheese-moulds.jpeg'),
   },
   {
     number: '04',
     title: 'Pressing & Preparing',
     description: 'Pressing and preparation refine texture and readiness before the final stage of Halloumi production.',
-    image: storySectionImages['04'],
+    image: require('./assets/grassland/grassland-pressing-trays.jpeg'),
   },
   {
     number: '05',
     title: 'Creating Our Halloumi',
     description: 'The final stage shown here captures Halloumi curds as the process comes together into the cheese ready for customers.',
-    image: storySectionImages['05'],
+    image: require('./assets/grassland/grassland-halloumi-curds.jpeg'),
   },
 ];
 

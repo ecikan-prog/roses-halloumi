@@ -457,6 +457,7 @@ function RecipesScreen() {
           <Text style={styles.secondaryButtonLabel}>Back to recipes</Text>
         </Pressable>
         {recipeQuery.isLoading ? <Text style={styles.metaText}>Loading recipe…</Text> : null}
+        {recipeQuery.error ? <Text style={styles.metaText}>Unable to load recipe right now. Please try again.</Text> : null}
         {recipe ? (
           <View style={styles.card}>
             <Image source={{ uri: recipe.image }} style={styles.recipeDetailImage} />
@@ -482,6 +483,7 @@ function RecipesScreen() {
         <Text style={styles.metaText}>Browse halloumi inspiration from quick meals to entertaining ideas.</Text>
       </View>
       {recipesQuery.isLoading ? <Text style={styles.metaText}>Loading recipes…</Text> : null}
+      {recipesQuery.error ? <Text style={styles.metaText}>Unable to load recipes right now. Please try again.</Text> : null}
       {(recipesQuery.data ?? []).map((recipe) => {
         const recipeCard = recipe as RecipeRecord;
 

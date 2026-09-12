@@ -60,6 +60,12 @@ async function main() {
     { name: 'Halloumi Cheese — 5 Pack', unit: '5 x 250g blocks', wholesalePrice: '30.25', retailPrice: '46.99' },
     { name: 'Halloumi Cheese — Wholesale Case', unit: '20 x 250g blocks', wholesalePrice: '114.00', retailPrice: '169.99' },
   ];
+  const legacyPreparedProductNames = [
+    "Rose's Halloumi Skewers",
+    "Rose's Halloumi Burger",
+    "Rose's Halloumi Salad Bowl",
+    "Rose's Halloumi Fries",
+  ];
 
   for (const product of products) {
     await prisma.product.upsert({
@@ -70,7 +76,7 @@ async function main() {
   }
 
   await prisma.product.updateMany({
-    where: { name: { notIn: products.map((product) => product.name) } },
+    where: { name: { in: legacyPreparedProductNames } },
     data: { active: false },
   });
 

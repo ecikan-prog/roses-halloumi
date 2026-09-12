@@ -443,7 +443,7 @@ function OrdersScreen() {
 function RecipesScreen() {
   const [selectedRecipeId, setSelectedRecipeId] = useState<number | null>(null);
   const recipesQuery = trpc.recipes.list.useQuery();
-  const recipeQuery = trpc.recipes.getById.useQuery(selectedRecipeId ? { id: selectedRecipeId } : skipToken);
+  const recipeQuery = trpc.recipes.getById.useQuery(selectedRecipeId !== null ? { id: selectedRecipeId } : skipToken);
 
   if (selectedRecipeId !== null) {
     const recipe = recipeQuery.data as RecipeDetailRecord | undefined;
@@ -457,7 +457,7 @@ function RecipesScreen() {
         {recipeQuery.error ? <Text style={styles.metaText}>Unable to load recipe right now. Please try again.</Text> : null}
         {recipe ? (
           <View style={styles.card}>
-            <Image source={{ uri: recipe.image }} style={styles.recipeDetailImage} />
+            <Image source={{ uri: recipe.image }} style={styles.recipeDetailImage} accessibilityLabel={`${recipe.title} recipe image`} />
             <Text style={styles.cardTitle}>{recipe.title}</Text>
             <Text style={styles.metaText}>{recipe.description}</Text>
             <View style={styles.recipeStepsWrap}>
@@ -486,7 +486,7 @@ function RecipesScreen() {
 
         return (
           <Pressable key={recipeCard.id} style={styles.card} onPress={() => setSelectedRecipeId(recipeCard.id)}>
-            <Image source={{ uri: recipeCard.image }} style={styles.recipeCardImage} />
+            <Image source={{ uri: recipeCard.image }} style={styles.recipeCardImage} accessibilityLabel={`${recipeCard.title} recipe image`} />
             <Text style={styles.cardTitle}>{recipeCard.title}</Text>
             <Text style={styles.metaText}>{recipeCard.description}</Text>
           </Pressable>

@@ -99,7 +99,7 @@ async function sendFile(response, filePath, urlPath, sendBody = true) {
   }
 }
 
-createServer((request, response) => {
+createServer(async (request, response) => {
   try {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       response.writeHead(405, {
@@ -124,17 +124,7 @@ createServer((request, response) => {
       return;
     }
 
-    void sendFile(response, requestPath, url.pathname, sendBody).catch(() => {
-      if (!response.headersSent) {
-        response.writeHead(500, {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'X-Content-Type-Options': 'nosniff',
-        });
-        response.end('Internal server error');
-      } else if (!response.writableEnded) {
-        response.destroy();
-      }
-    });
+    await sendFile(response, requestPath, url.pathname, sendBody);
   } catch {
     response.writeHead(400, {
       'Content-Type': 'text/plain; charset=utf-8',

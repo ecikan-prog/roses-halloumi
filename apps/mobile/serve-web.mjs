@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { createReadStream, existsSync } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,13 +58,41 @@ async function sendFile(response, filePath, fallbackToIndex = true, sendBody = t
       return;
     }
 
-    const fileContents = await readFile(filePath);
-    response.end(fileContents);
+    await new Promise((resolvePromise, reject) => {
+      const stream = createReadStream(filePath);
+      let settled = false;
+
+      function resolveOnce() {
+        if (!settled) {
+          settled = true;
+          resolvePromise();
+        }
+      }
+
+      function rejectOnce(error) {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      }
+
+      stream.once('open', () => {
+        stream.pipe(response);
+      });
+      stream.once('error', rejectOnce);
+      response.once('finish', resolveOnce);
+      response.once('close', resolveOnce);
+    });
   } catch (error) {
     const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
 
     if ((errorCode === 'ENOENT' || errorCode === 'ENOTDIR') && fallbackToIndex && filePath !== indexFile) {
       return sendFile(response, indexFile, false, sendBody);
+    }
+
+    if (response.headersSent) {
+      response.destroy(error instanceof Error ? error : undefined);
+      return;
     }
 
     response.writeHead(errorCode === 'ENOENT' || errorCode === 'ENOTDIR' ? 404 : 500, {
@@ -90,7 +118,6 @@ createServer((request, response) => {
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
   const allowSpaFallback =
     !url.pathname.startsWith('/_expo/') &&
-    !url.pathname.startsWith('/assets/') &&
     !assetExtensions.has(extname(url.pathname));
   const sendBody = request.method !== 'HEAD';
 

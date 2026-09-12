@@ -17,6 +17,15 @@ function isLocalWebHost() {
   return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
+function isProductionRailwayWebHost() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname } = window.location;
+  return hostname.endsWith('.up.railway.app') && hostname.includes('production');
+}
+
 function getApiUrl() {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
@@ -24,7 +33,7 @@ function getApiUrl() {
     return apiUrl;
   }
 
-  if (Platform.OS === 'web' && process.env.NODE_ENV === 'production' && !isLocalWebHost()) {
+  if (Platform.OS === 'web' && !isLocalWebHost() && isProductionRailwayWebHost()) {
     return WEB_PRODUCTION_API_URL;
   }
 

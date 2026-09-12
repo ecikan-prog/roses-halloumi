@@ -37,26 +37,32 @@ function resolveRequestPath(urlPath) {
   }
 }
 
-async function sendFile(response, filePath, fallbackToIndex = true) {
+async function sendFile(response, filePath, fallbackToIndex = true, sendBody = true) {
   try {
     const fileStat = await stat(filePath);
 
     if (fileStat.isDirectory()) {
-      return sendFile(response, join(filePath, 'index.html'), fallbackToIndex);
+      return sendFile(response, join(filePath, 'index.html'), fallbackToIndex, sendBody);
     }
 
-    const fileContents = await readFile(filePath);
     response.writeHead(200, {
       'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
       'Cache-Control': filePath === indexFile ? 'no-cache' : 'public, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff',
     });
+
+    if (!sendBody) {
+      response.end();
+      return;
+    }
+
+    const fileContents = await readFile(filePath);
     response.end(fileContents);
   } catch (error) {
     const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
 
     if ((errorCode === 'ENOENT' || errorCode === 'ENOTDIR') && fallbackToIndex && filePath !== indexFile) {
-      return sendFile(response, indexFile, false);
+      return sendFile(response, indexFile, false, sendBody);
     }
 
     response.writeHead(errorCode === 'ENOENT' || errorCode === 'ENOTDIR' ? 404 : 500, {
@@ -72,6 +78,7 @@ createServer((request, response) => {
   const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
   const allowSpaFallback =
     (request.method === 'GET' || request.method === 'HEAD') && (request.headers.accept?.includes('text/html') ?? false);
+  const sendBody = request.method !== 'HEAD';
 
   if (!requestPath) {
     response.writeHead(404, {
@@ -82,7 +89,7 @@ createServer((request, response) => {
     return;
   }
 
-  void sendFile(response, requestPath, allowSpaFallback);
+  void sendFile(response, requestPath, allowSpaFallback, sendBody);
 }).listen(port, '0.0.0.0', () => {
   console.log(`Serving Expo web build from ${distDir} on port ${port}`);
 });

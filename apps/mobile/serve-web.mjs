@@ -1,5 +1,5 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,19 +45,25 @@ async function sendFile(response, filePath, fallbackToIndex = true) {
       return sendFile(response, join(filePath, 'index.html'), fallbackToIndex);
     }
 
+    const fileContents = await readFile(filePath);
     response.writeHead(200, {
       'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
       'Cache-Control': filePath === indexFile ? 'no-cache' : 'public, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff',
     });
-    createReadStream(filePath).pipe(response);
-  } catch {
-    if (fallbackToIndex && filePath !== indexFile) {
+    response.end(fileContents);
+  } catch (error) {
+    const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+
+    if ((errorCode === 'ENOENT' || errorCode === 'ENOTDIR') && fallbackToIndex && filePath !== indexFile) {
       return sendFile(response, indexFile, false);
     }
 
-    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    response.end('Not found');
+    response.writeHead(errorCode === 'ENOENT' || errorCode === 'ENOTDIR' ? 404 : 500, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    response.end(errorCode === 'ENOENT' || errorCode === 'ENOTDIR' ? 'Not found' : 'Internal server error');
   }
 }
 

@@ -39,12 +39,16 @@ function resolveRequestPath(urlPath) {
   }
 }
 
-async function sendFile(response, filePath, fallbackToIndex = true, sendBody = true) {
+function shouldFallbackToIndex(urlPath) {
+  return !urlPath.startsWith('/_expo/') && !assetExtensions.has(extname(urlPath));
+}
+
+async function sendFile(response, filePath, urlPath, sendBody = true) {
   try {
     const fileStat = await stat(filePath);
 
     if (fileStat.isDirectory()) {
-      return sendFile(response, join(filePath, 'index.html'), fallbackToIndex, sendBody);
+      return sendFile(response, join(filePath, 'index.html'), urlPath, sendBody);
     }
 
     response.writeHead(200, {
@@ -69,8 +73,8 @@ async function sendFile(response, filePath, fallbackToIndex = true, sendBody = t
   } catch (error) {
     const errorCode = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
 
-    if ((errorCode === 'ENOENT' || errorCode === 'ENOTDIR') && fallbackToIndex && filePath !== indexFile) {
-      return sendFile(response, indexFile, false, sendBody);
+    if ((errorCode === 'ENOENT' || errorCode === 'ENOTDIR') && shouldFallbackToIndex(urlPath) && filePath !== indexFile) {
+      return sendFile(response, indexFile, '/', sendBody);
     }
 
     if (response.headersSent) {
@@ -100,9 +104,6 @@ createServer((request, response) => {
 
     const url = new URL(request.url ?? '/', 'http://localhost');
     const requestPath = url.pathname === '/' ? indexFile : resolveRequestPath(url.pathname);
-    const allowSpaFallback =
-      !url.pathname.startsWith('/_expo/') &&
-      !assetExtensions.has(extname(url.pathname));
     const sendBody = request.method !== 'HEAD';
 
     if (!requestPath) {
@@ -114,7 +115,7 @@ createServer((request, response) => {
       return;
     }
 
-    void sendFile(response, requestPath, allowSpaFallback, sendBody);
+    void sendFile(response, requestPath, url.pathname, sendBody);
   } catch {
     response.writeHead(400, {
       'Content-Type': 'text/plain; charset=utf-8',

@@ -125,7 +125,7 @@ function AppContent({
     );
   }
 
-  if (session.token && !session.user && meQuery.isLoading) {
+  if (session.token && !session.user && (meQuery.isLoading || meQuery.isFetching)) {
     return (
       <SafeAreaView style={styles.centeredScreen}>
         <ActivityIndicator size="large" color="#00695c" />
@@ -216,6 +216,12 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const [tab, setTab] = useState<AppTab>('catalog');
   const isStaff = session.user?.kind === 'staff';
 
+  useEffect(() => {
+    if (!isStaff && tab === 'customers') {
+      setTab('catalog');
+    }
+  }, [isStaff, tab]);
+
   return (
     <View style={styles.dashboard}>
       <View style={styles.header}>
@@ -265,6 +271,10 @@ function CatalogScreen({ session }: { session: SessionState }) {
       setSelectedCustomerId(session.user.id);
     }
   }, [session.user]);
+
+  useEffect(() => {
+    setQuantities({});
+  }, [effectiveCustomerId]);
 
   const selectedItems = ((productsQuery.data ?? []) as ProductRecord[])
     .filter((product) => quantities[product.id] > 0)
@@ -540,14 +550,14 @@ function SegmentedControl({
   onChange: (value: string) => void;
 }) {
   return (
-    <View accessibilityLabel={groupLabel} style={styles.segmentedControl}>
+    <View accessibilityLabel={groupLabel} accessibilityRole="radiogroup" style={styles.segmentedControl}>
       {options.map((option) => {
         const selected = option.value === value;
         return (
           <Pressable
             key={option.value}
             accessibilityLabel={option.label}
-            accessibilityRole="button"
+            accessibilityRole="radio"
             accessibilityState={{ selected }}
             style={[styles.segment, selected && styles.segmentSelected]}
             onPress={() => onChange(option.value)}

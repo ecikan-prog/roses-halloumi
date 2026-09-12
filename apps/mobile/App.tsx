@@ -1752,13 +1752,13 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   heroImageMobile: {
-    transform: [{ translateX: -72 }, { translateY: -12 }],
+    transform: [{ scale: 1.18 }, { translateX: -18 }, { translateY: -20 }],
   },
   heroImageTablet: {
-    transform: [{ translateX: -32 }, { translateY: -10 }],
+    transform: [{ scale: 1.08 }, { translateX: -14 }, { translateY: -18 }],
   },
   heroImageDesktop: {
-    transform: [{ translateY: -16 }],
+    transform: [{ scale: 1.04 }, { translateX: -8 }, { translateY: -24 }],
   },
   heroOverlay: {
     backgroundColor: 'rgba(15, 29, 20, 0.45)',

@@ -128,7 +128,8 @@ type RecipeFeature = {
 type StoryJourneyStage = {
   number: string;
   title: string;
-  description: string;
+  subtitle: string;
+  paragraphs: string[];
   image: ImageSourcePropType;
 };
 
@@ -216,32 +217,48 @@ const recipeFeatures: RecipeFeature[] = [
 const storyJourneyStages: StoryJourneyStage[] = [
   {
     number: '01',
-    title: 'Where It Begins',
-    description: 'The journey starts in open pasture, where the herd is cared for as the first step in bringing Grassland Cheese Halloumi to your table.',
+    title: 'From Cow to Cheese',
+    subtitle: 'Fresh milk from the farm',
+    paragraphs: [
+      "Our Halloumi begins with fresh, pasteurised whole cow's milk from a dairy farm in Pukekohe. From cow to cheesemaking, freshness is at the heart of what we do.",
+    ],
     image: require('./assets/grassland/grassland-cows-calves.jpeg'),
   },
   {
     number: '02',
     title: 'Fresh Milk',
-    description: 'Fresh milk moves into the cheesemaking process, connecting the farm stage to the careful production steps that follow.',
+    subtitle: 'The foundation of our Halloumi',
+    paragraphs: [
+      'Fresh whole milk is prepared for the cheesemaking process at our boutique facility. Modern equipment and careful preparation help us produce a consistent, high-quality Halloumi.',
+    ],
     image: require('./assets/grassland/grassland-fresh-milk.jpeg'),
   },
   {
     number: '03',
     title: 'Shaping the Cheese',
-    description: 'The cheese is placed into moulds to form its structure, shaping each batch with consistency and care.',
+    subtitle: 'Made for consistency',
+    paragraphs: [
+      'The cheese is shaped in moulds to create its familiar form. Our focus is on producing Halloumi with a soft, creamy texture and the characteristic squeaky bite people love.',
+    ],
     image: require('./assets/grassland/grassland-cheese-moulds.jpeg'),
   },
   {
     number: '04',
     title: 'Pressing & Preparing',
-    description: 'Pressing and preparation refine texture and readiness before the final stage of Halloumi production.',
+    subtitle: 'Developing the perfect texture',
+    paragraphs: [
+      'Pressing and preparation help develop the shape and texture of the cheese. Halloumi is naturally versatile and keeps its shape when cooked, making it a favourite with home cooks and chefs.',
+    ],
     image: require('./assets/grassland/grassland-pressing-trays.jpeg'),
   },
   {
     number: '05',
-    title: 'Creating Our Halloumi',
-    description: 'The final stage shown here captures Halloumi curds as the process comes together into the cheese ready for customers.',
+    title: 'Ready for Your Table',
+    subtitle: 'Good food. Good life.',
+    paragraphs: [
+      'Our Halloumi is made to be enjoyed in countless ways. Slice and pan-fry with a little olive oil until golden, grill it, bake it or add it to salads, burgers and savoury dishes. It can even be enjoyed with something sweet, such as honey and pancakes.',
+      'Vegetarian-friendly and ready to inspire your next meal.',
+    ],
     image: require('./assets/grassland/grassland-halloumi-curds.jpeg'),
   },
 ];
@@ -1261,6 +1278,14 @@ function OurStoryPageSection() {
         </ImageBackground>
       </View>
 
+      <View style={styles.storyIntroShell}>
+        <Text style={styles.sectionEyebrow}>OUR STORY</Text>
+        <Text style={styles.sectionTitle}>Good food brings a healthy & happy life.</Text>
+        <Text style={styles.sectionDescription}>
+          Rose's Dairy has been making specialty Halloumi cheese using methods that have been developed and refined through our family tradition over generations.
+        </Text>
+      </View>
+
       <View style={styles.storyJourneyShell}>
         {storyJourneyStages.map((stage, index) => {
           const reverseDesktop = !isMobile && index % 2 === 1;
@@ -1275,11 +1300,25 @@ function OurStoryPageSection() {
                   <Text style={styles.storyJourneyNumberText}>{stage.number}</Text>
                 </View>
                 <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>{stage.title}</Text>
-                <Text style={styles.storyJourneyDescription}>{stage.description}</Text>
+                <Text style={styles.storyJourneySubtitle}>{stage.subtitle}</Text>
+                {stage.paragraphs.map((paragraph, paragraphIndex) => (
+                  <Text key={paragraphIndex} style={styles.storyJourneyDescription}>
+                    {paragraph}
+                  </Text>
+                ))}
               </View>
             </View>
           );
         })}
+      </View>
+
+      <View style={styles.storyBrandShell}>
+        <Text style={styles.sectionEyebrow}>Our Halloumi</Text>
+        <Text style={styles.sectionTitle}>One cheese, so many possibilities.</Text>
+        <Text style={styles.sectionDescription}>
+          Our Halloumi is known for its creamy flavour, soft texture and satisfying squeak without being overly salty. It holds its shape beautifully when cooked, making it easy to grill, fry or bake.
+        </Text>
+        <Text style={styles.sectionDescription}>From everyday meals to entertaining, good food brings people together.</Text>
       </View>
     </View>
   );
@@ -2234,6 +2273,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 26,
     maxWidth: 520,
+  },
+  storyJourneySubtitle: {
+    color: '#1f5c43',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  storyIntroShell: {
+    gap: 12,
+  },
+  storyBrandShell: {
+    gap: 12,
   },
   wholesaleCard: {
     backgroundColor: '#123524',

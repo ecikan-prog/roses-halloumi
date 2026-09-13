@@ -4,7 +4,6 @@ import {
   Alert,
   Image,
   ImageBackground,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -693,53 +692,24 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
   const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
-  const heroOverlayContent = (
-    <View style={styles.heroOverlay}>
-      <View style={styles.heroBadge}>
-        <Text style={styles.heroBadgeText}>{brandStatement}</Text>
-      </View>
-      <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
-      <Text style={styles.heroSubtitle}>{heroMessage}</Text>
-      <View style={styles.heroActionRow}>
-        <Pressable style={styles.primaryButton} onPress={onPrimary}>
-          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
-          <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-
-  if (Platform.OS === 'web') {
-    const heroImageUri = Image.resolveAssetSource(heroImage)?.uri;
-
-    return (
-      <View style={[styles.heroShell, { minHeight: heroHeight }]}>
-        <View style={[styles.heroBackground, { position: 'relative' }]}>
-          <img
-            src={heroImageUri}
-            alt="Cows grazing on the green Grassland Cheese pasture"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center bottom',
-              borderRadius: 32,
-            }}
-          />
-          {heroOverlayContent}
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.heroShell, { minHeight: heroHeight }]}> 
       <ImageBackground source={heroImage} style={styles.heroBackground} imageStyle={[styles.heroImage, heroImageStyle]} resizeMode="cover">
-        {heroOverlayContent}
+        <View style={styles.heroOverlay}>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>{brandStatement}</Text>
+          </View>
+          <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
+          <Text style={styles.heroSubtitle}>{heroMessage}</Text>
+          <View style={styles.heroActionRow}>
+            <Pressable style={styles.primaryButton} onPress={onPrimary}>
+              <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
+              <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
+            </Pressable>
+          </View>
+        </View>
       </ImageBackground>
     </View>
   );

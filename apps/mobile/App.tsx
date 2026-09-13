@@ -997,7 +997,7 @@ function ProductCard({
   return (
     <View style={styles.productCard}>
       <View style={styles.productLogoPanel}>
-        <Image source={product.image} style={styles.productLogo} resizeMode="cover" accessibilityLabel={`${product.name} product photo`} />
+        <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
       <Text style={styles.productCardName}>{product.name}</Text>
       <Text style={styles.productCardSize}>{product.size}</Text>
@@ -1905,11 +1905,11 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 120,
+    height: 320,
   },
   productLogo: {
     width: '100%',
-    height: 84,
+    height: '100%',
   },
   productCardName: {
     fontSize: 22,

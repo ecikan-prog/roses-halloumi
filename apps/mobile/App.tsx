@@ -1755,13 +1755,13 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   heroImageMobile: {
-    transform: [{ scale: 1.35 }, { translateX: -18 }, { translateY: -110 }],
+    objectPosition: 'center 85%',
   },
   heroImageTablet: {
-    transform: [{ scale: 1.25 }, { translateX: -14 }, { translateY: -130 }],
+    objectPosition: 'center 85%',
   },
   heroImageDesktop: {
-    transform: [{ scale: 1.2 }, { translateY: -150 }],
+    objectPosition: 'center 85%',
   },
   heroOverlay: {
     backgroundColor: 'rgba(15, 29, 20, 0.45)',

@@ -29,6 +29,9 @@ const halloumiChickenSkewersImage = require('./assets/grassland/halloumi-chicken
 const halloumiFigsImage = require('./assets/grassland/grilled-halloumi-figs.jpeg');
 const halloumiDinnerIdeasImage = require('./assets/grassland/halloumi-rice-dinner.jpeg');
 const halloumiSharingPlatterImage = require('./assets/grassland/halloumi-sharing-platter.jpeg');
+const halloumi1kgImage = require('./assets/grassland/grassland-halloumi-1kg.jpg');
+const halloumi500gImage = require('./assets/grassland/grassland-halloumi-500g.jpg');
+const halloumi200gImage = require('./assets/grassland/grassland-halloumi-200g.jpg');
 const storySectionImages = {
   '01': require('./assets/grassland/grassland-cows-calves.jpeg'),
   '02': require('./assets/grassland/grassland-fresh-milk.jpeg'),
@@ -109,6 +112,7 @@ type ShopProductSpec = {
   size: string;
   description: string;
   detail: string;
+  image: ImageSourcePropType;
 };
 
 type ShopProductView = ShopProductSpec & {
@@ -137,6 +141,7 @@ const shopProductSpecs: ShopProductSpec[] = [
     size: '1 kg',
     description: 'A generous halloumi format for bigger family meals, grilling trays, and sharing platters.',
     detail: 'Designed for customers who want a larger halloumi format ready for slicing, grilling, frying, and sharing.',
+    image: halloumi1kgImage,
   },
   {
     slug: '500g',
@@ -144,6 +149,7 @@ const shopProductSpecs: ShopProductSpec[] = [
     size: '500 g',
     description: 'A versatile mid-size halloumi option for weeknight meals, salads, and pan-frying.',
     detail: 'A balanced everyday halloumi size that suits quick dinners, lunch plates, and smaller entertaining moments.',
+    image: halloumi500gImage,
   },
   {
     slug: '200g',
@@ -151,6 +157,7 @@ const shopProductSpecs: ShopProductSpec[] = [
     size: '200 g',
     description: 'A smaller halloumi size that is ideal for lighter meals, snacks, and trial purchases.',
     detail: 'A compact halloumi option for individual meals, smaller households, or customers trying the range for the first time.',
+    image: halloumi200gImage,
   },
 ];
 
@@ -990,7 +997,7 @@ function ProductCard({
   return (
     <View style={styles.productCard}>
       <View style={styles.productLogoPanel}>
-        <Image source={grasslandLogo} style={styles.productLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <Image source={product.image} style={styles.productLogo} resizeMode="cover" accessibilityLabel={`${product.name} product photo`} />
       </View>
       <Text style={styles.productCardName}>{product.name}</Text>
       <Text style={styles.productCardSize}>{product.size}</Text>

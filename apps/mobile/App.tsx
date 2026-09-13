@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   ImageBackground,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -14,6 +15,7 @@ import {
   useWindowDimensions,
   type ImageSourcePropType,
 } from 'react-native';
+import { Asset } from 'expo-asset';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
@@ -687,29 +689,81 @@ function HomePage({ onNavigate }: { onNavigate: (page: any) => void }) {
   );
 }
 
+// React Native Web renders <Image>/<ImageBackground> as a CSS `background-image` on an
+// inner <div>, so the `objectPosition` passed via `imageStyle` never reaches a real
+// replaced element and has no visual effect (it only affects `object-fit` elements like
+// <img>/<video>). To keep the cows + green pasture visible in the hero banner on Expo Web,
+// we render a real <img> with `objectFit`/`objectPosition` for web only, while native
+// iOS/Android keep using <ImageBackground> unchanged.
+//
+// IMPORTANT: `Image.resolveAssetSource` (used by a previous, reverted attempt at this fix)
+// does not exist on react-native-web's <Image> export and throws at runtime on web,
+// crashing the whole app with no error boundary (blank page in production). Use
+// `expo-asset`'s `Asset.fromModule`, which is the Expo-supported, cross-platform way to
+// resolve a `require()`'d image module to a usable URI, instead.
+function resolveWebImageUri(source: ImageSourcePropType): string | null {
+  try {
+    const uri = Asset.fromModule(source as number | string | { uri: string; width: number; height: number }).uri;
+    return typeof uri === 'string' && uri.length > 0 ? uri : null;
+  } catch {
+    return null;
+  }
+}
+
 function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
   const { width } = useWindowDimensions();
   const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
+  const heroOverlayContent = (
+    <View style={styles.heroOverlay}>
+      <View style={styles.heroBadge}>
+        <Text style={styles.heroBadgeText}>{brandStatement}</Text>
+      </View>
+      <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
+      <Text style={styles.heroSubtitle}>{heroMessage}</Text>
+      <View style={styles.heroActionRow}>
+        <Pressable style={styles.primaryButton} onPress={onPrimary}>
+          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
+          <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  if (Platform.OS === 'web') {
+    const heroImageUri = resolveWebImageUri(heroImage);
+
+    return (
+      <View style={[styles.heroShell, { minHeight: heroHeight }]}>
+        <View style={[styles.heroBackground, styles.heroWebImageWrapper]}>
+          {heroImageUri ? (
+            <img
+              src={heroImageUri}
+              alt="Cows grazing on the green Grassland Cheese pasture"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 85%',
+                borderRadius: 32,
+              }}
+            />
+          ) : null}
+          {heroOverlayContent}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.heroShell, { minHeight: heroHeight }]}> 
       <ImageBackground source={heroImage} style={styles.heroBackground} imageStyle={[styles.heroImage, heroImageStyle]} resizeMode="cover">
-        <View style={styles.heroOverlay}>
-          <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>{brandStatement}</Text>
-          </View>
-          <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
-          <Text style={styles.heroSubtitle}>{heroMessage}</Text>
-          <View style={styles.heroActionRow}>
-            <Pressable style={styles.primaryButton} onPress={onPrimary}>
-              <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
-              <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
-            </Pressable>
-          </View>
-        </View>
+        {heroOverlayContent}
       </ImageBackground>
     </View>
   );
@@ -1750,6 +1804,10 @@ const styles = StyleSheet.create({
   heroBackground: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  heroWebImageWrapper: {
+    position: 'relative',
+    overflow: 'hidden',
   },
   heroImage: {
     borderRadius: 32,

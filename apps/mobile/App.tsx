@@ -1761,7 +1761,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.08 }, { translateX: -14 }, { translateY: -18 }],
   },
   heroImageDesktop: {
-    transform: [{ scale: 1.02 }, { translateY: -72 }],
+    transform: [{ scale: 1.02 }, { translateY: -24 }],
   },
   heroOverlay: {
     backgroundColor: 'rgba(15, 29, 20, 0.45)',

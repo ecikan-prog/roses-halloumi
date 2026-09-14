@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   ImageBackground,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -32,6 +33,9 @@ const halloumiSharingPlatterImage = require('./assets/grassland/halloumi-sharing
 const halloumi1kgImage = require('./assets/grassland/grassland-halloumi-1kg.jpg');
 const halloumi500gImage = require('./assets/grassland/grassland-halloumi-500g.jpg');
 const halloumi200gImage = require('./assets/grassland/grassland-halloumi-200g.jpg');
+const mpiRegistrationPdf = require('./assets/quality-compliance/01-MPI-Animal-Products-Exporter-Registration.pdf');
+const foodSafetyAuditPdf = require('./assets/quality-compliance/02-Food-Safety-Quality-Audit-Certificate.pdf');
+const halloumiProductSpecPdf = require('./assets/quality-compliance/03-Roses-Dairy-Halloumi-Product-Specification.pdf');
 const storySectionImages = {
   '01': require('./assets/grassland/grassland-cows-calves.jpeg'),
   '02': require('./assets/grassland/grassland-fresh-milk.jpeg'),
@@ -87,7 +91,7 @@ type StaffUser = {
 
 type SessionUser = CustomerUser | StaffUser;
 type AuthMode = 'customer-login' | 'staff-login' | 'customer-register';
-type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
+type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
 type SignedInPage = PublicPage | 'orders' | 'customers';
 
 type SessionState = {
@@ -362,6 +366,8 @@ function renderPublicPage(
       return <WholesalePage onNavigate={onNavigate} />;
     case 'about':
       return <AboutPage />;
+    case 'quality-compliance':
+      return <QualityCompliancePage />;
     case 'cart':
       return <PublicCartPage onNavigate={onNavigate} />;
     case 'account':
@@ -493,6 +499,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       break;
     case 'about':
       content = <AboutPage />;
+      break;
+    case 'quality-compliance':
+      content = <QualityCompliancePage />;
       break;
     case 'cart':
       content = (
@@ -651,6 +660,7 @@ function SiteFooter({
     { label: 'Recipes', page: 'recipes' },
     { label: 'Wholesale', page: 'wholesale' },
     { label: 'About', page: 'about' },
+    { label: 'Quality & Compliance', page: 'quality-compliance' },
     { label: 'Contact', page: 'contact' },
     { label: 'Privacy', page: 'privacy' },
     { label: 'Terms', page: 'terms' },
@@ -1354,6 +1364,120 @@ function AboutPage() {
     <>
       <OurStoryPageSection />
     </>
+  );
+}
+
+function openQualityDocument(source: ImageSourcePropType) {
+  const uri = resolveWebImageUri(source);
+  if (!uri) {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+    return;
+  }
+  if (Platform.OS === 'web') {
+    // Open in a new browser tab, as PDFs should not replace the current page.
+    (globalThis as any).open?.(uri, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  Linking.openURL(uri).catch(() => {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+  });
+}
+
+function QualityDocumentCard({
+  title,
+  description,
+  meta,
+  source,
+  viewLabel,
+  showDownload,
+}: {
+  title: string;
+  description: string;
+  meta: Array<{ label: string; value: string }>;
+  source: ImageSourcePropType;
+  viewLabel: string;
+  showDownload?: boolean;
+}) {
+  return (
+    <View style={styles.qualityDocCard}>
+      <Text style={styles.qualityDocTitle}>{title}</Text>
+      <Text style={styles.qualityDocDescription}>{description}</Text>
+      {meta.length > 0 ? (
+        <View style={styles.qualityDocMetaList}>
+          {meta.map((item) => (
+            <View key={item.label} style={styles.qualityDocMetaRow}>
+              <Text style={styles.qualityDocMetaLabel}>{item.label}</Text>
+              <Text style={styles.qualityDocMetaValue}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.heroActionRow}>
+        <Pressable style={styles.primaryButton} onPress={() => openQualityDocument(source)}>
+          <Text style={styles.primaryButtonLabel}>{viewLabel}</Text>
+        </Pressable>
+        {showDownload ? (
+          <Pressable style={styles.secondaryButton} onPress={() => openQualityDocument(source)}>
+            <Text style={styles.secondaryButtonLabel}>Download PDF</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function QualityCompliancePage() {
+  return (
+    <SectionShell
+      eyebrow="Quality & Compliance"
+      title="Quality, safety and product information"
+      description="We believe in being transparent about the products we make and the standards that support them. Explore our official Rose's Dairy registration, audit certification and Halloumi product information below."
+    >
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Official Certifications</Text>
+        <View style={styles.qualityDocGrid}>
+          <QualityDocumentCard
+            title="MPI Animal Products Exporter Registration"
+            description="Official MPI Animal Products Exporter registration for AYYILDIZ Limited trading as Roses Dairy (Halloumi Cheese)."
+            meta={[
+              { label: 'MPI ID', value: 'AEX000656' },
+              { label: 'Validity', value: '16 March 2026 – 16 March 2027' },
+            ]}
+            source={mpiRegistrationPdf}
+            viewLabel="View Certificate"
+            showDownload
+          />
+          <QualityDocumentCard
+            title="Food Safety & Quality Audit Certificate"
+            description="Certificate of Audit for Ayyildiz Ltd, trading as Rose's Halloumi."
+            meta={[{ label: 'Certificate expiry', value: '2 January 2027' }]}
+            source={foodSafetyAuditPdf}
+            viewLabel="View Certificate"
+            showDownload
+          />
+        </View>
+      </View>
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Halloumi Product Information</Text>
+        <View style={styles.qualityDocGrid}>
+          <QualityDocumentCard
+            title="Rose’s Dairy Halloumi Product Specification"
+            description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
+            meta={[
+              { label: 'Product', value: 'Rose’s Dairy Halloumi' },
+              { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
+              { label: 'Ingredients', value: 'Pasteurised Cow’s Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
+              { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
+              { label: 'Opened', value: 'Consume within 5 days once opened.' },
+            ]}
+            source={halloumiProductSpecPdf}
+            viewLabel="View Product Specification"
+            showDownload
+          />
+        </View>
+      </View>
+    </SectionShell>
   );
 }
 
@@ -2080,6 +2204,57 @@ const styles = StyleSheet.create({
     color: '#fffef8',
     fontWeight: '700',
     fontSize: 16,
+  },
+  qualitySection: {
+    gap: 16,
+  },
+  qualitySectionHeading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  qualityDocCard: {
+    flexBasis: 320,
+    flexGrow: 1,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 12,
+  },
+  qualityDocTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocDescription: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#4d5c54',
+  },
+  qualityDocMetaList: {
+    gap: 6,
+  },
+  qualityDocMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  qualityDocMetaLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7d6744',
+  },
+  qualityDocMetaValue: {
+    fontSize: 14,
+    color: '#4d5c54',
+    flexShrink: 1,
   },
   noticeCard: {
     backgroundColor: '#fffdf8',

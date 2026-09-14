@@ -1261,6 +1261,18 @@ function OurStoryPageSection() {
         </ImageBackground>
       </View>
 
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Family Story</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            At Rose’s Dairy, cheese-making is more than a craft — it’s a family tradition. Since 2010 we have been producing specialty Halloumi on our boutique dairy farm in Pukekohe, Auckland, using a recipe that has been passed down through generations of our family dynasty.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            We believe good food nourishes both body and spirit. That simple belief guides everything we do. Every batch of our Halloumi begins with fresh, pasteurised whole cow’s milk from the paddock next door. It doesn’t get fresher than that.
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.storyJourneyShell}>
         {storyJourneyStages.map((stage, index) => {
           const reverseDesktop = !isMobile && index % 2 === 1;
@@ -1280,6 +1292,21 @@ function OurStoryPageSection() {
             </View>
           );
         })}
+      </View>
+
+      <View style={styles.storyFarmToTableSection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>From Our Farm to Your Table</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            We operate a small, carefully run facility right on the dairy farm. Modern equipment helps us maintain the highest standards of hygiene and consistency, while the heart of the process remains the time-honoured family methods we have perfected over many years.
+          </Text>
+        </View>
+        <View style={styles.storyBrandStatementCard}>
+          <Text style={styles.storyBrandStatement}>Fresh milk. Honest ingredients. A recipe rooted in family history.</Text>
+          <Text style={styles.storyBrandClosingLine}>That’s the Rose’s Dairy difference.</Text>
+          <Text style={styles.storyBrandClosingLine}>Good food. Good life.</Text>
+          <Text style={styles.storyBrandClosingLine}>Rose’s Halloumi — one of a kind.</Text>
+        </View>
       </View>
     </View>
   );
@@ -2234,6 +2261,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 26,
     maxWidth: 520,
+  },
+  storyFamilySection: {
+    gap: 16,
+  },
+  storyFarmToTableSection: {
+    gap: 16,
+  },
+  storyBrandStatementCard: {
+    backgroundColor: '#1f5c43',
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    gap: 10,
+    alignItems: 'center',
+  },
+  storyBrandStatement: {
+    color: '#fffdf8',
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    maxWidth: 640,
+  },
+  storyBrandClosingLine: {
+    color: '#f5e7b2',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   wholesaleCard: {
     backgroundColor: '#123524',

@@ -1294,6 +1294,36 @@ function OurStoryPageSection() {
         })}
       </View>
 
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>What Makes Our Halloumi Special</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            Our Halloumi is soft and gently squeaky, with a clean, creamy flavour that is never overly salty. We use just the right amount of rock salt so the natural taste of the milk shines through.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            Because it is made the traditional way and finished with modern precision, our cheese holds its shape beautifully when cooked. Chefs love it — it flips easily with tongs, browns evenly, and stays consistent batch after batch.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            Whether you fry, grill, bake, or pan-sear it in a little olive oil, Rose’s Halloumi delivers the same wonderful creamy taste every time. It is ready to enjoy straight from the pack and works equally well in savoury or sweet dishes.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>How to Enjoy It</Text>
+        <View style={styles.storyCard}>
+          <View style={styles.storyBulletList}>
+            <Text style={styles.storyBulletItem}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
+            <Text style={styles.storyBulletItem}>• Grill or bake for a delicious centrepiece</Text>
+            <Text style={styles.storyBulletItem}>• Pair with honey and pancakes for a sweet treat</Text>
+            <Text style={styles.storyBulletItem}>• Add to a plated toaster or simple skillet meal</Text>
+          </View>
+          <Text style={styles.storyParagraph}>
+            Our Halloumi is naturally vegetarian and loved by everyone from age 7 to 70. Once you taste it, you’ll understand why this centuries-old style of cheese has never gone out of favour.
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.storyFarmToTableSection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>From Our Farm to Your Table</Text>
         <View style={styles.storyCard}>
@@ -1308,6 +1338,13 @@ function OurStoryPageSection() {
           <Text style={styles.storyBrandClosingLine}>Rose’s Halloumi — one of a kind.</Text>
         </View>
       </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Halloumi</Text>
+        <View style={styles.storyBrandStatementCard}>
+          <Text style={styles.storyBrandStatement}>One cheese, so many possibilities.</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -1316,7 +1353,6 @@ function AboutPage() {
   return (
     <>
       <OurStoryPageSection />
-      <WhyGrasslandSection />
     </>
   );
 }
@@ -2290,6 +2326,14 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  storyBulletList: {
+    gap: 10,
+  },
+  storyBulletItem: {
+    color: '#4d5c54',
+    fontSize: 16,
+    lineHeight: 26,
   },
   wholesaleCard: {
     backgroundColor: '#123524',

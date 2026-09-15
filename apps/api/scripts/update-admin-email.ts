@@ -83,15 +83,16 @@ async function main() {
 
   // 2. The actual change: a single-row update by id, preserving id/role/passwordHash
   // unless a new password was explicitly requested.
+  const shouldRotatePassword = newPassword !== undefined;
   const updated = await prisma.staffUser.update({
     where: { id: existingAdmin.id },
     data: {
       email: newEmail,
-      ...(newPassword ? { passwordHash: await hashPassword(newPassword) } : {}),
+      ...(shouldRotatePassword ? { passwordHash: await hashPassword(newPassword) } : {}),
     },
   });
 
-  // 3. Post-change verification (never print passwordHash).
+  // 3. Post-change verification (never print passwordHash or any value derived from it).
   console.log('Admin email updated successfully.');
   console.log(
     JSON.stringify(
@@ -100,7 +101,6 @@ async function main() {
         name: updated.name,
         email: updated.email,
         role: updated.role,
-        passwordRotated: Boolean(newPassword),
         updatedAt: updated.updatedAt,
       },
       null,

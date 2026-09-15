@@ -15,6 +15,17 @@ function getPrice(customerType: CustomerType, wholesalePrice: { toNumber(): numb
   return customerType === CustomerType.WHOLESALE ? wholesalePrice.toNumber() : retailPrice.toNumber();
 }
 
+const FREE_DELIVERY_THRESHOLD = 80;
+const FLAT_DELIVERY_CHARGE = 9.95;
+
+function getDeliveryCharge(subtotal: number) {
+  return subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : FLAT_DELIVERY_CHARGE;
+}
+
+function buildOrderNumber(id: number) {
+  return `GC-${String(id).padStart(6, '0')}`;
+}
+
 export const ordersRouter = router({
   create: protectedProcedure
     .input(
@@ -23,6 +34,8 @@ export const ordersRouter = router({
         items: z.array(z.object({ productId: z.number().int().positive(), qty: z.number().positive() })).min(1),
         paymentTerm: z.enum(PaymentTerm),
         paymentMethod: z.enum(PaymentMethod).default(PaymentMethod.IN_APP),
+        deliveryAddress: z.string().trim().min(5).max(500).optional(),
+        orderNotes: z.string().trim().max(1000).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -67,7 +80,8 @@ export const ordersRouter = router({
 
       const subtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
       const discountApplied = input.paymentTerm === PaymentTerm.PAY_NOW ? Number((subtotal * 0.1).toFixed(2)) : 0;
-      const total = Number((subtotal - discountApplied).toFixed(2));
+      const deliveryCharge = getDeliveryCharge(subtotal);
+      const total = Number((subtotal - discountApplied + deliveryCharge).toFixed(2));
       const dueDate = input.paymentTerm === PaymentTerm.PAY_30 ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null;
       const paymentStatus = input.paymentTerm === PaymentTerm.PAY_NOW ? PaymentStatus.PAID : PaymentStatus.OUTSTANDING;
       const paymentMethod = input.paymentTerm === PaymentTerm.PAY_NOW ? input.paymentMethod : PaymentMethod.IN_APP;
@@ -77,6 +91,10 @@ export const ordersRouter = router({
           customerId: customer.id,
           staffId: ctx.user.kind === 'staff' ? ctx.user.id : null,
           paymentTerm: input.paymentTerm,
+          subtotal,
+          deliveryCharge,
+          deliveryAddress: input.deliveryAddress,
+          orderNotes: input.orderNotes,
           discountApplied,
           total,
           dueDate,
@@ -101,14 +119,34 @@ export const ordersRouter = router({
         },
       });
 
+      const orderWithNumber = await ctx.prisma.order.update({
+        where: { id: order.id },
+        data: { orderNumber: buildOrderNumber(order.id) },
+      });
+
       return {
         id: order.id,
+        orderNumber: orderWithNumber.orderNumber,
         status: order.status,
         paymentStatus: normalizePaymentStatus(order.paymentStatus, order.dueDate),
+        subtotal: order.subtotal?.toNumber() ?? subtotal,
+        deliveryCharge: order.deliveryCharge.toNumber(),
+        deliveryAddress: order.deliveryAddress,
+        orderNotes: order.orderNotes,
         total: order.total.toNumber(),
         discountApplied: order.discountApplied.toNumber(),
         dueDate: order.dueDate,
         createdAt: order.createdAt,
+        items: order.orderItems.map((item) => ({
+          id: item.id,
+          qty: item.qty.toNumber(),
+          unitPrice: item.unitPrice.toNumber(),
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            unit: item.product.unit,
+          },
+        })),
       };
     }),
   list: protectedProcedure
@@ -143,10 +181,15 @@ export const ordersRouter = router({
       return orders
         .map((order) => ({
           id: order.id,
+          orderNumber: order.orderNumber ?? buildOrderNumber(order.id),
           status: order.status,
           paymentTerm: order.paymentTerm,
           paymentMethod: order.paymentMethod,
           paymentStatus: normalizePaymentStatus(order.paymentStatus, order.dueDate),
+          subtotal: order.subtotal?.toNumber() ?? null,
+          deliveryCharge: order.deliveryCharge.toNumber(),
+          deliveryAddress: order.deliveryAddress,
+          orderNotes: order.orderNotes,
           discountApplied: order.discountApplied.toNumber(),
           total: order.total.toNumber(),
           dueDate: order.dueDate,

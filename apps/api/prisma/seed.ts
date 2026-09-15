@@ -55,10 +55,9 @@ async function main() {
   });
 
   const products = [
-    { name: 'Halloumi Cheese — Single Block', unit: '250g block', wholesalePrice: '6.50', retailPrice: '9.99' },
-    { name: 'Halloumi Cheese — 2 Pack', unit: '2 x 250g blocks', wholesalePrice: '12.40', retailPrice: '18.99' },
-    { name: 'Halloumi Cheese — 5 Pack', unit: '5 x 250g blocks', wholesalePrice: '30.25', retailPrice: '46.99' },
-    { name: 'Halloumi Cheese — Wholesale Case', unit: '20 x 250g blocks', wholesalePrice: '114.00', retailPrice: '169.99' },
+    { name: 'Grassland Cheese Halloumi — 1kg', unit: '1kg block', wholesalePrice: '18.50', retailPrice: '27.99' },
+    { name: 'Grassland Cheese Halloumi — 500g', unit: '500g block', wholesalePrice: '10.50', retailPrice: '15.99' },
+    { name: 'Grassland Cheese Halloumi — 200g', unit: '200g block', wholesalePrice: '5.50', retailPrice: '8.49' },
   ];
 
   for (const product of products) {
@@ -129,7 +128,7 @@ async function main() {
     });
   }
 
-  const seededProduct = await prisma.product.findFirstOrThrow({ where: { name: 'Halloumi Cheese — Single Block' } });
+  const seededProduct = await prisma.product.findFirstOrThrow({ where: { name: 'Grassland Cheese Halloumi — 500g' } });
 
   await prisma.order.upsert({
     where: { id: 1 },

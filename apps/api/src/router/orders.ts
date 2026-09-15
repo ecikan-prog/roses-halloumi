@@ -1,6 +1,8 @@
 import { CustomerType, PaymentMethod, PaymentStatus, PaymentTerm } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { buildOrderConfirmationEmail } from '../lib/emailTemplates.js';
+import { sendMail } from '../lib/mailer.js';
 import { protectedProcedure, router, staffProcedure } from './trpc.js';
 
 function normalizePaymentStatus(status: PaymentStatus, dueDate: Date | null) {
@@ -123,6 +125,24 @@ export const ordersRouter = router({
         where: { id: order.id },
         data: { orderNumber: buildOrderNumber(order.id) },
       });
+
+      const confirmationEmail = buildOrderConfirmationEmail({
+        name: order.customer.name,
+        orderNumber: orderWithNumber.orderNumber ?? buildOrderNumber(order.id),
+        items: order.orderItems.map((item) => ({
+          qty: item.qty.toNumber(),
+          unitPrice: item.unitPrice.toNumber(),
+          productName: item.product.name,
+          unit: item.product.unit,
+        })),
+        subtotal: order.subtotal?.toNumber() ?? subtotal,
+        deliveryCharge: order.deliveryCharge.toNumber(),
+        discountApplied: order.discountApplied.toNumber(),
+        total: order.total.toNumber(),
+        deliveryAddress: order.deliveryAddress,
+        orderNotes: order.orderNotes,
+      });
+      void sendMail({ to: order.customer.email, ...confirmationEmail });
 
       return {
         id: order.id,

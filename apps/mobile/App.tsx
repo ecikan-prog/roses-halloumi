@@ -1870,20 +1870,26 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
     }
   }
 
+  const accountKind = mode === 'staff-login' ? 'staff-login' : 'customer';
+  const headingByMode: Record<AuthMode, string> = {
+    'customer-login': 'Customer Login',
+    'staff-login': 'Staff Login',
+    'customer-register': 'Create Customer Account',
+  };
+
   return (
     <View style={styles.authPanel}>
       <Text style={styles.authPanelTitle}>{brandName}</Text>
-      <Text style={styles.authPanelSubtitle}>Customer account access and registration for halloumi ordering.</Text>
       <SegmentedControl
-        groupLabel="Authentication mode"
-        value={mode}
+        groupLabel="Account type"
+        value={accountKind}
         options={[
-          { label: 'Customer', value: 'customer-login' },
+          { label: 'Customer', value: 'customer' },
           { label: 'Staff', value: 'staff-login' },
-          { label: 'Register', value: 'customer-register' },
         ]}
-        onChange={(value) => changeMode(value as AuthMode)}
+        onChange={(value) => changeMode(value === 'staff-login' ? 'staff-login' : 'customer-login')}
       />
+      <Text style={styles.authPanelSubtitle}>{headingByMode[mode]}</Text>
       {mode === 'customer-register' ? (
         <>
           <Field label="Full name" value={name} onChangeText={setName} />
@@ -1898,10 +1904,23 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
       {mode === 'customer-login' ? (
         <Text style={styles.metaText}>Forgot your password? Contact support to reset your account access.</Text>
       ) : null}
+      {mode === 'staff-login' ? (
+        <Text style={styles.metaText}>Staff accounts are created by an administrator.</Text>
+      ) : null}
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
       </Pressable>
+      {mode === 'customer-login' ? (
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-register')}>
+          <Text style={styles.secondaryButtonLabel}>Create customer account</Text>
+        </Pressable>
+      ) : null}
+      {mode === 'customer-register' ? (
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

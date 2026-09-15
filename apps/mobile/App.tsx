@@ -22,6 +22,7 @@ import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
+import AdminDashboardScreen from './src/admin/AdminDashboard';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
 const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg(1).jpg');
@@ -105,7 +106,7 @@ type ConfirmedOrder = {
   items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
 };
 
-type SessionState = {
+export type SessionState = {
   token: string | null;
   user: SessionUser | null;
 };
@@ -338,11 +339,15 @@ function AppContent({
     );
   }
 
-  return session.token && session.user ? (
-    <Dashboard session={session} onSignOut={handleSignOut} />
-  ) : (
-    <PublicWebsite currentPage={publicPage} onNavigate={setPublicPage} onAuthenticated={handleAuthenticated} />
-  );
+  if (session.token && session.user) {
+    if (session.user.kind === 'staff') {
+      return <AdminDashboardScreen session={session} onSignOut={handleSignOut} />;
+    }
+
+    return <Dashboard session={session} onSignOut={handleSignOut} />;
+  }
+
+  return <PublicWebsite currentPage={publicPage} onNavigate={setPublicPage} onAuthenticated={handleAuthenticated} />;
 }
 
 function PublicWebsite({

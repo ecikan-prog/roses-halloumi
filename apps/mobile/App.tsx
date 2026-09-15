@@ -91,7 +91,7 @@ type StaffUser = {
 };
 
 type SessionUser = CustomerUser | StaffUser;
-type AuthMode = 'customer-login' | 'staff-login' | 'customer-register';
+type AuthMode = 'customer-login' | 'admin-login' | 'customer-register';
 type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
 type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
 
@@ -487,7 +487,7 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     }
 
     if (user.kind === 'staff' && !effectiveCustomerId) {
-      Alert.alert('Choose customer', 'Select a customer before creating a staff order.');
+      Alert.alert('Choose customer', 'Select a customer before creating an admin order.');
       return;
     }
 
@@ -1756,7 +1756,7 @@ function SignedInAccountPage({
           <View style={styles.inlineCard}>
             <Text style={styles.inlineCardTitle}>Account details</Text>
             <Text style={styles.metaText}>{session.user?.email}</Text>
-            <Text style={styles.metaText}>{session.user?.kind === 'staff' ? `${session.user.role} team access` : `${session.user?.type} customer access`}</Text>
+            <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
             <View style={styles.heroActionRow}>
               <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
@@ -1870,20 +1870,27 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
     }
   }
 
+  if (mode === 'admin-login') {
+    return (
+      <View style={styles.authPanel}>
+        <Text style={styles.authPanelTitle}>Admin Login</Text>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Sign in'}</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.authPanel}>
-      <Text style={styles.authPanelTitle}>{brandName}</Text>
-      <Text style={styles.authPanelSubtitle}>Customer account access and registration for halloumi ordering.</Text>
-      <SegmentedControl
-        groupLabel="Authentication mode"
-        value={mode}
-        options={[
-          { label: 'Customer', value: 'customer-login' },
-          { label: 'Staff', value: 'staff-login' },
-          { label: 'Register', value: 'customer-register' },
-        ]}
-        onChange={(value) => changeMode(value as AuthMode)}
-      />
+      <Text style={styles.authPanelTitle}>Welcome to {brandName}</Text>
+      <Text style={styles.authPanelSubtitle}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
       {mode === 'customer-register' ? (
         <>
           <Field label="Full name" value={name} onChangeText={setName} />
@@ -1902,6 +1909,24 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
       <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
       </Pressable>
+      {mode === 'customer-login' ? (
+        <>
+          <Text style={styles.metaText}>Don&apos;t have an account?</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-register')}>
+            <Text style={styles.secondaryButtonLabel}>Create a customer account</Text>
+          </Pressable>
+        </>
+      ) : (
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      )}
+      <View style={styles.adminAccessSection}>
+        <Text style={styles.adminAccessLabel}>Admin Access</Text>
+        <Pressable onPress={() => changeMode('admin-login')}>
+          <Text style={styles.adminAccessLink}>Admin Login</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -1988,7 +2013,7 @@ function CustomersScreen() {
   }
 
   return (
-    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Staff can create and manage customer access without changing the halloumi product rules.">
+    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Admins can create and manage customer access without changing the halloumi product rules.">
       <View style={styles.inlineCard}>
         <Text style={styles.inlineCardTitle}>Create customer account</Text>
         <Field label="Name" value={name} onChangeText={setName} />
@@ -2761,6 +2786,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     color: '#4d5c54',
+  },
+  adminAccessSection: {
+    marginTop: 12,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#e7ddc9',
+    alignItems: 'center',
+    gap: 4,
+  },
+  adminAccessLabel: {
+    fontSize: 12,
+    color: '#8a8375',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminAccessLink: {
+    fontSize: 13,
+    color: '#4d5c54',
+    textDecorationLine: 'underline',
   },
   inlineTwoColumnRow: {
     flexDirection: 'row',

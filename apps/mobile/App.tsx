@@ -21,6 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
+import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
 const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg(1).jpg');
@@ -92,7 +93,17 @@ type StaffUser = {
 type SessionUser = CustomerUser | StaffUser;
 type AuthMode = 'customer-login' | 'staff-login' | 'customer-register';
 type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
-type SignedInPage = PublicPage | 'orders' | 'customers';
+type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
+
+type ConfirmedOrder = {
+  orderNumber: string;
+  subtotal: number;
+  deliveryCharge: number;
+  discountApplied: number;
+  total: number;
+  createdAt: Date | string;
+  items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
+};
 
 type SessionState = {
   token: string | null;
@@ -141,7 +152,7 @@ const paymentStatusOptions: Array<PaymentStatus | 'ALL'> = ['ALL', PaymentStatus
 const shopProductSpecs: ShopProductSpec[] = [
   {
     slug: '1kg',
-    name: '1 kg Halloumi',
+    name: 'Grassland Cheese Halloumi — 1kg',
     size: '1 kg',
     description: 'A generous halloumi format for bigger family meals, grilling trays, and sharing platters.',
     detail: 'Designed for customers who want a larger halloumi format ready for slicing, grilling, frying, and sharing.',
@@ -149,7 +160,7 @@ const shopProductSpecs: ShopProductSpec[] = [
   },
   {
     slug: '500g',
-    name: '500 g Halloumi',
+    name: 'Grassland Cheese Halloumi — 500g',
     size: '500 g',
     description: 'A versatile mid-size halloumi option for weeknight meals, salads, and pan-frying.',
     detail: 'A balanced everyday halloumi size that suits quick dinners, lunch plates, and smaller entertaining moments.',
@@ -157,7 +168,7 @@ const shopProductSpecs: ShopProductSpec[] = [
   },
   {
     slug: '200g',
-    name: '200 g Halloumi',
+    name: 'Grassland Cheese Halloumi — 200g',
     size: '200 g',
     description: 'A smaller halloumi size that is ideal for lighter meals, snacks, and trial purchases.',
     detail: 'A compact halloumi option for individual meals, smaller households, or customers trying the range for the first time.',
@@ -391,6 +402,10 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_NOW);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.IN_APP);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [lastOrder, setLastOrder] = useState<ConfirmedOrder | null>(null);
   const [selectedProductSlug, setSelectedProductSlug] = useState<ShopProductSpec['slug'] | null>(null);
   const isStaff = user.kind === 'staff';
   const effectiveCustomerId = user.kind === 'customer' ? user.id : selectedCustomerId;
@@ -415,14 +430,38 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   }, [isStaff, page]);
 
   useEffect(() => {
-    if (!isStaff && page === 'orders') {
-      setPage('account');
-    }
-  }, [isStaff, page]);
-
-  useEffect(() => {
     setQuantities({});
   }, [effectiveCustomerId]);
+
+  // Restore any cart saved before a refresh so the customer doesn't lose their selections.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist the cart whenever it changes so it survives navigation and page refreshes.
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
 
   const shopProducts = useMemo<ShopProductView[]>(() => {
     const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
@@ -437,7 +476,8 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
   const discount = paymentTerm === PaymentTerm.PAY_NOW ? subtotal * 0.1 : 0;
-  const total = subtotal - discount;
+  const deliveryCharge = subtotal > 0 && subtotal < 80 ? 9.95 : 0;
+  const total = subtotal - discount + deliveryCharge;
   const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
   async function submitOrder() {
@@ -451,17 +491,35 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       return;
     }
 
+    if (user.kind === 'customer' && deliveryAddress.trim().length < 5) {
+      Alert.alert('Delivery address required', 'Enter a delivery address of at least 5 characters before confirming the order.');
+      return;
+    }
+
     try {
-      await createOrder.mutateAsync({
+      const result = await createOrder.mutateAsync({
         customerId: user.kind === 'staff' ? effectiveCustomerId : undefined,
         paymentTerm,
         ...(paymentTerm === PaymentTerm.PAY_NOW ? { paymentMethod } : {}),
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
+        ...(deliveryAddress.trim() ? { deliveryAddress: deliveryAddress.trim() } : {}),
+        ...(orderNotes.trim() ? { orderNotes: orderNotes.trim() } : {}),
       });
       await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
       setQuantities({});
-      setPage('account');
-      Alert.alert('Order confirmed', paymentTerm === PaymentTerm.PAY_NOW ? 'Discount applied and payment marked as paid.' : 'Order saved with 30 day terms.');
+      await clearStoredCart();
+      setDeliveryAddress('');
+      setOrderNotes('');
+      setLastOrder({
+        orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
+        subtotal: result.subtotal ?? subtotal,
+        deliveryCharge: result.deliveryCharge ?? deliveryCharge,
+        discountApplied: result.discountApplied,
+        total: result.total,
+        createdAt: result.createdAt,
+        items: result.items ?? selectedItems.map((item) => ({ id: item.id, qty: item.qty, unitPrice: item.effectivePrice, product: { id: item.id, name: item.name, unit: item.unit } })),
+      });
+      setPage('order-confirmation');
     } catch (error) {
       Alert.alert('Order failed', getErrorMessage(error));
     }
@@ -512,8 +570,15 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           selectedItems={selectedItems}
+          quantities={quantities}
+          setQuantities={setQuantities}
+          deliveryAddress={deliveryAddress}
+          setDeliveryAddress={setDeliveryAddress}
+          orderNotes={orderNotes}
+          setOrderNotes={setOrderNotes}
           subtotal={subtotal}
           discount={discount}
+          deliveryCharge={deliveryCharge}
           total={total}
           onNavigate={setPage}
           onSubmitOrder={submitOrder}
@@ -521,11 +586,19 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         />
       );
       break;
+    case 'order-confirmation':
+      content = <OrderConfirmationPage order={lastOrder} onNavigate={setPage} />;
+      break;
     case 'account':
       content = <SignedInAccountPage session={session} onNavigate={setPage} onSignOut={onSignOut} />;
       break;
     case 'orders':
-      content = <OrdersPage title="Order history" description="Review customer orders and payment status." />;
+      content = (
+        <OrdersPage
+          title={isStaff ? 'Order history' : 'My orders'}
+          description={isStaff ? 'Review customer orders and payment status.' : 'Review your Halloumi order history, current orders, and status.'}
+        />
+      );
       break;
     case 'customers':
       content = <CustomersScreen />;
@@ -615,6 +688,7 @@ function SiteHeader({
     { label: 'Our Story', page: 'about' },
     { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
     { label: session ? 'Customer Account' : 'Login', page: 'account' },
+    ...(session && !isStaff ? [{ label: 'My Orders', page: 'orders' as const }] : []),
     ...(isStaff ? [{ label: 'Orders', page: 'orders' as const }, { label: 'Customers', page: 'customers' as const }] : []),
   ];
 
@@ -1094,8 +1168,15 @@ function CartPage({
   paymentMethod,
   setPaymentMethod,
   selectedItems,
+  quantities,
+  setQuantities,
+  deliveryAddress,
+  setDeliveryAddress,
+  orderNotes,
+  setOrderNotes,
   subtotal,
   discount,
+  deliveryCharge,
   total,
   onNavigate,
   onSubmitOrder,
@@ -1107,13 +1188,35 @@ function CartPage({
   paymentMethod: PaymentMethod;
   setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
   selectedItems: Array<ProductRecord & { qty: number }>;
+  quantities: Record<number, number>;
+  setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
+  deliveryAddress: string;
+  setDeliveryAddress: Dispatch<SetStateAction<string>>;
+  orderNotes: string;
+  setOrderNotes: Dispatch<SetStateAction<string>>;
   subtotal: number;
   discount: number;
+  deliveryCharge: number;
   total: number;
   onNavigate: (page: SignedInPage) => void;
   onSubmitOrder: () => Promise<void>;
   isSubmitting: boolean;
 }) {
+  const isCustomer = session.user?.kind === 'customer';
+  const deliveryAddressValid = !isCustomer || deliveryAddress.trim().length >= 5;
+
+  function changeQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  function removeItem(productId: number) {
+    setQuantities((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+  }
+
   return (
     <SectionShell eyebrow="Cart & Checkout" title="Review your Halloumi order" description="Your cart and checkout stay connected to the existing ordering flow.">
       <View style={styles.inlineTwoColumnRow}>
@@ -1126,6 +1229,18 @@ function CartPage({
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cartLineTitle}>{item.name}</Text>
                     <Text style={styles.metaText}>{item.qty} × ${item.effectivePrice.toFixed(2)}</Text>
+                    <View style={styles.quantityRow}>
+                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty - 1)}>
+                        <Text style={styles.quantityLabel}>-</Text>
+                      </Pressable>
+                      <Text style={styles.quantityValue}>{item.qty}</Text>
+                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty + 1)}>
+                        <Text style={styles.quantityLabel}>+</Text>
+                      </Pressable>
+                      <Pressable style={styles.secondaryButton} onPress={() => removeItem(item.id)}>
+                        <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                      </Pressable>
+                    </View>
                   </View>
                   <Text style={styles.cartLineTotal}>${(item.qty * item.effectivePrice).toFixed(2)}</Text>
                 </View>
@@ -1142,6 +1257,15 @@ function CartPage({
           <View style={styles.inlineCard}>
             <Text style={styles.inlineCardTitle}>Checkout</Text>
             <Text style={styles.metaText}>Ordering as {session.user?.name}</Text>
+            <Text style={styles.metaText}>{session.user?.email}</Text>
+            {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
+            {isCustomer ? (
+              <>
+                <Field label="Delivery address" value={deliveryAddress} onChangeText={setDeliveryAddress} />
+                <Field label="Order notes (optional)" value={orderNotes} onChangeText={setOrderNotes} />
+                {!deliveryAddressValid ? <Text style={styles.errorText}>Enter a delivery address to continue.</Text> : null}
+              </>
+            ) : null}
             <SegmentedControl
               groupLabel="Checkout payment term"
               value={paymentTerm}
@@ -1164,11 +1288,52 @@ function CartPage({
             ) : null}
             <Text style={styles.summaryLine}>Subtotal: ${subtotal.toFixed(2)}</Text>
             <Text style={styles.summaryLine}>Discount: -${discount.toFixed(2)}</Text>
+            <Text style={styles.summaryLine}>Delivery: {deliveryCharge > 0 ? `$${deliveryCharge.toFixed(2)}` : 'Free'}</Text>
             <Text style={styles.summaryTotal}>Total: ${total.toFixed(2)}</Text>
-            <Pressable disabled={!selectedItems.length || isSubmitting} style={[styles.primaryButton, (!selectedItems.length || isSubmitting) && styles.disabledPrimaryButton]} onPress={() => void onSubmitOrder()}>
+            <Pressable
+              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid}
+              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid) && styles.disabledPrimaryButton]}
+              onPress={() => void onSubmitOrder()}
+            >
               <Text style={styles.primaryButtonLabel}>{isSubmitting ? 'Processing…' : 'Confirm order'}</Text>
             </Pressable>
           </View>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | null; onNavigate: (page: SignedInPage) => void }) {
+  if (!order) {
+    return (
+      <SectionShell eyebrow="Order Confirmation" title="No recent order found" description="Place an order from the shop to see your confirmation here.">
+        <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
+          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+        </Pressable>
+      </SectionShell>
+    );
+  }
+
+  return (
+    <SectionShell eyebrow="Order Confirmation" title="Thank you for your order!" description={`Order ${order.orderNumber} has been received and confirmed.`}>
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Order {order.orderNumber}</Text>
+        <Text style={styles.metaText}>Placed {new Date(order.createdAt).toLocaleString()}</Text>
+        {order.items.map((item) => (
+          <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ ${item.unitPrice.toFixed(2)}</Text>
+        ))}
+        <Text style={styles.summaryLine}>Subtotal: ${order.subtotal.toFixed(2)}</Text>
+        <Text style={styles.summaryLine}>Discount: -${order.discountApplied.toFixed(2)}</Text>
+        <Text style={styles.summaryLine}>Delivery: {order.deliveryCharge > 0 ? `$${order.deliveryCharge.toFixed(2)}` : 'Free'}</Text>
+        <Text style={styles.summaryTotal}>Total: ${order.total.toFixed(2)}</Text>
+        <View style={styles.heroActionRow}>
+          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+            <Text style={styles.primaryButtonLabel}>View Order History</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+            <Text style={styles.secondaryButtonLabel}>Continue Shopping</Text>
+          </Pressable>
         </View>
       </View>
     </SectionShell>
@@ -1609,12 +1774,15 @@ function SignedInAccountPage({
             {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
             {(ordersQuery.data ?? []).slice(0, 3).map((order) => (
               <View key={order.id} style={styles.accountOrderRow}>
-                <Text style={styles.cartLineTitle}>Order #{order.id}</Text>
-                <Text style={styles.metaText}>{order.paymentStatus} • ${order.total.toFixed(2)}</Text>
+                <Text style={styles.cartLineTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+                <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • ${order.total.toFixed(2)}</Text>
               </View>
             ))}
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate(session.user?.kind === 'staff' ? 'orders' : 'cart')}>
-              <Text style={styles.secondaryButtonLabel}>{session.user?.kind === 'staff' ? 'View All Orders' : 'Open Cart & Checkout'}</Text>
+            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('orders')}>
+              <Text style={styles.secondaryButtonLabel}>View All Orders</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('cart')}>
+              <Text style={styles.secondaryButtonLabel}>Open Cart & Checkout</Text>
             </Pressable>
           </View>
         </View>
@@ -1623,12 +1791,16 @@ function SignedInAccountPage({
   );
 }
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
   const [mode, setMode] = useState<AuthMode>('customer-login');
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const customerLogin = trpc.auth.customerLogin.useMutation();
   const staffLogin = trpc.auth.staffLogin.useMutation();
@@ -1636,25 +1808,65 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   const loading = customerLogin.isPending || staffLogin.isPending || customerRegister.isPending;
 
+  function changeMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setFormError(null);
+  }
+
+  function validate(): string | null {
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters.';
+    }
+
+    if (mode === 'customer-register') {
+      if (name.trim().length < 2) {
+        return 'Enter your full name.';
+      }
+
+      if (contact.trim().length < 6) {
+        return 'Enter a valid mobile number.';
+      }
+
+      if (confirmPassword !== password) {
+        return 'Passwords do not match.';
+      }
+    }
+
+    return null;
+  }
+
   async function submit() {
+    const validationError = validate();
+
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError(null);
+
     try {
       if (mode === 'customer-register') {
         const result = await customerRegister.mutateAsync({
-          name,
-          contact: contact.trim() || undefined,
-          email,
+          name: name.trim(),
+          contact: contact.trim(),
+          email: email.trim(),
           password,
         });
         await onAuthenticated(result.token, result.user as SessionUser);
       } else if (mode === 'customer-login') {
-        const result = await customerLogin.mutateAsync({ email, password });
+        const result = await customerLogin.mutateAsync({ email: email.trim(), password });
         await onAuthenticated(result.token, result.user as SessionUser);
       } else {
-        const result = await staffLogin.mutateAsync({ email, password });
+        const result = await staffLogin.mutateAsync({ email: email.trim(), password });
         await onAuthenticated(result.token, result.user as SessionUser);
       }
     } catch (error) {
-      Alert.alert('Authentication failed', getErrorMessage(error));
+      setFormError(getErrorMessage(error));
     }
   }
 
@@ -1670,16 +1882,23 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
           { label: 'Staff', value: 'staff-login' },
           { label: 'Register', value: 'customer-register' },
         ]}
-        onChange={(value) => setMode(value as AuthMode)}
+        onChange={(value) => changeMode(value as AuthMode)}
       />
       {mode === 'customer-register' ? (
         <>
-          <Field label="Business / account name" value={name} onChangeText={setName} />
-          <Field label="Contact" value={contact} onChangeText={setContact} />
+          <Field label="Full name" value={name} onChangeText={setName} />
+          <Field label="Mobile number" value={contact} onChangeText={setContact} keyboardType="default" />
         </>
       ) : null}
       <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      {mode === 'customer-register' ? (
+        <Field label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+      ) : null}
+      {mode === 'customer-login' ? (
+        <Text style={styles.metaText}>Forgot your password? Contact support to reset your account access.</Text>
+      ) : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
       </Pressable>
@@ -1705,11 +1924,14 @@ function OrdersPage({ title, description }: { title: string; description: string
       {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
       {(ordersQuery.data ?? []).map((order) => (
         <View key={order.id} style={styles.inlineCard}>
-          <Text style={styles.inlineCardTitle}>Order #{order.id}</Text>
+          <Text style={styles.inlineCardTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+          <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleString()} • Status: {order.status}</Text>
           <Text style={styles.metaText}>{order.customer.name} • {order.paymentStatus} • ${order.total.toFixed(2)}</Text>
           <Text style={styles.metaText}>{order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now' : 'Pay in 30'} • {order.paymentMethod}</Text>
           {order.staff ? <Text style={styles.metaText}>Created by {order.staff.name}</Text> : null}
           {order.dueDate ? <Text style={styles.metaText}>Due {new Date(order.dueDate).toLocaleDateString()}</Text> : null}
+          {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to: {order.deliveryAddress}</Text> : null}
+          {order.orderNotes ? <Text style={styles.metaText}>Notes: {order.orderNotes}</Text> : null}
           {order.items.map((item) => (
             <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ ${item.unitPrice.toFixed(2)}</Text>
           ))}
@@ -2566,6 +2788,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     color: '#4d5c54',
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#b3261e',
+    fontWeight: '600',
   },
   segmentedControl: {
     flexDirection: 'row',

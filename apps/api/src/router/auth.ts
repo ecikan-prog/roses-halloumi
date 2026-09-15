@@ -2,6 +2,8 @@ import { AccountSource, CustomerType } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { hashPassword, signToken, verifyPassword } from '../lib/auth.js';
+import { buildWelcomeEmail } from '../lib/emailTemplates.js';
+import { sendMail } from '../lib/mailer.js';
 import { protectedProcedure, publicProcedure, router } from './trpc.js';
 
 const credentialsSchema = z.object({
@@ -16,7 +18,7 @@ export const authRouter = router({
         name: z.string().min(2),
         email: z.string().email(),
         password: z.string().min(8),
-        contact: z.string().trim().min(2).optional(),
+        contact: z.string().trim().min(6),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -46,6 +48,9 @@ export const authRouter = router({
         type: customer.type,
         contact: customer.contact,
       });
+
+      const welcomeEmail = buildWelcomeEmail({ name: customer.name });
+      void sendMail({ to: customer.email, ...welcomeEmail });
 
       return {
         token,

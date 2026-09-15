@@ -81,10 +81,15 @@ model Recipe {
 
 model Order {
   id               Int            @id @default(autoincrement())
+  orderNumber      String?        @unique
   customerId       Int
   staffId          Int?
   status           OrderStatus    @default(CONFIRMED)
   paymentTerm      PaymentTerm
+  subtotal         Decimal?       @db.Decimal(10, 2)
+  deliveryCharge   Decimal        @default(0) @db.Decimal(10, 2)
+  deliveryAddress  String?
+  orderNotes       String?
   discountApplied  Decimal        @db.Decimal(10, 2)
   total            Decimal        @db.Decimal(10, 2)
   dueDate          DateTime?

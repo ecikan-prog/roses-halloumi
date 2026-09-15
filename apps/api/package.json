@@ -11,7 +11,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
-    "update-admin-email": "tsx scripts/update-admin-email.ts"
+    "update-admin-email": "tsx scripts/update-admin-email.ts",
+    "reset-admin-password": "tsx scripts/reset-admin-password.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

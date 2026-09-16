@@ -979,16 +979,19 @@ function PublicShopSection({
   adjustQuantity,
 }: {
   onNavigate: (page: any) => void;
-  shopProducts?: ShopProductView[];
+  shopProducts?: ShopProductView[] | null;
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
   // Defensive default: shopProducts should always be an array by the time it reaches this
   // component (it is derived from a fixed list of product specs, never directly from the
-  // API response), but a missing prop here previously crashed the whole app with
+  // API response), but a missing/null prop here previously crashed the whole app with
   // "shopProducts.map is not a function". Never let a data-flow regression upstream take
-  // down the homepage (and, transitively, customer login) again.
-  if (shopProducts.length === 0) {
+  // down the homepage (and, transitively, customer login) again. The `= []` default only
+  // covers `undefined`, so `?? []` below also guards against an explicit `null`.
+  const safeShopProducts = shopProducts ?? [];
+
+  if (safeShopProducts.length === 0) {
     return (
       <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
         <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
@@ -999,7 +1002,7 @@ function PublicShopSection({
   return (
     <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
       <View style={styles.productGrid}>
-        {shopProducts.map((product) => {
+        {safeShopProducts.map((product) => {
           const backendProduct = product.product;
           const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
           return (
@@ -1034,17 +1037,23 @@ function PublicShopPage({
   adjustQuantity,
 }: {
   onNavigate: (page: any) => void;
-  shopProducts?: ShopProductView[];
+  shopProducts?: ShopProductView[] | null;
   isLoading: boolean;
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
+  const safeShopProducts = shopProducts ?? [];
+
   return (
     <>
       <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Add halloumi to your cart now, then sign in or create an account to complete checkout.">
         {isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
+        {!isLoading && safeShopProducts.length === 0 ? (
+          <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+        ) : null}
         <View style={styles.productGrid}>
-          {shopProducts.map((product) => {
+          {safeShopProducts.map((product) => {
             const backendProduct = product.product;
             const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (
@@ -1107,12 +1116,14 @@ function ShopPage({
   setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
   quantities: Record<number, number>;
   setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
-  shopProducts?: ShopProductView[];
+  shopProducts?: ShopProductView[] | null;
   selectedProductSlug: ShopProductSpec['slug'] | null;
   setSelectedProductSlug: Dispatch<SetStateAction<ShopProductSpec['slug'] | null>>;
   onNavigate: (page: SignedInPage) => void;
 }) {
-  const featuredProduct = shopProducts.find((product) => product.slug === selectedProductSlug) ?? null;
+  // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
+  const safeShopProducts = shopProducts ?? [];
+  const featuredProduct = safeShopProducts.find((product) => product.slug === selectedProductSlug) ?? null;
   const customers = (customerQuery.data ?? []) as Array<{ id: number; name: string; type: 'WHOLESALE' | 'RETAIL' }>;
 
   function adjustQuantity(productId: number, nextQuantity: number) {
@@ -1208,8 +1219,11 @@ function ShopPage({
         ) : null}
 
         {productsQuery.isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
+        {!productsQuery.isLoading && safeShopProducts.length === 0 ? (
+          <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+        ) : null}
         <View style={styles.productGrid}>
-          {shopProducts.map((product) => {
+          {safeShopProducts.map((product) => {
             const backendProduct = product.product;
             const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (

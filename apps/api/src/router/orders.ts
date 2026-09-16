@@ -3,7 +3,8 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { buildOrderConfirmationEmail } from '../lib/emailTemplates.js';
 import { sendMail } from '../lib/mailer.js';
-import { calculateShipping, DEPOT_ADDRESS, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
+import { DEPOT_ADDRESS, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
+import { getShippingProvider } from '../lib/shippingProvider.js';
 import { getProductWeightKg } from '../lib/productWeights.js';
 import { protectedProcedure, router, staffProcedure } from './trpc.js';
 
@@ -139,7 +140,9 @@ export const ordersRouter = router({
             postcode: input.deliveryAddress.postcode,
           }
         : null;
-      const shipping = destination ? calculateShipping({ origin: DEPOT_ADDRESS, destination, totalWeight: totalProductWeight }, subtotal) : null;
+      const shipping = destination
+        ? await getShippingProvider().getQuote({ origin: DEPOT_ADDRESS, destination, totalWeight: totalProductWeight }, subtotal)
+        : null;
       const deliveryCharge = shipping?.amount ?? 0;
       const total = Number((subtotal - discountApplied + deliveryCharge).toFixed(2));
       // At this point PAY_NOW has already been rejected above, so paymentTerm

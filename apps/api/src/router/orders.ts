@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { buildOrderConfirmationEmail } from '../lib/emailTemplates.js';
 import { sendMail } from '../lib/mailer.js';
-import { calculateShipping, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
+import { calculateShipping, DEPOT_ADDRESS, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
 import { getProductWeightKg } from '../lib/productWeights.js';
 import { protectedProcedure, router, staffProcedure } from './trpc.js';
 
@@ -78,6 +78,8 @@ export const ordersRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Customer not found.' });
       }
 
+      const resolvedCustomerId: number = customer.id;
+
       if (ctx.user.kind === 'customer' && !input.deliveryAddress) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'A delivery address is required before shipping can be calculated.' });
       }
@@ -137,7 +139,7 @@ export const ordersRouter = router({
             postcode: input.deliveryAddress.postcode,
           }
         : null;
-      const shipping = destination ? calculateShipping({ destination, totalProductWeight }, subtotal) : null;
+      const shipping = destination ? calculateShipping({ origin: DEPOT_ADDRESS, destination, totalWeight: totalProductWeight }, subtotal) : null;
       const deliveryCharge = shipping?.amount ?? 0;
       const total = Number((subtotal - discountApplied + deliveryCharge).toFixed(2));
       // At this point PAY_NOW has already been rejected above, so paymentTerm
@@ -148,43 +150,75 @@ export const ordersRouter = router({
       const paymentStatus = PaymentStatus.OUTSTANDING;
       const paymentMethod = PaymentMethod.IN_APP;
 
-      const order = await ctx.prisma.order.create({
-        data: {
-          customerId: customer.id,
-          staffId: ctx.user.kind === 'staff' ? ctx.user.id : null,
-          paymentTerm: input.paymentTerm,
-          subtotal,
-          deliveryCharge,
-          deliveryAddress: input.deliveryAddress ? formatDeliveryAddress(input.deliveryAddress) : undefined,
-          orderNotes: input.orderNotes,
-          discountApplied,
-          total,
-          dueDate,
-          paymentStatus,
-          paymentMethod,
-          orderItems: {
-            create: orderItems.map((item) => ({
-              productId: item.productId,
-              qty: item.qty,
-              unitPrice: item.unitPrice,
-            })),
-          },
-        },
-        include: {
-          customer: true,
-          orderItems: {
-            include: {
-              product: true,
+      // The insert and the orderNumber assignment must succeed or fail
+      // together: if we numbered the order in a separate call after the
+      // create, a failure there (e.g. a database missing the orderNumber
+      // column/index) would leave a half-created, un-numbered order sitting
+      // in the database while the customer sees a failed "Confirm order".
+      // Wrapping both in one transaction guarantees the order is only ever
+      // persisted once it is fully created and numbered.
+      async function createNumberedOrder() {
+        return ctx.prisma.$transaction(async (tx) => {
+          const createdOrder = await tx.order.create({
+            data: {
+              customerId: resolvedCustomerId,
+              staffId: ctx.user.kind === 'staff' ? ctx.user.id : null,
+              paymentTerm: input.paymentTerm,
+              subtotal,
+              deliveryCharge,
+              deliveryAddress: input.deliveryAddress ? formatDeliveryAddress(input.deliveryAddress) : undefined,
+              orderNotes: input.orderNotes,
+              discountApplied,
+              total,
+              dueDate,
+              paymentStatus,
+              paymentMethod,
+              orderItems: {
+                create: orderItems.map((item) => ({
+                  productId: item.productId,
+                  qty: item.qty,
+                  unitPrice: item.unitPrice,
+                })),
+              },
             },
-          },
-          staff: true,
-        },
-      });
+            include: {
+              customer: true,
+              orderItems: {
+                include: {
+                  product: true,
+                },
+              },
+              staff: true,
+            },
+          });
 
-      const orderWithNumber = await ctx.prisma.order.update({
-        where: { id: order.id },
-        data: { orderNumber: buildOrderNumber(order.id) },
-      });
+          const numberedOrder = await tx.order.update({
+            where: { id: createdOrder.id },
+            data: { orderNumber: buildOrderNumber(createdOrder.id) },
+          });
+
+          return { createdOrder, numberedOrder };
+        });
+      }
+
+      let created: Awaited<ReturnType<typeof createNumberedOrder>>;
+
+      try {
+        created = await createNumberedOrder();
+      } catch (error) {
+        // Surface a real, useful message instead of letting the customer
+        // see nothing happen. The order is guaranteed NOT to exist in the
+        // database if we reach this catch block (the transaction above
+        // rolled back), so we must not send a confirmation email either.
+        console.error('[orders.create] Failed to create order:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'We could not place your order because of a server error. Please try again, or contact us if this keeps happening.',
+          cause: error,
+        });
+      }
+
+      const { createdOrder: order, numberedOrder: orderWithNumber } = created;
 
       // Pay in 30 confirmation email is only ever sent after the order row
       // above has been successfully created and numbered — if order creation

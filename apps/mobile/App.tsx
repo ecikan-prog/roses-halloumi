@@ -103,6 +103,8 @@ type ConfirmedOrder = {
   discountApplied: number;
   total: number;
   createdAt: Date | string;
+  deliveryAddress?: string | null;
+  isTemporaryShippingRate?: boolean;
   items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
 };
 
@@ -134,6 +136,49 @@ type ShopProductSpec = {
 type ShopProductView = ShopProductSpec & {
   product?: ProductRecord;
 };
+
+// Mirrors apps/api/src/lib/productWeights.ts so the checkout can preview a
+// shipping estimate before the order is submitted (the API always
+// recalculates shipping itself from the same weights when the order is
+// created — this is only used for the live on-screen estimate).
+const PRODUCT_WEIGHT_KG_BY_SLUG: Record<ShopProductSpec['slug'], number> = {
+  '1kg': 1.0,
+  '500g': 0.5,
+  '200g': 0.2,
+};
+
+function getProductWeightKg(product: ProductRecord): number {
+  const spec = shopProductSpecs.find((candidate) => candidate.name.toLowerCase() === product.name.trim().toLowerCase());
+  return spec ? PRODUCT_WEIGHT_KG_BY_SLUG[spec.slug] : 0;
+}
+
+type DeliveryAddressForm = {
+  name: string;
+  addressLine: string;
+  suburb: string;
+  region: string;
+  postcode: string;
+  country: string;
+};
+
+const emptyDeliveryAddress: DeliveryAddressForm = {
+  name: '',
+  addressLine: '',
+  suburb: '',
+  region: '',
+  postcode: '',
+  country: '',
+};
+
+function isDeliveryAddressComplete(address: DeliveryAddressForm) {
+  return (
+    address.name.trim().length >= 2 &&
+    address.addressLine.trim().length >= 3 &&
+    address.suburb.trim().length >= 1 &&
+    address.postcode.trim().length >= 1 &&
+    address.country.trim().length >= 2
+  );
+}
 
 type RecipeFeature = {
   title: string;
@@ -497,11 +542,11 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const user = session.user as SessionUser;
   const [page, setPage] = useState<SignedInPage>('home');
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>(user.kind === 'customer' ? user.id : undefined);
-  const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_NOW);
+  const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_30);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.IN_APP);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [cartHydrated, setCartHydrated] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressForm>(emptyDeliveryAddress);
   const [orderNotes, setOrderNotes] = useState('');
   const [lastOrder, setLastOrder] = useState<ConfirmedOrder | null>(null);
   const [selectedProductSlug, setSelectedProductSlug] = useState<ShopProductSpec['slug'] | null>(null);
@@ -573,8 +618,25 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
     .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
-  const discount = paymentTerm === PaymentTerm.PAY_NOW ? subtotal * 0.1 : 0;
-  const deliveryCharge = subtotal > 0 && subtotal < 80 ? 9.95 : 0;
+  // Pay Now would previously apply a 10% discount, but Pay Now cannot be
+  // completed yet (no payment gateway is connected), so no discount is
+  // currently offered at checkout.
+  const discount = 0;
+  const totalWeightKg = selectedItems.reduce((sum, item) => sum + getProductWeightKg(item) * item.qty, 0);
+  const deliveryAddressReady = isDeliveryAddressComplete(deliveryAddress);
+  const shippingEstimateQuery = trpc.shipping.estimate.useQuery(
+    {
+      items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
+      destination: {
+        country: deliveryAddress.country.trim(),
+        region: deliveryAddress.region.trim() || undefined,
+        city: deliveryAddress.suburb.trim() || undefined,
+        postcode: deliveryAddress.postcode.trim() || undefined,
+      },
+    },
+    { enabled: selectedItems.length > 0 && deliveryAddressReady },
+  );
+  const deliveryCharge = deliveryAddressReady ? shippingEstimateQuery.data?.amount ?? 0 : 0;
   const total = subtotal - discount + deliveryCharge;
   const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
@@ -593,8 +655,16 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       return;
     }
 
-    if (user.kind === 'customer' && deliveryAddress.trim().length < 5) {
-      Alert.alert('Delivery address required', 'Enter a delivery address of at least 5 characters before confirming the order.');
+    if (paymentTerm === PaymentTerm.PAY_NOW) {
+      Alert.alert(
+        'Pay now is not available yet',
+        'Online card payment is coming soon. Please select "Pay in 30" to place your order today without paying online.',
+      );
+      return;
+    }
+
+    if (user.kind === 'customer' && !deliveryAddressReady) {
+      Alert.alert('Delivery address required', 'Enter your name, address, suburb/town/city, postcode and country before confirming the order.');
       return;
     }
 
@@ -602,15 +672,25 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       const result = await createOrder.mutateAsync({
         customerId: user.kind === 'staff' ? effectiveCustomerId : undefined,
         paymentTerm,
-        ...(paymentTerm === PaymentTerm.PAY_NOW ? { paymentMethod } : {}),
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
-        ...(deliveryAddress.trim() ? { deliveryAddress: deliveryAddress.trim() } : {}),
+        ...(deliveryAddressReady
+          ? {
+              deliveryAddress: {
+                name: deliveryAddress.name.trim(),
+                addressLine: deliveryAddress.addressLine.trim(),
+                suburb: deliveryAddress.suburb.trim(),
+                region: deliveryAddress.region.trim() || undefined,
+                postcode: deliveryAddress.postcode.trim(),
+                country: deliveryAddress.country.trim(),
+              },
+            }
+          : {}),
         ...(orderNotes.trim() ? { orderNotes: orderNotes.trim() } : {}),
       });
       await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
       setQuantities({});
       await clearStoredCart();
-      setDeliveryAddress('');
+      setDeliveryAddress(emptyDeliveryAddress);
       setOrderNotes('');
       setLastOrder({
         orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
@@ -619,6 +699,8 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         discountApplied: result.discountApplied,
         total: result.total,
         createdAt: result.createdAt,
+        deliveryAddress: result.deliveryAddress,
+        isTemporaryShippingRate: result.isTemporaryShippingRate,
         items: result.items ?? selectedItems.map((item) => ({ id: item.id, qty: item.qty, unitPrice: item.effectivePrice, product: { id: item.id, name: item.name, unit: item.unit } })),
       });
       setPage('order-confirmation');
@@ -682,6 +764,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
           discount={discount}
           deliveryCharge={deliveryCharge}
           total={total}
+          totalWeightKg={totalWeightKg}
+          deliveryAddressReady={deliveryAddressReady}
+          shippingEstimateQuery={shippingEstimateQuery}
           onNavigate={setPage}
           onSubmitOrder={submitOrder}
           isSubmitting={createOrder.isPending}
@@ -1168,24 +1253,12 @@ function ShopPage({
                 groupLabel="Payment term"
                 value={paymentTerm}
                 options={[
-                  { label: 'Pay now (-10%)', value: PaymentTerm.PAY_NOW },
+                  { label: 'Pay now (coming soon)', value: PaymentTerm.PAY_NOW, disabled: true },
                   { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
                 ]}
                 onChange={(value) => setPaymentTerm(value as PaymentTerm)}
               />
-              {paymentTerm === PaymentTerm.PAY_NOW ? (
-                <SegmentedControl
-                  groupLabel="Payment method"
-                  value={paymentMethod}
-                  options={[
-                    { label: 'In-app placeholder', value: PaymentMethod.IN_APP },
-                    { label: 'Mark EFTPOS paid', value: PaymentMethod.EFTPOS },
-                  ]}
-                  onChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                />
-              ) : (
-                <Text style={styles.metaText}>Due date will be set to 30 days from confirmation.</Text>
-              )}
+              <Text style={styles.metaText}>Online card payment (Pay now) is not connected yet, so it can&apos;t be selected. Choose Pay in 30 to confirm your order today — due date will be set to 30 days from confirmation.</Text>
             </View>
           </View>
           <View style={styles.inlineCardColumn}>
@@ -1372,8 +1445,6 @@ function CartPage({
   session,
   paymentTerm,
   setPaymentTerm,
-  paymentMethod,
-  setPaymentMethod,
   selectedItems,
   quantities,
   setQuantities,
@@ -1385,6 +1456,9 @@ function CartPage({
   discount,
   deliveryCharge,
   total,
+  totalWeightKg,
+  deliveryAddressReady,
+  shippingEstimateQuery,
   onNavigate,
   onSubmitOrder,
   isSubmitting,
@@ -1392,25 +1466,29 @@ function CartPage({
   session: SessionState;
   paymentTerm: PaymentTerm;
   setPaymentTerm: Dispatch<SetStateAction<PaymentTerm>>;
-  paymentMethod: PaymentMethod;
-  setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
+  paymentMethod?: PaymentMethod;
+  setPaymentMethod?: Dispatch<SetStateAction<PaymentMethod>>;
   selectedItems: Array<ProductRecord & { qty: number }>;
   quantities: Record<number, number>;
   setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
-  deliveryAddress: string;
-  setDeliveryAddress: Dispatch<SetStateAction<string>>;
+  deliveryAddress: DeliveryAddressForm;
+  setDeliveryAddress: Dispatch<SetStateAction<DeliveryAddressForm>>;
   orderNotes: string;
   setOrderNotes: Dispatch<SetStateAction<string>>;
   subtotal: number;
   discount: number;
   deliveryCharge: number;
   total: number;
+  totalWeightKg: number;
+  deliveryAddressReady: boolean;
+  shippingEstimateQuery: { data?: { amount: number; isTemporaryRate: boolean } | null; isLoading: boolean };
   onNavigate: (page: SignedInPage) => void;
   onSubmitOrder: () => Promise<void>;
   isSubmitting: boolean;
 }) {
   const isCustomer = session.user?.kind === 'customer';
-  const deliveryAddressValid = !isCustomer || deliveryAddress.trim().length >= 5;
+  const deliveryAddressValid = !isCustomer || deliveryAddressReady;
+  const isPayNow = paymentTerm === PaymentTerm.PAY_NOW;
 
   function changeQuantity(productId: number, nextQuantity: number) {
     setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
@@ -1422,6 +1500,10 @@ function CartPage({
       delete next[productId];
       return next;
     });
+  }
+
+  function updateAddressField(field: keyof DeliveryAddressForm) {
+    return (value: string) => setDeliveryAddress((current) => ({ ...current, [field]: value }));
   }
 
   return (
@@ -1455,6 +1537,7 @@ function CartPage({
             ) : (
               <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
             )}
+            {selectedItems.length ? <Text style={styles.metaText}>Total product weight: {totalWeightKg.toFixed(3)} kg</Text> : null}
             <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
             </Pressable>
@@ -1468,38 +1551,45 @@ function CartPage({
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
             {isCustomer ? (
               <>
-                <Field label="Delivery address" value={deliveryAddress} onChangeText={setDeliveryAddress} />
+                <Text style={styles.inlineCardTitle}>Delivery address</Text>
+                <Field label="Full name" value={deliveryAddress.name} onChangeText={updateAddressField('name')} />
+                <Field label="Address" value={deliveryAddress.addressLine} onChangeText={updateAddressField('addressLine')} />
+                <Field label="Suburb / town / city" value={deliveryAddress.suburb} onChangeText={updateAddressField('suburb')} />
+                <Field label="Region (if applicable)" value={deliveryAddress.region} onChangeText={updateAddressField('region')} />
+                <Field label="Postcode" value={deliveryAddress.postcode} onChangeText={updateAddressField('postcode')} />
+                <Field label="Country" value={deliveryAddress.country} onChangeText={updateAddressField('country')} />
                 <Field label="Order notes (optional)" value={orderNotes} onChangeText={setOrderNotes} />
-                {!deliveryAddressValid ? <Text style={styles.errorText}>Enter a delivery address to continue.</Text> : null}
+                {!deliveryAddressValid ? (
+                  <Text style={styles.errorText}>Enter your name, address, suburb/town/city, postcode and country so shipping can be calculated.</Text>
+                ) : null}
               </>
             ) : null}
             <SegmentedControl
               groupLabel="Checkout payment term"
               value={paymentTerm}
               options={[
-                { label: 'Pay now (-10%)', value: PaymentTerm.PAY_NOW },
+                { label: 'Pay now (coming soon)', value: PaymentTerm.PAY_NOW, disabled: true },
                 { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
               ]}
               onChange={(value) => setPaymentTerm(value as PaymentTerm)}
             />
-            {paymentTerm === PaymentTerm.PAY_NOW ? (
-              <SegmentedControl
-                groupLabel="Checkout payment method"
-                value={paymentMethod}
-                options={[
-                  { label: 'In-app placeholder', value: PaymentMethod.IN_APP },
-                  { label: 'Mark EFTPOS paid', value: PaymentMethod.EFTPOS },
-                ]}
-                onChange={(value) => setPaymentMethod(value as PaymentMethod)}
-              />
-            ) : null}
+            {isPayNow ? (
+              <Text style={styles.errorText}>Online card payment isn&apos;t connected yet. Please select "Pay in 30" to confirm your order — no payment is required today.</Text>
+            ) : (
+              <Text style={styles.metaText}>Pay in 30: confirm now, no payment gateway required. Due date is set to 30 days from confirmation.</Text>
+            )}
             <Text style={styles.summaryLine}>Subtotal: {formatMoney(subtotal)}</Text>
             <Text style={styles.summaryLine}>Discount: -{formatMoney(discount)}</Text>
-            <Text style={styles.summaryLine}>Delivery: {deliveryCharge > 0 ? formatMoney(deliveryCharge) : 'Free'}</Text>
+            <Text style={styles.summaryLine}>
+              Shipping: {deliveryAddressReady ? (shippingEstimateQuery.isLoading ? 'Calculating…' : deliveryCharge > 0 ? formatMoney(deliveryCharge) : 'Free') : 'Enter delivery address to calculate'}
+            </Text>
+            {deliveryAddressReady && shippingEstimateQuery.data?.isTemporaryRate ? (
+              <Text style={styles.metaText}>Shipping shown is a temporary estimate based on weight and destination — final courier rates have not been configured yet.</Text>
+            ) : null}
             <Text style={styles.summaryTotal}>Total: {formatMoney(total)}</Text>
             <Pressable
-              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid}
-              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid) && styles.disabledPrimaryButton]}
+              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow}
+              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow) && styles.disabledPrimaryButton]}
               onPress={() => void onSubmitOrder()}
             >
               <Text style={styles.primaryButtonLabel}>{isSubmitting ? 'Processing…' : 'Confirm order'}</Text>
@@ -1532,8 +1622,15 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
         ))}
         <Text style={styles.summaryLine}>Subtotal: {formatMoney(order.subtotal)}</Text>
         <Text style={styles.summaryLine}>Discount: -{formatMoney(order.discountApplied)}</Text>
-        <Text style={styles.summaryLine}>Delivery: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text>
+        <Text style={styles.summaryLine}>Shipping: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text>
+        {order.isTemporaryShippingRate ? (
+          <Text style={styles.metaText}>Shipping was calculated using a temporary estimate based on weight and destination — final courier rates have not been configured yet.</Text>
+        ) : null}
         <Text style={styles.summaryTotal}>Total: {formatMoney(order.total)}</Text>
+        {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to:{'\n'}{order.deliveryAddress}</Text> : null}
+        <Text style={styles.metaText}>Payment method: Pay in 30</Text>
+        <Text style={styles.metaText}>Payment status: Deferred / unpaid</Text>
+        <Text style={styles.metaText}>A confirmation email has been sent to your registered email address.</Text>
         <View style={styles.heroActionRow}>
           <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
             <Text style={styles.primaryButtonLabel}>View Order History</Text>
@@ -2202,6 +2299,7 @@ function OrdersPage({ title, description }: { title: string; description: string
           <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleString()} • Status: {order.status}</Text>
           <Text style={styles.metaText}>{order.customer.name} • {order.paymentStatus} • ${order.total.toFixed(2)}</Text>
           <Text style={styles.metaText}>{order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now' : 'Pay in 30'} • {order.paymentMethod}</Text>
+          {order.subtotal !== null ? <Text style={styles.metaText}>Subtotal: {formatMoney(order.subtotal)} • Shipping: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text> : null}
           {order.staff ? <Text style={styles.metaText}>Created by {order.staff.name}</Text> : null}
           {order.dueDate ? <Text style={styles.metaText}>Due {new Date(order.dueDate).toLocaleDateString()}</Text> : null}
           {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to: {order.deliveryAddress}</Text> : null}
@@ -2339,7 +2437,7 @@ function SegmentedControl({
   onChange,
 }: {
   groupLabel: string;
-  options: Array<{ label: string; value: string }>;
+  options: Array<{ label: string; value: string; disabled?: boolean }>;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -2350,11 +2448,17 @@ function SegmentedControl({
         return (
           <Pressable
             key={option.value}
+            disabled={option.disabled}
             accessibilityLabel={option.label}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
-            style={[styles.segment, selected && styles.segmentSelected]}
-            onPress={() => onChange(option.value)}
+            accessibilityState={{ selected, disabled: option.disabled }}
+            style={[styles.segment, selected && styles.segmentSelected, option.disabled && styles.disabledButton]}
+            onPress={() => {
+              if (option.disabled) {
+                return;
+              }
+              onChange(option.value);
+            }}
           >
             <Text style={[styles.segmentLabel, selected && styles.segmentLabelSelected]}>{option.label}</Text>
           </Pressable>

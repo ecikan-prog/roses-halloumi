@@ -82,6 +82,10 @@ export function buildOrderConfirmationEmail(params: {
   total: number;
   deliveryAddress?: string | null;
   orderNotes?: string | null;
+  /** Human-readable payment term, e.g. "Pay in 30". */
+  paymentTermLabel: string;
+  /** Human-readable payment status, e.g. "Deferred / unpaid". */
+  paymentStatusLabel: string;
 }) {
   const subject = `Your ${BRAND_NAME} order ${params.orderNumber} is confirmed`;
 
@@ -112,7 +116,8 @@ export function buildOrderConfirmationEmail(params: {
       <tr><td>Delivery</td><td style="text-align:right;">${params.deliveryCharge > 0 ? `$${params.deliveryCharge.toFixed(2)}` : 'Free'}</td></tr>
       <tr><td style="font-weight:bold;padding-top:8px;">Total</td><td style="text-align:right;font-weight:bold;padding-top:8px;">$${params.total.toFixed(2)}</td></tr>
     </table>
-    ${params.deliveryAddress ? `<p style="font-size:13px;line-height:20px;"><strong>Delivery address:</strong><br/>${escapeHtml(params.deliveryAddress)}</p>` : ''}
+    ${params.deliveryAddress ? `<p style="font-size:13px;line-height:20px;"><strong>Delivery address:</strong><br/>${escapeHtml(params.deliveryAddress).replace(/\n/g, '<br/>')}</p>` : ''}
+    <p style="font-size:13px;line-height:20px;"><strong>Payment method:</strong> ${escapeHtml(params.paymentTermLabel)}<br/><strong>Payment status:</strong> ${escapeHtml(params.paymentStatusLabel)}</p>
     ${params.orderNotes ? `<p style="font-size:13px;line-height:20px;"><strong>Order notes:</strong><br/>${escapeHtml(params.orderNotes)}</p>` : ''}
     <p style="font-size:14px;line-height:22px;">We'll be in touch with any updates on your order. Questions? Reply to this email or contact us at info@grasslandcheese.com.</p>
     <p style="font-size:14px;line-height:22px;">Thanks again,<br/>The ${BRAND_NAME} Team</p>
@@ -131,6 +136,9 @@ export function buildOrderConfirmationEmail(params: {
     `Total: $${params.total.toFixed(2)}`,
     '',
     ...(params.deliveryAddress ? [`Delivery address: ${params.deliveryAddress}`, ''] : []),
+    `Payment method: ${params.paymentTermLabel}`,
+    `Payment status: ${params.paymentStatusLabel}`,
+    '',
     ...(params.orderNotes ? [`Order notes: ${params.orderNotes}`, ''] : []),
     'We\'ll be in touch with any updates on your order. Questions? Reply to this email or contact us at info@grasslandcheese.com.',
     '',

@@ -4,7 +4,8 @@
  * Grassland Cheese currently sells and ships within New Zealand only. This
  * module contains the CALCULATION LOGIC only — every rate, surcharge, band
  * and classification list lives in `nzCourierRateConfig.ts`. When the real
- * courier rate card is supplied, only that config file needs to change; this
+ * courier rate card (or the real NZ Post Domestic Rating API) is connected,
+ * only `resolveStaticRate`/`nzCourierRateConfig.ts` need to change; this
  * engine and the checkout/order code do not need to be rewritten.
  *
  * Every shipment is calculated from our depot (the ORIGIN, see
@@ -12,26 +13,39 @@
  * address (the DESTINATION). The origin is never the customer's address —
  * callers must always pass `DEPOT_ADDRESS` as `origin`.
  *
- * IMPORTANT: the rates produced here are placeholders (see
- * `nzCourierRateConfig.ts`) until a real courier rate card is configured —
- * `isTemporaryRate` is always `true` while that remains the case and must be
- * surfaced to the customer (checkout UI, confirmation email) rather than
- * presented as a final/official price.
+ * PRICING MODEL: matches how a real NZ domestic courier (and the NZ Post
+ * Domestic Rating API) actually rates a shipment:
+ *   1. Resolve a DISTANCE CATEGORY (across-town / within-island /
+ *      nationwide) from the origin and destination postcodes — an Auckland
+ *      depot shipping to any South Island address is always `NATIONWIDE`,
+ *      never a South Island "within island" rate.
+ *   2. Resolve CHARGEABLE WEIGHT per parcel — the greater of actual weight
+ *      and volumetric/cubic weight (from parcel dimensions, when known).
+ *   3. Price each parcel from the category's weight-increment rate card
+ *      (first Nkg, then additional Nkg increments), then add rural/remote
+ *      surcharges per parcel.
+ *
+ * IMPORTANT: `isTemporaryRate` is always `true` while `nzCourierRateConfig`
+ * still contains any unconfirmed placeholder figures (see that file) —
+ * callers (checkout UI, emails) must surface this so nobody mistakes these
+ * numbers for an official, final courier price.
  */
 
 import {
   DEPOT_ADDRESS,
   FREE_SHIPPING_THRESHOLD_NZD,
   MAX_PARCEL_WEIGHT_KG,
-  NZ_WEIGHT_BANDS,
   PACKAGING_WEIGHT_KG,
   REMOTE_POSTCODES,
   REMOTE_SURCHARGE_NZD,
   RURAL_ADDRESS_KEYWORDS,
   RURAL_SURCHARGE_NZD,
-  SOUTH_ISLAND_SURCHARGE_NZD,
+  STATIC_RATE_CARD,
+  VOLUMETRIC_DIVISOR,
+  resolveDistanceCategory,
   resolveIslandFromPostcode,
-  type NzWeightBand,
+  type NzDistanceCategory,
+  type NzWeightIncrementRate,
 } from './nzCourierRateConfig.js';
 
 export type ShippingDestination = {
@@ -52,12 +66,28 @@ export type ShippingOrigin = {
   postcode?: string | null;
 };
 
+/** A single parcel's physical dimensions (cm), used to compute volumetric/cubic weight. */
+export type ParcelDimensionsCm = {
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+};
+
 export type ShippingCalculationInput = {
   /** Our dispatch/depot address. Always `DEPOT_ADDRESS` in production — the customer's address is never the origin. */
   origin: ShippingOrigin;
   destination: ShippingDestination;
   /** Total product weight in kilograms (sum of productWeightKg * qty across the cart). Packaging weight is added internally. */
   totalWeight: number;
+  /**
+   * Optional per-parcel dimensions (cm), applied to every parcel the
+   * shipment is split into, used to compute chargeable (volumetric) weight.
+   * Product dimensions aren't tracked yet, so callers may omit this — the
+   * shipment is then rated on actual weight only.
+   */
+  parcelDimensionsCm?: ParcelDimensionsCm;
+  /** Number of parcels to force the shipment into, if already known (e.g. multiple distinct boxes). Otherwise parcels are derived automatically from `MAX_PARCEL_WEIGHT_KG`. */
+  numberOfParcels?: number;
 };
 
 export type NzIsland = 'NORTH' | 'SOUTH';
@@ -73,16 +103,21 @@ export type ShippingCalculationResult = {
   isRemote: boolean;
   /** True when the origin (depot) and destination are on different islands, i.e. the shipment requires an inter-island ferry/line-haul leg. */
   crossesIslands: boolean;
+  /** Distance/postage category the rate card actually priced this shipment under. */
+  distanceCategory: NzDistanceCategory;
   weightBandLabel: string;
-  /** Total shipment weight used for rating, i.e. total product weight + packaging weight. */
+  /** Total shipment weight used for rating, i.e. total product weight + packaging weight (actual, not chargeable/volumetric). */
   totalShipmentWeightKg: number;
+  /** Chargeable weight per parcel actually used to price the shipment (max of actual and volumetric weight). */
+  chargeableWeightKg: number;
   packagingWeightKg: number;
   /** Number of parcels the shipment was split into (> 1 when the shipment exceeds the configured max parcel weight). */
   parcelCount: number;
   /**
-   * True while placeholder rates from `nzCourierRateConfig.ts` are in use.
-   * Callers (checkout UI, emails) must surface this so nobody mistakes the
-   * placeholder for a final rate.
+   * True while any placeholder rates from `nzCourierRateConfig.ts` are in
+   * use (currently the ACROSS_TOWN/WITHIN_ISLAND rates, and the rural/remote
+   * postcode heuristics). Callers (checkout UI, emails) must surface this so
+   * nobody mistakes the placeholder for a final rate.
    */
   isTemporaryRate: boolean;
   freeShippingApplied: boolean;
@@ -114,38 +149,78 @@ function resolveIsRemote(destination: ShippingDestination): boolean {
   return postcode.length > 0 && REMOTE_POSTCODES.includes(postcode);
 }
 
-function resolveWeightBand(weightKg: number): NzWeightBand {
-  return NZ_WEIGHT_BANDS.find((band) => weightKg <= band.maxWeightKg) ?? NZ_WEIGHT_BANDS[NZ_WEIGHT_BANDS.length - 1];
-}
-
 /** Splits a total shipment weight into evenly-sized parcels, none exceeding the configured max parcel weight. */
-function splitIntoParcels(totalShipmentWeightKg: number): number[] {
+function splitIntoParcels(totalShipmentWeightKg: number, numberOfParcels?: number): number[] {
   if (totalShipmentWeightKg <= 0) {
     return [0];
   }
 
-  const parcelCount = Math.max(1, Math.ceil(totalShipmentWeightKg / MAX_PARCEL_WEIGHT_KG));
+  const parcelCount = Math.max(1, numberOfParcels ?? Math.ceil(totalShipmentWeightKg / MAX_PARCEL_WEIGHT_KG));
   const perParcelWeight = totalShipmentWeightKg / parcelCount;
   return Array.from({ length: parcelCount }, () => perParcelWeight);
 }
 
-function ratePerParcel(weightKg: number, crossesIslands: boolean, serviceArea: NzServiceArea, isRemote: boolean): number {
-  const band = resolveWeightBand(weightKg);
-  let rate = band.urbanRateNzd;
+/** Volumetric (cubic) weight in kg for a parcel's dimensions (cm), per `VOLUMETRIC_DIVISOR`. */
+function volumetricWeightKg(dimensionsCm: ParcelDimensionsCm): number {
+  return (dimensionsCm.lengthCm * dimensionsCm.widthCm * dimensionsCm.heightCm) / VOLUMETRIC_DIVISOR;
+}
+
+/** Chargeable weight for a parcel: the greater of its actual weight and its volumetric weight (if dimensions are known). */
+function resolveChargeableWeightKg(actualWeightKg: number, dimensionsCm?: ParcelDimensionsCm): number {
+  if (!dimensionsCm) {
+    return actualWeightKg;
+  }
+
+  return Math.max(actualWeightKg, volumetricWeightKg(dimensionsCm));
+}
+
+/** Prices a single parcel's chargeable weight against a distance category's weight-increment rate card. */
+function priceForChargeableWeight(rate: NzWeightIncrementRate, chargeableWeightKg: number): number {
+  if (chargeableWeightKg <= 0) {
+    return 0;
+  }
+
+  if (chargeableWeightKg <= rate.firstIncrementKg) {
+    return rate.firstIncrementRateNzd;
+  }
+
+  const additionalKg = chargeableWeightKg - rate.firstIncrementKg;
+  const additionalIncrements = Math.ceil(additionalKg / rate.additionalIncrementKg);
+  return rate.firstIncrementRateNzd + additionalIncrements * rate.additionalIncrementRateNzd;
+}
+
+/**
+ * Resolves the priced rate for one parcel. This is the single seam to
+ * replace with a real courier rating call (e.g. the NZ Post Domestic Rating
+ * API, passing origin/destination postcode, chargeable weight, dimensions,
+ * rural status and distance category) — every other function in this file
+ * is independent of where the rate actually comes from.
+ */
+function resolveStaticRate(distanceCategory: NzDistanceCategory, chargeableWeightKg: number, serviceArea: NzServiceArea, isRemote: boolean): number {
+  const rate = STATIC_RATE_CARD[distanceCategory];
+  let price = priceForChargeableWeight(rate, chargeableWeightKg);
 
   if (serviceArea === 'RURAL') {
-    rate += RURAL_SURCHARGE_NZD;
+    price += RURAL_SURCHARGE_NZD;
   }
 
   if (isRemote) {
-    rate += REMOTE_SURCHARGE_NZD;
+    price += REMOTE_SURCHARGE_NZD;
   }
 
-  if (crossesIslands) {
-    rate += SOUTH_ISLAND_SURCHARGE_NZD;
+  return price;
+}
+
+function distanceCategoryLabel(category: NzDistanceCategory): string {
+  if (category === 'ACROSS_TOWN') {
+    return 'Across town';
   }
 
-  return rate;
+  if (category === 'NATIONWIDE') {
+    return 'Nationwide (inter-island)';
+  }
+
+  return 'Within island';
 }
 
 /**
@@ -158,10 +233,7 @@ function ratePerParcel(weightKg: number, crossesIslands: boolean, serviceArea: N
  * @param input.totalWeight Total product weight in kilograms (sum of unit weight × quantity for every cart line, excluding packaging).
  * @param productSubtotal Optional product subtotal, used only to evaluate the (currently disabled) free-shipping threshold.
  */
-export function calculateShipping(
-  input: ShippingCalculationInput,
-  productSubtotal?: number,
-): ShippingCalculationResult {
+export function calculateShipping(input: ShippingCalculationInput, productSubtotal?: number): ShippingCalculationResult {
   if (!isNewZealandDestination(input.destination.country)) {
     throw new Error('calculateShipping only supports New Zealand destinations. Validate the destination country before calling this function.');
   }
@@ -173,24 +245,29 @@ export function calculateShipping(
   const totalProductWeight = Math.max(0, input.totalWeight);
   const totalShipmentWeightKg = Number((totalProductWeight + PACKAGING_WEIGHT_KG).toFixed(3));
 
-  const originIsland = resolveIslandFromPostcode(input.origin.postcode);
   const destinationIsland = resolveIslandFromPostcode(input.destination.postcode);
-  const crossesIslands = originIsland !== destinationIsland;
+  const crossesIslands = resolveIslandFromPostcode(input.origin.postcode) !== destinationIsland;
+  const distanceCategory = resolveDistanceCategory(input.origin.postcode, input.destination.postcode);
   const serviceArea = resolveServiceArea(input.destination);
   const isRemote = resolveIsRemote(input.destination);
 
   const freeShippingApplied =
     FREE_SHIPPING_THRESHOLD_NZD !== null && typeof productSubtotal === 'number' && productSubtotal >= FREE_SHIPPING_THRESHOLD_NZD;
 
-  const parcelWeights = splitIntoParcels(totalShipmentWeightKg);
+  const parcelWeights = splitIntoParcels(totalShipmentWeightKg, input.numberOfParcels);
+  const chargeableParcelWeights = parcelWeights.map((weightKg) => resolveChargeableWeightKg(weightKg, input.parcelDimensionsCm));
+
   const amount = freeShippingApplied
     ? 0
-    : Number(parcelWeights.reduce((sum, parcelWeight) => sum + ratePerParcel(parcelWeight, crossesIslands, serviceArea, isRemote), 0).toFixed(2));
+    : Number(
+        chargeableParcelWeights
+          .reduce((sum, chargeableWeightKg) => sum + resolveStaticRate(distanceCategory, chargeableWeightKg, serviceArea, isRemote), 0)
+          .toFixed(2),
+      );
 
-  const weightBand = resolveWeightBand(parcelWeights[0]);
   const islandLabel = destinationIsland === 'SOUTH' ? 'South Island' : 'North Island';
   const areaLabel = serviceArea === 'RURAL' ? 'Rural' : 'Urban';
-  const zoneLabel = `${islandLabel} – ${areaLabel}${isRemote ? ' (remote surcharge applied)' : ''}${crossesIslands ? ' (inter-island)' : ''}`;
+  const zoneLabel = `${islandLabel} – ${areaLabel} · ${distanceCategoryLabel(distanceCategory)}${isRemote ? ' (remote surcharge applied)' : ''}`;
 
   return {
     amount,
@@ -200,8 +277,13 @@ export function calculateShipping(
     serviceArea,
     isRemote,
     crossesIslands,
-    weightBandLabel: parcelWeights.length > 1 ? `${weightBand.label} × ${parcelWeights.length} parcels` : weightBand.label,
+    distanceCategory,
+    weightBandLabel:
+      chargeableParcelWeights.length > 1
+        ? `${chargeableParcelWeights[0].toFixed(2)}kg × ${chargeableParcelWeights.length} parcels (chargeable weight)`
+        : `${chargeableParcelWeights[0]?.toFixed(2) ?? '0.00'}kg (chargeable weight)`,
     totalShipmentWeightKg,
+    chargeableWeightKg: chargeableParcelWeights.reduce((sum, weightKg) => sum + weightKg, 0),
     packagingWeightKg: PACKAGING_WEIGHT_KG,
     parcelCount: parcelWeights.length,
     isTemporaryRate: true,
@@ -210,4 +292,3 @@ export function calculateShipping(
 }
 
 export { DEPOT_ADDRESS };
-

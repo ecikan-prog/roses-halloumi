@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   ImageBackground,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -20,6 +21,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
+import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
+import AdminDashboardScreen from './src/admin/AdminDashboard';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
 const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg(1).jpg');
@@ -32,6 +35,9 @@ const halloumiSharingPlatterImage = require('./assets/grassland/halloumi-sharing
 const halloumi1kgImage = require('./assets/grassland/grassland-halloumi-1kg.jpg');
 const halloumi500gImage = require('./assets/grassland/grassland-halloumi-500g.jpg');
 const halloumi200gImage = require('./assets/grassland/grassland-halloumi-200g.jpg');
+const mpiRegistrationPdf = require('./assets/quality-compliance/01-MPI-Animal-Products-Exporter-Registration.pdf');
+const foodSafetyAuditPdf = require('./assets/quality-compliance/02-Food-Safety-Quality-Audit-Certificate.pdf');
+const halloumiProductSpecPdf = require('./assets/quality-compliance/03-Roses-Dairy-Halloumi-Product-Specification.pdf');
 const storySectionImages = {
   '01': require('./assets/grassland/grassland-cows-calves.jpeg'),
   '02': require('./assets/grassland/grassland-fresh-milk.jpeg'),
@@ -86,11 +92,21 @@ type StaffUser = {
 };
 
 type SessionUser = CustomerUser | StaffUser;
-type AuthMode = 'customer-login' | 'staff-login' | 'customer-register';
-type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
-type SignedInPage = PublicPage | 'orders' | 'customers';
+type AuthMode = 'customer-login' | 'admin-login' | 'customer-register';
+type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
+type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
 
-type SessionState = {
+type ConfirmedOrder = {
+  orderNumber: string;
+  subtotal: number;
+  deliveryCharge: number;
+  discountApplied: number;
+  total: number;
+  createdAt: Date | string;
+  items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
+};
+
+export type SessionState = {
   token: string | null;
   user: SessionUser | null;
 };
@@ -137,7 +153,7 @@ const paymentStatusOptions: Array<PaymentStatus | 'ALL'> = ['ALL', PaymentStatus
 const shopProductSpecs: ShopProductSpec[] = [
   {
     slug: '1kg',
-    name: '1 kg Halloumi',
+    name: 'Grassland Cheese Halloumi — 1kg',
     size: '1 kg',
     description: 'A generous halloumi format for bigger family meals, grilling trays, and sharing platters.',
     detail: 'Designed for customers who want a larger halloumi format ready for slicing, grilling, frying, and sharing.',
@@ -145,7 +161,7 @@ const shopProductSpecs: ShopProductSpec[] = [
   },
   {
     slug: '500g',
-    name: '500 g Halloumi',
+    name: 'Grassland Cheese Halloumi — 500g',
     size: '500 g',
     description: 'A versatile mid-size halloumi option for weeknight meals, salads, and pan-frying.',
     detail: 'A balanced everyday halloumi size that suits quick dinners, lunch plates, and smaller entertaining moments.',
@@ -153,7 +169,7 @@ const shopProductSpecs: ShopProductSpec[] = [
   },
   {
     slug: '200g',
-    name: '200 g Halloumi',
+    name: 'Grassland Cheese Halloumi — 200g',
     size: '200 g',
     description: 'A smaller halloumi size that is ideal for lighter meals, snacks, and trial purchases.',
     detail: 'A compact halloumi option for individual meals, smaller households, or customers trying the range for the first time.',
@@ -323,11 +339,15 @@ function AppContent({
     );
   }
 
-  return session.token && session.user ? (
-    <Dashboard session={session} onSignOut={handleSignOut} />
-  ) : (
-    <PublicWebsite currentPage={publicPage} onNavigate={setPublicPage} onAuthenticated={handleAuthenticated} />
-  );
+  if (session.token && session.user) {
+    if (session.user.kind === 'staff') {
+      return <AdminDashboardScreen session={session} onSignOut={handleSignOut} />;
+    }
+
+    return <Dashboard session={session} onSignOut={handleSignOut} />;
+  }
+
+  return <PublicWebsite currentPage={publicPage} onNavigate={setPublicPage} onAuthenticated={handleAuthenticated} />;
 }
 
 function PublicWebsite({
@@ -339,10 +359,68 @@ function PublicWebsite({
   onNavigate: (page: PublicPage) => void;
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
 }) {
-  const content = renderPublicPage(currentPage, onNavigate, onAuthenticated);
+  // Retail visitors can browse live halloumi pricing and build a cart before creating
+  // an account. This is the same cart storage the signed-in checkout reads on login.
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const productsQuery = trpc.catalog.listProducts.useQuery();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
+
+  const shopProducts = useMemo<ShopProductView[]>(() => {
+    const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
+    return shopProductSpecs.map((spec) => ({
+      ...spec,
+      product: backendProducts.find((product) => matchesAllowedProduct(product, spec)),
+    }));
+  }, [productsQuery.data]);
+
+  const selectedItems = shopProducts
+    .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
+    .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
+
+  const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  const content = renderPublicPage(currentPage, onNavigate, onAuthenticated, {
+    productsQuery,
+    shopProducts,
+    quantities,
+    adjustQuantity,
+    selectedItems,
+  });
 
   return (
-    <SiteScreen currentPage={currentPage} onNavigate={onNavigate} session={null}>
+    <SiteScreen currentPage={currentPage} onNavigate={onNavigate} session={null} cartCount={cartCount}>
       {content}
     </SiteScreen>
   );
@@ -352,18 +430,41 @@ function renderPublicPage(
   currentPage: PublicPage,
   onNavigate: (page: PublicPage) => void,
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>,
+  cart: {
+    productsQuery: ReturnType<typeof trpc.catalog.listProducts.useQuery>;
+    shopProducts: ShopProductView[];
+    quantities: Record<number, number>;
+    adjustQuantity: (productId: number, nextQuantity: number) => void;
+    selectedItems: Array<ProductRecord & { qty: number }>;
+  },
 ) {
   switch (currentPage) {
     case 'shop':
-      return <PublicShopPage onNavigate={onNavigate} />;
+      return (
+        <PublicShopPage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          isLoading={cart.productsQuery.isLoading}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
     case 'recipes':
       return <RecipesPage />;
     case 'wholesale':
       return <WholesalePage onNavigate={onNavigate} />;
     case 'about':
       return <AboutPage />;
+    case 'quality-compliance':
+      return <QualityCompliancePage />;
     case 'cart':
-      return <PublicCartPage onNavigate={onNavigate} />;
+      return (
+        <PublicCartPage
+          onNavigate={onNavigate}
+          selectedItems={cart.selectedItems}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
     case 'account':
       return <AccountPage onNavigate={onNavigate} onAuthenticated={onAuthenticated} />;
     case 'contact':
@@ -374,7 +475,14 @@ function renderPublicPage(
       return <TermsPage />;
     case 'home':
     default:
-      return <HomePage onNavigate={onNavigate} />;
+      return (
+        <HomePage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
   }
 }
 
@@ -385,6 +493,10 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_NOW);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.IN_APP);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [lastOrder, setLastOrder] = useState<ConfirmedOrder | null>(null);
   const [selectedProductSlug, setSelectedProductSlug] = useState<ShopProductSpec['slug'] | null>(null);
   const isStaff = user.kind === 'staff';
   const effectiveCustomerId = user.kind === 'customer' ? user.id : selectedCustomerId;
@@ -409,14 +521,38 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   }, [isStaff, page]);
 
   useEffect(() => {
-    if (!isStaff && page === 'orders') {
-      setPage('account');
-    }
-  }, [isStaff, page]);
-
-  useEffect(() => {
     setQuantities({});
   }, [effectiveCustomerId]);
+
+  // Restore any cart saved before a refresh so the customer doesn't lose their selections.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist the cart whenever it changes so it survives navigation and page refreshes.
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
 
   const shopProducts = useMemo<ShopProductView[]>(() => {
     const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
@@ -431,7 +567,8 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
   const discount = paymentTerm === PaymentTerm.PAY_NOW ? subtotal * 0.1 : 0;
-  const total = subtotal - discount;
+  const deliveryCharge = subtotal > 0 && subtotal < 80 ? 9.95 : 0;
+  const total = subtotal - discount + deliveryCharge;
   const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
   async function submitOrder() {
@@ -441,21 +578,39 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     }
 
     if (user.kind === 'staff' && !effectiveCustomerId) {
-      Alert.alert('Choose customer', 'Select a customer before creating a staff order.');
+      Alert.alert('Choose customer', 'Select a customer before creating an admin order.');
+      return;
+    }
+
+    if (user.kind === 'customer' && deliveryAddress.trim().length < 5) {
+      Alert.alert('Delivery address required', 'Enter a delivery address of at least 5 characters before confirming the order.');
       return;
     }
 
     try {
-      await createOrder.mutateAsync({
+      const result = await createOrder.mutateAsync({
         customerId: user.kind === 'staff' ? effectiveCustomerId : undefined,
         paymentTerm,
         ...(paymentTerm === PaymentTerm.PAY_NOW ? { paymentMethod } : {}),
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
+        ...(deliveryAddress.trim() ? { deliveryAddress: deliveryAddress.trim() } : {}),
+        ...(orderNotes.trim() ? { orderNotes: orderNotes.trim() } : {}),
       });
       await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
       setQuantities({});
-      setPage('account');
-      Alert.alert('Order confirmed', paymentTerm === PaymentTerm.PAY_NOW ? 'Discount applied and payment marked as paid.' : 'Order saved with 30 day terms.');
+      await clearStoredCart();
+      setDeliveryAddress('');
+      setOrderNotes('');
+      setLastOrder({
+        orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
+        subtotal: result.subtotal ?? subtotal,
+        deliveryCharge: result.deliveryCharge ?? deliveryCharge,
+        discountApplied: result.discountApplied,
+        total: result.total,
+        createdAt: result.createdAt,
+        items: result.items ?? selectedItems.map((item) => ({ id: item.id, qty: item.qty, unitPrice: item.effectivePrice, product: { id: item.id, name: item.name, unit: item.unit } })),
+      });
+      setPage('order-confirmation');
     } catch (error) {
       Alert.alert('Order failed', getErrorMessage(error));
     }
@@ -494,6 +649,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     case 'about':
       content = <AboutPage />;
       break;
+    case 'quality-compliance':
+      content = <QualityCompliancePage />;
+      break;
     case 'cart':
       content = (
         <CartPage
@@ -503,8 +661,15 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           selectedItems={selectedItems}
+          quantities={quantities}
+          setQuantities={setQuantities}
+          deliveryAddress={deliveryAddress}
+          setDeliveryAddress={setDeliveryAddress}
+          orderNotes={orderNotes}
+          setOrderNotes={setOrderNotes}
           subtotal={subtotal}
           discount={discount}
+          deliveryCharge={deliveryCharge}
           total={total}
           onNavigate={setPage}
           onSubmitOrder={submitOrder}
@@ -512,11 +677,19 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         />
       );
       break;
+    case 'order-confirmation':
+      content = <OrderConfirmationPage order={lastOrder} onNavigate={setPage} />;
+      break;
     case 'account':
       content = <SignedInAccountPage session={session} onNavigate={setPage} onSignOut={onSignOut} />;
       break;
     case 'orders':
-      content = <OrdersPage title="Order history" description="Review customer orders and payment status." />;
+      content = (
+        <OrdersPage
+          title={isStaff ? 'Order history' : 'My orders'}
+          description={isStaff ? 'Review customer orders and payment status.' : 'Review your Halloumi order history, current orders, and status.'}
+        />
+      );
       break;
     case 'customers':
       content = <CustomersScreen />;
@@ -606,6 +779,7 @@ function SiteHeader({
     { label: 'Our Story', page: 'about' },
     { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
     { label: session ? 'Customer Account' : 'Login', page: 'account' },
+    ...(session && !isStaff ? [{ label: 'My Orders', page: 'orders' as const }] : []),
     ...(isStaff ? [{ label: 'Orders', page: 'orders' as const }, { label: 'Customers', page: 'customers' as const }] : []),
   ];
 
@@ -651,6 +825,7 @@ function SiteFooter({
     { label: 'Recipes', page: 'recipes' },
     { label: 'Wholesale', page: 'wholesale' },
     { label: 'About', page: 'about' },
+    { label: 'Quality & Compliance', page: 'quality-compliance' },
     { label: 'Contact', page: 'contact' },
     { label: 'Privacy', page: 'privacy' },
     { label: 'Terms', page: 'terms' },
@@ -683,11 +858,21 @@ function SiteFooter({
   );
 }
 
-function HomePage({ onNavigate }: { onNavigate: (page: any) => void }) {
+function HomePage({
+  onNavigate,
+  shopProducts,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
   return (
     <>
       <HeroSection onPrimary={() => onNavigate('shop')} onSecondary={() => onNavigate('about')} />
-      <PublicShopSection onNavigate={onNavigate} />
+      <PublicShopSection onNavigate={onNavigate} shopProducts={shopProducts} quantities={quantities} adjustQuantity={adjustQuantity} />
       <WhyGrasslandSection />
       <RecipesSection onNavigate={onNavigate} />
       <StorySection />
@@ -776,26 +961,87 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
   );
 }
 
-function PublicShopSection({ onNavigate }: { onNavigate: (page: any) => void }) {
+function PublicShopSection({
+  onNavigate,
+  shopProducts,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
   return (
-    <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three customer-facing sizes. Pricing and ordering appear as soon as matching live product records are available.">
+    <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
       <View style={styles.productGrid}>
-        {shopProductSpecs.map((product) => (
-          <ProductCard key={product.slug} product={product} quantity={0} onAdd={() => onNavigate('account')} onOpenDetails={() => onNavigate('shop')} disabled ctaLabel="Available Soon" />
-        ))}
+        {shopProducts.map((product) => {
+          const backendProduct = product.product;
+          const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+          return (
+            <ProductCard
+              key={product.slug}
+              product={product}
+              quantity={quantity}
+              onAdd={() => {
+                if (!backendProduct) {
+                  return;
+                }
+                adjustQuantity(backendProduct.id, quantity + 1);
+              }}
+              onOpenDetails={() => onNavigate('shop')}
+              onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+              onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+              disabled={!backendProduct}
+              ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+            />
+          );
+        })}
       </View>
     </SectionShell>
   );
 }
 
-function PublicShopPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+function PublicShopPage({
+  onNavigate,
+  shopProducts,
+  isLoading,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  isLoading: boolean;
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
   return (
     <>
-      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Create an account or sign in to access ordering when live product records are available.">
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Add halloumi to your cart now, then sign in or create an account to complete checkout.">
+        {isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
         <View style={styles.productGrid}>
-          {shopProductSpecs.map((product) => (
-            <ProductCard key={product.slug} product={product} quantity={0} onAdd={() => onNavigate('account')} onOpenDetails={() => {}} disabled ctaLabel="Available Soon" />
-          ))}
+          {shopProducts.map((product) => {
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+            return (
+              <ProductCard
+                key={product.slug}
+                product={product}
+                quantity={quantity}
+                onAdd={() => {
+                  if (!backendProduct) {
+                    return;
+                  }
+                  adjustQuantity(backendProduct.id, quantity + 1);
+                }}
+                onOpenDetails={() => {}}
+                onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+                onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+              />
+            );
+          })}
         </View>
         <View style={styles.noticeCard}>
           <Text style={styles.noticeTitle}>Halloumi only</Text>
@@ -1084,8 +1330,15 @@ function CartPage({
   paymentMethod,
   setPaymentMethod,
   selectedItems,
+  quantities,
+  setQuantities,
+  deliveryAddress,
+  setDeliveryAddress,
+  orderNotes,
+  setOrderNotes,
   subtotal,
   discount,
+  deliveryCharge,
   total,
   onNavigate,
   onSubmitOrder,
@@ -1097,13 +1350,35 @@ function CartPage({
   paymentMethod: PaymentMethod;
   setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
   selectedItems: Array<ProductRecord & { qty: number }>;
+  quantities: Record<number, number>;
+  setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
+  deliveryAddress: string;
+  setDeliveryAddress: Dispatch<SetStateAction<string>>;
+  orderNotes: string;
+  setOrderNotes: Dispatch<SetStateAction<string>>;
   subtotal: number;
   discount: number;
+  deliveryCharge: number;
   total: number;
   onNavigate: (page: SignedInPage) => void;
   onSubmitOrder: () => Promise<void>;
   isSubmitting: boolean;
 }) {
+  const isCustomer = session.user?.kind === 'customer';
+  const deliveryAddressValid = !isCustomer || deliveryAddress.trim().length >= 5;
+
+  function changeQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  function removeItem(productId: number) {
+    setQuantities((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+  }
+
   return (
     <SectionShell eyebrow="Cart & Checkout" title="Review your Halloumi order" description="Your cart and checkout stay connected to the existing ordering flow.">
       <View style={styles.inlineTwoColumnRow}>
@@ -1116,6 +1391,18 @@ function CartPage({
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cartLineTitle}>{item.name}</Text>
                     <Text style={styles.metaText}>{item.qty} × ${item.effectivePrice.toFixed(2)}</Text>
+                    <View style={styles.quantityRow}>
+                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty - 1)}>
+                        <Text style={styles.quantityLabel}>-</Text>
+                      </Pressable>
+                      <Text style={styles.quantityValue}>{item.qty}</Text>
+                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty + 1)}>
+                        <Text style={styles.quantityLabel}>+</Text>
+                      </Pressable>
+                      <Pressable style={styles.secondaryButton} onPress={() => removeItem(item.id)}>
+                        <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                      </Pressable>
+                    </View>
                   </View>
                   <Text style={styles.cartLineTotal}>${(item.qty * item.effectivePrice).toFixed(2)}</Text>
                 </View>
@@ -1132,6 +1419,15 @@ function CartPage({
           <View style={styles.inlineCard}>
             <Text style={styles.inlineCardTitle}>Checkout</Text>
             <Text style={styles.metaText}>Ordering as {session.user?.name}</Text>
+            <Text style={styles.metaText}>{session.user?.email}</Text>
+            {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
+            {isCustomer ? (
+              <>
+                <Field label="Delivery address" value={deliveryAddress} onChangeText={setDeliveryAddress} />
+                <Field label="Order notes (optional)" value={orderNotes} onChangeText={setOrderNotes} />
+                {!deliveryAddressValid ? <Text style={styles.errorText}>Enter a delivery address to continue.</Text> : null}
+              </>
+            ) : null}
             <SegmentedControl
               groupLabel="Checkout payment term"
               value={paymentTerm}
@@ -1154,8 +1450,13 @@ function CartPage({
             ) : null}
             <Text style={styles.summaryLine}>Subtotal: ${subtotal.toFixed(2)}</Text>
             <Text style={styles.summaryLine}>Discount: -${discount.toFixed(2)}</Text>
+            <Text style={styles.summaryLine}>Delivery: {deliveryCharge > 0 ? `$${deliveryCharge.toFixed(2)}` : 'Free'}</Text>
             <Text style={styles.summaryTotal}>Total: ${total.toFixed(2)}</Text>
-            <Pressable disabled={!selectedItems.length || isSubmitting} style={[styles.primaryButton, (!selectedItems.length || isSubmitting) && styles.disabledPrimaryButton]} onPress={() => void onSubmitOrder()}>
+            <Pressable
+              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid}
+              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid) && styles.disabledPrimaryButton]}
+              onPress={() => void onSubmitOrder()}
+            >
               <Text style={styles.primaryButtonLabel}>{isSubmitting ? 'Processing…' : 'Confirm order'}</Text>
             </Pressable>
           </View>
@@ -1165,12 +1466,90 @@ function CartPage({
   );
 }
 
-function PublicCartPage({ onNavigate }: { onNavigate: (page: PublicPage) => void }) {
+function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | null; onNavigate: (page: SignedInPage) => void }) {
+  if (!order) {
+    return (
+      <SectionShell eyebrow="Order Confirmation" title="No recent order found" description="Place an order from the shop to see your confirmation here.">
+        <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
+          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+        </Pressable>
+      </SectionShell>
+    );
+  }
+
   return (
-    <SectionShell eyebrow="Cart" title="Cart and checkout" description="Create an account to continue into ordering once matching live halloumi products are published.">
+    <SectionShell eyebrow="Order Confirmation" title="Thank you for your order!" description={`Order ${order.orderNumber} has been received and confirmed.`}>
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Order {order.orderNumber}</Text>
+        <Text style={styles.metaText}>Placed {new Date(order.createdAt).toLocaleString()}</Text>
+        {order.items.map((item) => (
+          <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ ${item.unitPrice.toFixed(2)}</Text>
+        ))}
+        <Text style={styles.summaryLine}>Subtotal: ${order.subtotal.toFixed(2)}</Text>
+        <Text style={styles.summaryLine}>Discount: -${order.discountApplied.toFixed(2)}</Text>
+        <Text style={styles.summaryLine}>Delivery: {order.deliveryCharge > 0 ? `$${order.deliveryCharge.toFixed(2)}` : 'Free'}</Text>
+        <Text style={styles.summaryTotal}>Total: ${order.total.toFixed(2)}</Text>
+        <View style={styles.heroActionRow}>
+          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+            <Text style={styles.primaryButtonLabel}>View Order History</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+            <Text style={styles.secondaryButtonLabel}>Continue Shopping</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function PublicCartPage({
+  onNavigate,
+  selectedItems,
+  adjustQuantity,
+}: {
+  onNavigate: (page: PublicPage) => void;
+  selectedItems: Array<ProductRecord & { qty: number }>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
+
+  return (
+    <SectionShell eyebrow="Cart" title="Cart and checkout" description="Sign in or create an account to complete checkout with existing server-side pricing.">
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Cart</Text>
+        {selectedItems.length ? (
+          selectedItems.map((item) => (
+            <View key={item.id} style={styles.cartLineItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cartLineTitle}>{item.name}</Text>
+                <Text style={styles.metaText}>{item.qty} × ${item.effectivePrice.toFixed(2)}</Text>
+                <View style={styles.quantityRow}>
+                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
+                    <Text style={styles.quantityLabel}>-</Text>
+                  </Pressable>
+                  <Text style={styles.quantityValue}>{item.qty}</Text>
+                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
+                    <Text style={styles.quantityLabel}>+</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => adjustQuantity(item.id, 0)}>
+                    <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={styles.cartLineTotal}>${(item.qty * item.effectivePrice).toFixed(2)}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
+        )}
+        <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
+        </Pressable>
+      </View>
+      {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: ${subtotal.toFixed(2)}</Text> : null}
       <View style={styles.noticeCard}>
         <Text style={styles.noticeTitle}>Ready to order?</Text>
-        <Text style={styles.noticeText}>Sign in or register to manage your customer account and move into the live ordering flow when product availability is published.</Text>
+        <Text style={styles.noticeText}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
         <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
           <Text style={styles.primaryButtonLabel}>Go to Account</Text>
         </Pressable>
@@ -1261,6 +1640,18 @@ function OurStoryPageSection() {
         </ImageBackground>
       </View>
 
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Family Story</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            At Rose’s Dairy, cheese-making is more than a craft — it’s a family tradition. Since 2010 we have been producing specialty Halloumi on our boutique dairy farm in Pukekohe, Auckland, using a recipe that has been passed down through generations of our family dynasty.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            We believe good food nourishes both body and spirit. That simple belief guides everything we do. Every batch of our Halloumi begins with fresh, pasteurised whole cow’s milk from the paddock next door. It doesn’t get fresher than that.
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.storyJourneyShell}>
         {storyJourneyStages.map((stage, index) => {
           const reverseDesktop = !isMobile && index % 2 === 1;
@@ -1281,6 +1672,58 @@ function OurStoryPageSection() {
           );
         })}
       </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>What Makes Our Halloumi Special</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            Our Halloumi is soft and gently squeaky, with a clean, creamy flavour that is never overly salty. We use just the right amount of rock salt so the natural taste of the milk shines through.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            Because it is made the traditional way and finished with modern precision, our cheese holds its shape beautifully when cooked. Chefs love it — it flips easily with tongs, browns evenly, and stays consistent batch after batch.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            Whether you fry, grill, bake, or pan-sear it in a little olive oil, Rose’s Halloumi delivers the same wonderful creamy taste every time. It is ready to enjoy straight from the pack and works equally well in savoury or sweet dishes.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>How to Enjoy It</Text>
+        <View style={styles.storyCard}>
+          <View style={styles.storyBulletList}>
+            <Text style={styles.storyBulletItem}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
+            <Text style={styles.storyBulletItem}>• Grill or bake for a delicious centrepiece</Text>
+            <Text style={styles.storyBulletItem}>• Pair with honey and pancakes for a sweet treat</Text>
+            <Text style={styles.storyBulletItem}>• Add to a plated toaster or simple skillet meal</Text>
+          </View>
+          <Text style={styles.storyParagraph}>
+            Our Halloumi is naturally vegetarian and loved by everyone from age 7 to 70. Once you taste it, you’ll understand why this centuries-old style of cheese has never gone out of favour.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFarmToTableSection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>From Our Farm to Your Table</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            We operate a small, carefully run facility right on the dairy farm. Modern equipment helps us maintain the highest standards of hygiene and consistency, while the heart of the process remains the time-honoured family methods we have perfected over many years.
+          </Text>
+        </View>
+        <View style={styles.storyBrandStatementCard}>
+          <Text style={styles.storyBrandStatement}>Fresh milk. Honest ingredients. A recipe rooted in family history.</Text>
+          <Text style={styles.storyBrandClosingLine}>That’s the Rose’s Dairy difference.</Text>
+          <Text style={styles.storyBrandClosingLine}>Good food. Good life.</Text>
+          <Text style={styles.storyBrandClosingLine}>Rose’s Halloumi — one of a kind.</Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Halloumi</Text>
+        <View style={styles.storyBrandStatementCard}>
+          <Text style={styles.storyBrandStatement}>One cheese, so many possibilities.</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -1289,8 +1732,121 @@ function AboutPage() {
   return (
     <>
       <OurStoryPageSection />
-      <WhyGrasslandSection />
     </>
+  );
+}
+
+function openQualityDocument(source: ImageSourcePropType) {
+  const uri = resolveWebImageUri(source);
+  if (!uri) {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+    return;
+  }
+  if (Platform.OS === 'web') {
+    // Open in a new browser tab, as PDFs should not replace the current page.
+    (globalThis as any).open?.(uri, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  Linking.openURL(uri).catch(() => {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+  });
+}
+
+function QualityDocumentCard({
+  title,
+  description,
+  meta,
+  source,
+  viewLabel,
+  showDownload,
+}: {
+  title: string;
+  description: string;
+  meta: Array<{ label: string; value: string }>;
+  source: ImageSourcePropType;
+  viewLabel: string;
+  showDownload?: boolean;
+}) {
+  return (
+    <View style={styles.qualityDocCard}>
+      <Text style={styles.qualityDocTitle}>{title}</Text>
+      <Text style={styles.qualityDocDescription}>{description}</Text>
+      {meta.length > 0 ? (
+        <View style={styles.qualityDocMetaList}>
+          {meta.map((item) => (
+            <View key={item.label} style={styles.qualityDocMetaRow}>
+              <Text style={styles.qualityDocMetaLabel}>{item.label}</Text>
+              <Text style={styles.qualityDocMetaValue}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.heroActionRow}>
+        <Pressable style={styles.primaryButton} onPress={() => openQualityDocument(source)}>
+          <Text style={styles.primaryButtonLabel}>{viewLabel}</Text>
+        </Pressable>
+        {showDownload ? (
+          <Pressable style={styles.secondaryButton} onPress={() => openQualityDocument(source)}>
+            <Text style={styles.secondaryButtonLabel}>Download PDF</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function QualityCompliancePage() {
+  return (
+    <SectionShell
+      eyebrow="Quality & Compliance"
+      title="Quality, safety and product information"
+      description="We believe in being transparent about the products we make and the standards that support them. Explore our official Rose's Dairy registration, audit certification and Halloumi product information below."
+    >
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Official Certifications</Text>
+        <View style={styles.qualityDocGrid}>
+          <QualityDocumentCard
+            title="MPI Animal Products Exporter Registration"
+            description="Official MPI Animal Products Exporter registration for AYYILDIZ Limited trading as Roses Dairy (Halloumi Cheese)."
+            meta={[
+              { label: 'MPI ID', value: 'AEX000656' },
+              { label: 'Validity', value: '16 March 2026 – 16 March 2027' },
+            ]}
+            source={mpiRegistrationPdf}
+            viewLabel="View Certificate"
+            showDownload
+          />
+          <QualityDocumentCard
+            title="Food Safety & Quality Audit Certificate"
+            description="Certificate of Audit for Ayyildiz Ltd, trading as Rose's Halloumi."
+            meta={[{ label: 'Certificate expiry', value: '2 January 2027' }]}
+            source={foodSafetyAuditPdf}
+            viewLabel="View Certificate"
+            showDownload
+          />
+        </View>
+      </View>
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Halloumi Product Information</Text>
+        <View style={styles.qualityDocGrid}>
+          <QualityDocumentCard
+            title="Rose’s Dairy Halloumi Product Specification"
+            description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
+            meta={[
+              { label: 'Product', value: 'Rose’s Dairy Halloumi' },
+              { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
+              { label: 'Ingredients', value: 'Pasteurised Cow’s Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
+              { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
+              { label: 'Opened', value: 'Consume within 5 days once opened.' },
+            ]}
+            source={halloumiProductSpecPdf}
+            viewLabel="View Product Specification"
+            showDownload
+          />
+        </View>
+      </View>
+    </SectionShell>
   );
 }
 
@@ -1404,7 +1960,7 @@ function SignedInAccountPage({
           <View style={styles.inlineCard}>
             <Text style={styles.inlineCardTitle}>Account details</Text>
             <Text style={styles.metaText}>{session.user?.email}</Text>
-            <Text style={styles.metaText}>{session.user?.kind === 'staff' ? `${session.user.role} team access` : `${session.user?.type} customer access`}</Text>
+            <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
             <View style={styles.heroActionRow}>
               <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
@@ -1422,12 +1978,15 @@ function SignedInAccountPage({
             {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
             {(ordersQuery.data ?? []).slice(0, 3).map((order) => (
               <View key={order.id} style={styles.accountOrderRow}>
-                <Text style={styles.cartLineTitle}>Order #{order.id}</Text>
-                <Text style={styles.metaText}>{order.paymentStatus} • ${order.total.toFixed(2)}</Text>
+                <Text style={styles.cartLineTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+                <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • ${order.total.toFixed(2)}</Text>
               </View>
             ))}
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate(session.user?.kind === 'staff' ? 'orders' : 'cart')}>
-              <Text style={styles.secondaryButtonLabel}>{session.user?.kind === 'staff' ? 'View All Orders' : 'Open Cart & Checkout'}</Text>
+            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('orders')}>
+              <Text style={styles.secondaryButtonLabel}>View All Orders</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('cart')}>
+              <Text style={styles.secondaryButtonLabel}>Open Cart & Checkout</Text>
             </Pressable>
           </View>
         </View>
@@ -1436,12 +1995,16 @@ function SignedInAccountPage({
   );
 }
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
   const [mode, setMode] = useState<AuthMode>('customer-login');
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const customerLogin = trpc.auth.customerLogin.useMutation();
   const staffLogin = trpc.auth.staffLogin.useMutation();
@@ -1449,53 +2012,125 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   const loading = customerLogin.isPending || staffLogin.isPending || customerRegister.isPending;
 
+  function changeMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setFormError(null);
+  }
+
+  function validate(): string | null {
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters.';
+    }
+
+    if (mode === 'customer-register') {
+      if (name.trim().length < 2) {
+        return 'Enter your full name.';
+      }
+
+      if (contact.trim().length < 6) {
+        return 'Enter a valid mobile number.';
+      }
+
+      if (confirmPassword !== password) {
+        return 'Passwords do not match.';
+      }
+    }
+
+    return null;
+  }
+
   async function submit() {
+    const validationError = validate();
+
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError(null);
+
     try {
       if (mode === 'customer-register') {
         const result = await customerRegister.mutateAsync({
-          name,
-          contact: contact.trim() || undefined,
-          email,
+          name: name.trim(),
+          contact: contact.trim(),
+          email: email.trim(),
           password,
         });
         await onAuthenticated(result.token, result.user as SessionUser);
       } else if (mode === 'customer-login') {
-        const result = await customerLogin.mutateAsync({ email, password });
+        const result = await customerLogin.mutateAsync({ email: email.trim(), password });
         await onAuthenticated(result.token, result.user as SessionUser);
       } else {
-        const result = await staffLogin.mutateAsync({ email, password });
+        const result = await staffLogin.mutateAsync({ email: email.trim(), password });
         await onAuthenticated(result.token, result.user as SessionUser);
       }
     } catch (error) {
-      Alert.alert('Authentication failed', getErrorMessage(error));
+      setFormError(getErrorMessage(error));
     }
+  }
+
+  if (mode === 'admin-login') {
+    return (
+      <View style={styles.authPanel}>
+        <Text style={styles.authPanelTitle}>Admin Login</Text>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Sign in'}</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (
     <View style={styles.authPanel}>
-      <Text style={styles.authPanelTitle}>{brandName}</Text>
-      <Text style={styles.authPanelSubtitle}>Customer account access and registration for halloumi ordering.</Text>
-      <SegmentedControl
-        groupLabel="Authentication mode"
-        value={mode}
-        options={[
-          { label: 'Customer', value: 'customer-login' },
-          { label: 'Staff', value: 'staff-login' },
-          { label: 'Register', value: 'customer-register' },
-        ]}
-        onChange={(value) => setMode(value as AuthMode)}
-      />
+      <Text style={styles.authPanelTitle}>Welcome to {brandName}</Text>
+      <Text style={styles.authPanelSubtitle}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
       {mode === 'customer-register' ? (
         <>
-          <Field label="Business / account name" value={name} onChangeText={setName} />
-          <Field label="Contact" value={contact} onChangeText={setContact} />
+          <Field label="Full name" value={name} onChangeText={setName} />
+          <Field label="Mobile number" value={contact} onChangeText={setContact} keyboardType="default" />
         </>
       ) : null}
       <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      {mode === 'customer-register' ? (
+        <Field label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+      ) : null}
+      {mode === 'customer-login' ? (
+        <Text style={styles.metaText}>Forgot your password? Contact support to reset your account access.</Text>
+      ) : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
       </Pressable>
+      {mode === 'customer-login' ? (
+        <>
+          <Text style={styles.metaText}>Don&apos;t have an account?</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-register')}>
+            <Text style={styles.secondaryButtonLabel}>Create a customer account</Text>
+          </Pressable>
+        </>
+      ) : (
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      )}
+      <View style={styles.adminAccessSection}>
+        <Text style={styles.adminAccessLabel}>Admin Access</Text>
+        <Pressable onPress={() => changeMode('admin-login')}>
+          <Text style={styles.adminAccessLink}>Admin Login</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -1518,11 +2153,14 @@ function OrdersPage({ title, description }: { title: string; description: string
       {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
       {(ordersQuery.data ?? []).map((order) => (
         <View key={order.id} style={styles.inlineCard}>
-          <Text style={styles.inlineCardTitle}>Order #{order.id}</Text>
+          <Text style={styles.inlineCardTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+          <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleString()} • Status: {order.status}</Text>
           <Text style={styles.metaText}>{order.customer.name} • {order.paymentStatus} • ${order.total.toFixed(2)}</Text>
           <Text style={styles.metaText}>{order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now' : 'Pay in 30'} • {order.paymentMethod}</Text>
           {order.staff ? <Text style={styles.metaText}>Created by {order.staff.name}</Text> : null}
           {order.dueDate ? <Text style={styles.metaText}>Due {new Date(order.dueDate).toLocaleDateString()}</Text> : null}
+          {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to: {order.deliveryAddress}</Text> : null}
+          {order.orderNotes ? <Text style={styles.metaText}>Notes: {order.orderNotes}</Text> : null}
           {order.items.map((item) => (
             <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ ${item.unitPrice.toFixed(2)}</Text>
           ))}
@@ -1579,7 +2217,7 @@ function CustomersScreen() {
   }
 
   return (
-    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Staff can create and manage customer access without changing the halloumi product rules.">
+    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Admins can create and manage customer access without changing the halloumi product rules.">
       <View style={styles.inlineCard}>
         <Text style={styles.inlineCardTitle}>Create customer account</Text>
         <Field label="Name" value={name} onChangeText={setName} />
@@ -2018,6 +2656,57 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
+  qualitySection: {
+    gap: 16,
+  },
+  qualitySectionHeading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  qualityDocCard: {
+    flexBasis: 320,
+    flexGrow: 1,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 12,
+  },
+  qualityDocTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocDescription: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#4d5c54',
+  },
+  qualityDocMetaList: {
+    gap: 6,
+  },
+  qualityDocMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  qualityDocMetaLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7d6744',
+  },
+  qualityDocMetaValue: {
+    fontSize: 14,
+    color: '#4d5c54',
+    flexShrink: 1,
+  },
   noticeCard: {
     backgroundColor: '#fffdf8',
     borderRadius: 24,
@@ -2235,6 +2924,43 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     maxWidth: 520,
   },
+  storyFamilySection: {
+    gap: 16,
+  },
+  storyFarmToTableSection: {
+    gap: 16,
+  },
+  storyBrandStatementCard: {
+    backgroundColor: '#1f5c43',
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    gap: 10,
+    alignItems: 'center',
+  },
+  storyBrandStatement: {
+    color: '#fffdf8',
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    maxWidth: 640,
+  },
+  storyBrandClosingLine: {
+    color: '#f5e7b2',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  storyBulletList: {
+    gap: 10,
+  },
+  storyBulletItem: {
+    color: '#4d5c54',
+    fontSize: 16,
+    lineHeight: 26,
+  },
   wholesaleCard: {
     backgroundColor: '#123524',
     borderRadius: 28,
@@ -2265,6 +2991,25 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: '#4d5c54',
   },
+  adminAccessSection: {
+    marginTop: 12,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#e7ddc9',
+    alignItems: 'center',
+    gap: 4,
+  },
+  adminAccessLabel: {
+    fontSize: 12,
+    color: '#8a8375',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminAccessLink: {
+    fontSize: 13,
+    color: '#4d5c54',
+    textDecorationLine: 'underline',
+  },
   inlineTwoColumnRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2291,6 +3036,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     color: '#4d5c54',
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#b3261e',
+    fontWeight: '600',
   },
   segmentedControl: {
     flexDirection: 'row',

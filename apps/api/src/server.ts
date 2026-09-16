@@ -3,7 +3,7 @@ import express from 'express';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { allowedOrigins, env } from './config.js';
 import { createContext } from './context.js';
-import { ensureOrderNumberColumn } from './lib/ensureOrderNumberColumn.js';
+import { ensureOrderSchema } from './lib/ensureOrderNumberColumn.js';
 import { prisma } from './lib/prisma.js';
 import { appRouter } from './router/index.js';
 
@@ -35,18 +35,19 @@ app.use(
   }),
 );
 
-// Self-heal the `Order.orderNumber` column/index before accepting requests.
-// Some production databases were provisioned before this column existed and
-// were never re-synced with `prisma db push`, which made every order
-// creation (including the checkout "Confirm order" flow) fail with a
-// "column does not exist" error. This check is idempotent and only ever
-// adds the missing column/index/backfill — it never touches existing data —
-// so it is safe to run on every startup.
+// Self-heal `Order` table schema drift before accepting requests. Some
+// production databases were provisioned/last-synced before columns such as
+// `orderNumber` existed, or with a `deliveryAddress`/`orderNotes` column too
+// narrow (VARCHAR(191)) for the content the checkout flow writes to it. Both
+// made order creation (the checkout "Confirm order" flow) fail with a
+// database error. This check is idempotent and only ever adds missing
+// columns/indexes or widens narrow text columns — it never touches existing
+// data — so it is safe to run on every startup.
 async function start() {
   try {
-    await ensureOrderNumberColumn(prisma);
+    await ensureOrderSchema(prisma);
   } catch (error) {
-    console.error('[startup] Failed to verify/repair Order.orderNumber column. Order creation may fail until this is resolved:', error);
+    console.error('[startup] Failed to verify/repair Order table schema. Order creation may fail until this is resolved:', error);
   }
 
   app.listen(env.PORT, () => {

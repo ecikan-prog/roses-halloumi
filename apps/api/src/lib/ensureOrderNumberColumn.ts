@@ -1,34 +1,38 @@
 /**
- * SAFE, NON-DESTRUCTIVE self-healing check for the `Order.orderNumber` column.
+ * SAFE, NON-DESTRUCTIVE self-healing checks for `Order` table schema drift.
  *
- * Background: `prisma/schema.prisma` declares `Order.orderNumber` (a nullable,
- * unique String), but this project pushes schema changes with `prisma db
- * push` rather than tracked migrations. If a database was provisioned before
- * `orderNumber` was added to the schema and `db push` was never re-run
- * against it, Prisma Client still generates queries that reference the
- * column, and EVERY query against `Order` (including "Pay in 30" order
- * creation from the checkout "Confirm order" button) fails with an error
- * like:
+ * Background: this project pushes schema changes with `prisma db push`
+ * rather than tracked migrations, and production deploys only run `prisma
+ * generate` (see `apps/api/package.json` `build` script) — `db push` is
+ * never re-run automatically against the live database. If the production
+ * database was provisioned (or last synced) before a column was added to
+ * `schema.prisma`, or with a narrower column type than the schema now
+ * implies, Prisma Client still generates queries that assume the newer
+ * shape, and those queries fail at runtime with errors such as:
  *
  *   The column `railway.Order.orderNumber` does not exist in the current
  *   database.
+ *   Data too long for column 'deliveryAddress' at row 1
  *
- * This is the concrete, previously-unfixed root cause of "Confirm order"
- * silently failing in production: the order was never actually created
- * because the very first `prisma.order.create(...)` call throws as soon as
- * Prisma tries to read back the (missing) `orderNumber` column.
+ * Both are concrete, previously-seen root causes of "Confirm order" failing
+ * in production with a generic server error: the `orders.create` mutation's
+ * `prisma.$transaction(...)` throws before any response is returned, so the
+ * customer sees "We could not place your order because of a server error."
+ * even though nothing about the request itself was invalid.
  *
- * This function is called once at API startup (see `server.ts`) so the fix
- * is applied automatically on every deploy instead of depending on someone
- * remembering to run a one-off script by hand. It is also exported for reuse
- * by the standalone `scripts/ensure-order-number-column.ts` CLI.
+ * `ensureOrderSchema` is called once at API startup (see `server.ts`) so
+ * these fixes are applied automatically on every deploy instead of
+ * depending on someone remembering to run a one-off script by hand. It is
+ * also exported for reuse by the standalone
+ * `scripts/ensure-order-number-column.ts` CLI.
  *
  * It:
- *   - Only ever ADDS the `orderNumber` column (and its unique index) to the
- *     `Order` table if they are missing. It never drops or alters any other
- *     column, table, or row.
- *   - Is fully idempotent: running it again when the column/index already
- *     exist is a no-op.
+ *   - Only ever ADDS missing columns/indexes, or WIDENS an existing text
+ *     column's capacity (e.g. `VARCHAR(191)` -> `TEXT`). It never drops,
+ *     narrows, or alters any column in a way that could lose data, and
+ *     never touches any table other than `Order`.
+ *   - Is fully idempotent: running it again when everything already matches
+ *     the current schema is a no-op.
  *   - Backfills `orderNumber` ONLY for existing rows where it is currently
  *     NULL, using the exact same `GC-000123` format the API already
  *     generates for new orders. No existing non-null orderNumber, and no
@@ -53,6 +57,17 @@ async function columnExists(prisma: PrismaClient, table: string, column: string)
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
+async function getColumnDataType(prisma: PrismaClient, table: string, column: string) {
+  const rows = await prisma.$queryRaw<Array<{ DATA_TYPE: string }>>`
+    SELECT DATA_TYPE
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = ${table}
+      AND column_name = ${column}
+  `;
+  return rows[0]?.DATA_TYPE ?? null;
+}
+
 async function indexExists(prisma: PrismaClient, table: string, indexName: string) {
   const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
     SELECT COUNT(*) AS count
@@ -64,14 +79,49 @@ async function indexExists(prisma: PrismaClient, table: string, indexName: strin
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
-export async function ensureOrderNumberColumn(prisma: PrismaClient, log: (message: string) => void = console.log) {
-  const hasColumn = await columnExists(prisma, 'Order', 'orderNumber');
+/**
+ * Ensures a nullable free-text `Order` column (e.g. `deliveryAddress`,
+ * `orderNotes`) exists and is a `TEXT` column, wide enough to hold the
+ * multi-line, multi-field content the API builds for it. Prisma's default
+ * mapping for an un-annotated `String?` column is `VARCHAR(191)`, which is
+ * too small for a formatted delivery address (name + address line + suburb
+ * + region + postcode + country) or a full order note, and MySQL rejects
+ * the insert with "Data too long for column" — this is why "Confirm order"
+ * could still fail in production even after the `orderNumber` column was
+ * fixed. Widening a column never loses existing data.
+ */
+async function ensureWideTextColumn(prisma: PrismaClient, table: string, column: string, log: (message: string) => void) {
+  const hasColumn = await columnExists(prisma, table, column);
 
   if (!hasColumn) {
-    log('[ensure-order-number-column] Column Order.orderNumber is missing. Adding it now (nullable, non-destructive)...');
-    await prisma.$executeRawUnsafe('ALTER TABLE `Order` ADD COLUMN `orderNumber` VARCHAR(191) NULL');
-    log('[ensure-order-number-column] Added column Order.orderNumber.');
+    log(`[ensure-order-schema] Column ${table}.${column} is missing. Adding it now as TEXT (nullable, non-destructive)...`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` TEXT NULL`);
+    log(`[ensure-order-schema] Added column ${table}.${column}.`);
+    return;
   }
+
+  const dataType = await getColumnDataType(prisma, table, column);
+
+  if (dataType === 'varchar') {
+    log(`[ensure-order-schema] Column ${table}.${column} is a narrow VARCHAR. Widening it to TEXT (non-destructive, keeps existing data)...`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` TEXT NULL`);
+    log(`[ensure-order-schema] Widened column ${table}.${column} to TEXT.`);
+  }
+}
+
+/** Adds a missing nullable/defaulted `Order` column if it doesn't already exist. Never touches an existing column. */
+async function ensureColumn(prisma: PrismaClient, table: string, column: string, ddl: string, log: (message: string) => void) {
+  const hasColumn = await columnExists(prisma, table, column);
+
+  if (!hasColumn) {
+    log(`[ensure-order-schema] Column ${table}.${column} is missing. Adding it now (${ddl})...`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${ddl}`);
+    log(`[ensure-order-schema] Added column ${table}.${column}.`);
+  }
+}
+
+export async function ensureOrderNumberColumn(prisma: PrismaClient, log: (message: string) => void = console.log) {
+  await ensureColumn(prisma, 'Order', 'orderNumber', 'VARCHAR(191) NULL', log);
 
   const hasUniqueIndex = await indexExists(prisma, 'Order', 'Order_orderNumber_key');
 
@@ -94,4 +144,33 @@ export async function ensureOrderNumberColumn(prisma: PrismaClient, log: (messag
   if (ordersMissingNumber.length > 0) {
     log(`[ensure-order-number-column] Backfilled orderNumber for ${ordersMissingNumber.length} existing order(s).`);
   }
+}
+
+/**
+ * Full self-heal pass for `Order` table schema drift. Runs the existing
+ * `orderNumber` column/index/backfill check, then defensively ensures every
+ * other column `orders.create` relies on is present (adding it with a
+ * schema-consistent, non-destructive default if missing) and widens the
+ * free-text columns that were previously too small. Called once at API
+ * startup — see `server.ts`.
+ */
+export async function ensureOrderSchema(prisma: PrismaClient, log: (message: string) => void = console.log) {
+  await ensureOrderNumberColumn(prisma, log);
+
+  // Defensive: these columns were all introduced alongside orderNumber for
+  // the checkout/"Pay in 30" flow. If the production database missed one
+  // `db push`, it could be missing any of them, not just orderNumber.
+  await ensureColumn(prisma, 'Order', 'staffId', 'INT NULL', log);
+  await ensureColumn(prisma, 'Order', 'subtotal', 'DECIMAL(10,2) NULL', log);
+  await ensureColumn(prisma, 'Order', 'deliveryCharge', "DECIMAL(10,2) NOT NULL DEFAULT '0.00'", log);
+  await ensureColumn(prisma, 'Order', 'discountApplied', "DECIMAL(10,2) NOT NULL DEFAULT '0.00'", log);
+  await ensureColumn(prisma, 'Order', 'dueDate', 'DATETIME(3) NULL', log);
+  await ensureColumn(prisma, 'Order', 'paymentStatus', "ENUM('PAID','OUTSTANDING','OVERDUE') NOT NULL DEFAULT 'OUTSTANDING'", log);
+  await ensureColumn(prisma, 'Order', 'paymentMethod', "ENUM('IN_APP','EFTPOS') NOT NULL DEFAULT 'IN_APP'", log);
+
+  // deliveryAddress/orderNotes must be TEXT, not the default VARCHAR(191) —
+  // see ensureWideTextColumn for why the narrower type breaks order
+  // creation for realistic addresses/notes.
+  await ensureWideTextColumn(prisma, 'Order', 'deliveryAddress', log);
+  await ensureWideTextColumn(prisma, 'Order', 'orderNotes', log);
 }

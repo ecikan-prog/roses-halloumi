@@ -571,6 +571,10 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const total = subtotal - discount + deliveryCharge;
   const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
   async function submitOrder() {
     if (!selectedItems.length) {
       Alert.alert('Add items', 'Choose at least one Halloumi product before confirming the order.');
@@ -705,7 +709,14 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       break;
     case 'home':
     default:
-      content = <HomePage onNavigate={setPage} />;
+      content = (
+        <HomePage
+          onNavigate={setPage}
+          shopProducts={shopProducts}
+          quantities={quantities}
+          adjustQuantity={adjustQuantity}
+        />
+      );
       break;
   }
 
@@ -860,7 +871,7 @@ function SiteFooter({
 
 function HomePage({
   onNavigate,
-  shopProducts,
+  shopProducts = [],
   quantities,
   adjustQuantity,
 }: {

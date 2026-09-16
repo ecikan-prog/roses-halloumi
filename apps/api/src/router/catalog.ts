@@ -1,14 +1,17 @@
 import { CustomerType } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { protectedProcedure, router, staffProcedure } from './trpc.js';
+import { publicProcedure, router, staffProcedure } from './trpc.js';
 
 function getUnitPrice(customerType: CustomerType, wholesalePrice: { toNumber(): number }, retailPrice: { toNumber(): number }) {
   return customerType === CustomerType.WHOLESALE ? wholesalePrice.toNumber() : retailPrice.toNumber();
 }
 
 export const catalogRouter = router({
-  listProducts: protectedProcedure
+  // Publicly readable so retail visitors can see live, active halloumi products and
+  // retail pricing before creating an account. Staff-only fields (e.g. inactive
+  // products) still require an authenticated staff session via includeInactive.
+  listProducts: publicProcedure
     .input(
       z
         .object({
@@ -18,11 +21,19 @@ export const catalogRouter = router({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
+      if (input?.includeInactive && (!ctx.user || ctx.user.kind !== 'staff')) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Staff access required.' });
+      }
+
       let customerType: CustomerType;
 
-      if (ctx.user.kind === 'customer') {
+      if (ctx.user && ctx.user.kind === 'customer') {
         customerType = ctx.user.type;
       } else if (input?.customerId) {
+        if (!ctx.user || ctx.user.kind !== 'staff') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Staff access required.' });
+        }
+
         const customer = await ctx.prisma.customer.findUnique({ where: { id: input.customerId } });
 
         if (!customer) {

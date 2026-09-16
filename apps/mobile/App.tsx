@@ -359,10 +359,68 @@ function PublicWebsite({
   onNavigate: (page: PublicPage) => void;
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
 }) {
-  const content = renderPublicPage(currentPage, onNavigate, onAuthenticated);
+  // Retail visitors can browse live halloumi pricing and build a cart before creating
+  // an account. This is the same cart storage the signed-in checkout reads on login.
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const productsQuery = trpc.catalog.listProducts.useQuery();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
+
+  const shopProducts = useMemo<ShopProductView[]>(() => {
+    const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
+    return shopProductSpecs.map((spec) => ({
+      ...spec,
+      product: backendProducts.find((product) => matchesAllowedProduct(product, spec)),
+    }));
+  }, [productsQuery.data]);
+
+  const selectedItems = shopProducts
+    .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
+    .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
+
+  const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  const content = renderPublicPage(currentPage, onNavigate, onAuthenticated, {
+    productsQuery,
+    shopProducts,
+    quantities,
+    adjustQuantity,
+    selectedItems,
+  });
 
   return (
-    <SiteScreen currentPage={currentPage} onNavigate={onNavigate} session={null}>
+    <SiteScreen currentPage={currentPage} onNavigate={onNavigate} session={null} cartCount={cartCount}>
       {content}
     </SiteScreen>
   );
@@ -372,10 +430,25 @@ function renderPublicPage(
   currentPage: PublicPage,
   onNavigate: (page: PublicPage) => void,
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>,
+  cart: {
+    productsQuery: ReturnType<typeof trpc.catalog.listProducts.useQuery>;
+    shopProducts: ShopProductView[];
+    quantities: Record<number, number>;
+    adjustQuantity: (productId: number, nextQuantity: number) => void;
+    selectedItems: Array<ProductRecord & { qty: number }>;
+  },
 ) {
   switch (currentPage) {
     case 'shop':
-      return <PublicShopPage onNavigate={onNavigate} />;
+      return (
+        <PublicShopPage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          isLoading={cart.productsQuery.isLoading}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
     case 'recipes':
       return <RecipesPage />;
     case 'wholesale':
@@ -385,7 +458,13 @@ function renderPublicPage(
     case 'quality-compliance':
       return <QualityCompliancePage />;
     case 'cart':
-      return <PublicCartPage onNavigate={onNavigate} />;
+      return (
+        <PublicCartPage
+          onNavigate={onNavigate}
+          selectedItems={cart.selectedItems}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
     case 'account':
       return <AccountPage onNavigate={onNavigate} onAuthenticated={onAuthenticated} />;
     case 'contact':
@@ -396,7 +475,14 @@ function renderPublicPage(
       return <TermsPage />;
     case 'home':
     default:
-      return <HomePage onNavigate={onNavigate} />;
+      return (
+        <HomePage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
   }
 }
 
@@ -772,11 +858,21 @@ function SiteFooter({
   );
 }
 
-function HomePage({ onNavigate }: { onNavigate: (page: any) => void }) {
+function HomePage({
+  onNavigate,
+  shopProducts,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
   return (
     <>
       <HeroSection onPrimary={() => onNavigate('shop')} onSecondary={() => onNavigate('about')} />
-      <PublicShopSection onNavigate={onNavigate} />
+      <PublicShopSection onNavigate={onNavigate} shopProducts={shopProducts} quantities={quantities} adjustQuantity={adjustQuantity} />
       <WhyGrasslandSection />
       <RecipesSection onNavigate={onNavigate} />
       <StorySection />
@@ -865,26 +961,87 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
   );
 }
 
-function PublicShopSection({ onNavigate }: { onNavigate: (page: any) => void }) {
+function PublicShopSection({
+  onNavigate,
+  shopProducts,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
   return (
-    <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three customer-facing sizes. Pricing and ordering appear as soon as matching live product records are available.">
+    <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
       <View style={styles.productGrid}>
-        {shopProductSpecs.map((product) => (
-          <ProductCard key={product.slug} product={product} quantity={0} onAdd={() => onNavigate('account')} onOpenDetails={() => onNavigate('shop')} disabled ctaLabel="Available Soon" />
-        ))}
+        {shopProducts.map((product) => {
+          const backendProduct = product.product;
+          const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+          return (
+            <ProductCard
+              key={product.slug}
+              product={product}
+              quantity={quantity}
+              onAdd={() => {
+                if (!backendProduct) {
+                  return;
+                }
+                adjustQuantity(backendProduct.id, quantity + 1);
+              }}
+              onOpenDetails={() => onNavigate('shop')}
+              onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+              onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+              disabled={!backendProduct}
+              ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+            />
+          );
+        })}
       </View>
     </SectionShell>
   );
 }
 
-function PublicShopPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+function PublicShopPage({
+  onNavigate,
+  shopProducts,
+  isLoading,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  isLoading: boolean;
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
   return (
     <>
-      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Create an account or sign in to access ordering when live product records are available.">
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Add halloumi to your cart now, then sign in or create an account to complete checkout.">
+        {isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
         <View style={styles.productGrid}>
-          {shopProductSpecs.map((product) => (
-            <ProductCard key={product.slug} product={product} quantity={0} onAdd={() => onNavigate('account')} onOpenDetails={() => {}} disabled ctaLabel="Available Soon" />
-          ))}
+          {shopProducts.map((product) => {
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+            return (
+              <ProductCard
+                key={product.slug}
+                product={product}
+                quantity={quantity}
+                onAdd={() => {
+                  if (!backendProduct) {
+                    return;
+                  }
+                  adjustQuantity(backendProduct.id, quantity + 1);
+                }}
+                onOpenDetails={() => {}}
+                onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+                onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+              />
+            );
+          })}
         </View>
         <View style={styles.noticeCard}>
           <Text style={styles.noticeTitle}>Halloumi only</Text>
@@ -1345,12 +1502,54 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
   );
 }
 
-function PublicCartPage({ onNavigate }: { onNavigate: (page: PublicPage) => void }) {
+function PublicCartPage({
+  onNavigate,
+  selectedItems,
+  adjustQuantity,
+}: {
+  onNavigate: (page: PublicPage) => void;
+  selectedItems: Array<ProductRecord & { qty: number }>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
+
   return (
-    <SectionShell eyebrow="Cart" title="Cart and checkout" description="Create an account to continue into ordering once matching live halloumi products are published.">
+    <SectionShell eyebrow="Cart" title="Cart and checkout" description="Sign in or create an account to complete checkout with existing server-side pricing.">
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Cart</Text>
+        {selectedItems.length ? (
+          selectedItems.map((item) => (
+            <View key={item.id} style={styles.cartLineItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cartLineTitle}>{item.name}</Text>
+                <Text style={styles.metaText}>{item.qty} × ${item.effectivePrice.toFixed(2)}</Text>
+                <View style={styles.quantityRow}>
+                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
+                    <Text style={styles.quantityLabel}>-</Text>
+                  </Pressable>
+                  <Text style={styles.quantityValue}>{item.qty}</Text>
+                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
+                    <Text style={styles.quantityLabel}>+</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => adjustQuantity(item.id, 0)}>
+                    <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={styles.cartLineTotal}>${(item.qty * item.effectivePrice).toFixed(2)}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
+        )}
+        <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
+        </Pressable>
+      </View>
+      {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: ${subtotal.toFixed(2)}</Text> : null}
       <View style={styles.noticeCard}>
         <Text style={styles.noticeTitle}>Ready to order?</Text>
-        <Text style={styles.noticeText}>Sign in or register to manage your customer account and move into the live ordering flow when product availability is published.</Text>
+        <Text style={styles.noticeText}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
         <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
           <Text style={styles.primaryButtonLabel}>Go to Account</Text>
         </Pressable>

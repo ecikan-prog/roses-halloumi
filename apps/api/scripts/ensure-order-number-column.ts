@@ -1,12 +1,14 @@
 /**
- * SAFE, NON-DESTRUCTIVE production fix for the missing `Order.orderNumber`
- * column.
+ * SAFE, NON-DESTRUCTIVE production fix for `Order` table schema drift
+ * (missing columns such as `orderNumber`, and narrow `deliveryAddress`/
+ * `orderNotes` columns that are too small for their content).
  *
  * NOTE: as of this change the API also runs this same, idempotent check
  * automatically on every startup (see `src/server.ts` /
- * `src/lib/ensureOrderNumberColumn.ts`), so production should self-heal on
- * deploy without needing this script run by hand. It is kept as a
- * standalone CLI for manually checking/fixing a database out-of-band.
+ * `src/lib/ensureOrderNumberColumn.ts`'s `ensureOrderSchema`), so production
+ * should self-heal on deploy without needing this script run by hand. It is
+ * kept as a standalone CLI for manually checking/fixing a database
+ * out-of-band.
  *
  * Usage (local):
  *   npm run ensure-order-number-column --workspace @dairy-sales/api
@@ -19,13 +21,13 @@
  * never prints DATABASE_URL, credentials, or any other secret.)
  */
 import { PrismaClient } from '@prisma/client';
-import { ensureOrderNumberColumn } from '../src/lib/ensureOrderNumberColumn.js';
+import { ensureOrderSchema } from '../src/lib/ensureOrderNumberColumn.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  await ensureOrderNumberColumn(prisma, console.log);
-  console.log('\nDone. Only the orderNumber column/index and NULL orderNumber values above were touched; no orders were deleted or reset.');
+  await ensureOrderSchema(prisma, console.log);
+  console.log('\nDone. Only missing Order columns/indexes were added and narrow text columns were widened; no orders were deleted or reset.');
 }
 
 main()

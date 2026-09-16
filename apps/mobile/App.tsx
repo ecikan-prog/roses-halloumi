@@ -974,15 +974,28 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
 
 function PublicShopSection({
   onNavigate,
-  shopProducts,
+  shopProducts = [],
   quantities,
   adjustQuantity,
 }: {
   onNavigate: (page: any) => void;
-  shopProducts: ShopProductView[];
+  shopProducts?: ShopProductView[];
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  // Defensive default: shopProducts should always be an array by the time it reaches this
+  // component (it is derived from a fixed list of product specs, never directly from the
+  // API response), but a missing prop here previously crashed the whole app with
+  // "shopProducts.map is not a function". Never let a data-flow regression upstream take
+  // down the homepage (and, transitively, customer login) again.
+  if (shopProducts.length === 0) {
+    return (
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
+        <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+      </SectionShell>
+    );
+  }
+
   return (
     <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
       <View style={styles.productGrid}>
@@ -1015,13 +1028,13 @@ function PublicShopSection({
 
 function PublicShopPage({
   onNavigate,
-  shopProducts,
+  shopProducts = [],
   isLoading,
   quantities,
   adjustQuantity,
 }: {
   onNavigate: (page: any) => void;
-  shopProducts: ShopProductView[];
+  shopProducts?: ShopProductView[];
   isLoading: boolean;
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
@@ -1077,7 +1090,7 @@ function ShopPage({
   setPaymentMethod,
   quantities,
   setQuantities,
-  shopProducts,
+  shopProducts = [],
   selectedProductSlug,
   setSelectedProductSlug,
   onNavigate,
@@ -1094,7 +1107,7 @@ function ShopPage({
   setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
   quantities: Record<number, number>;
   setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
-  shopProducts: ShopProductView[];
+  shopProducts?: ShopProductView[];
   selectedProductSlug: ShopProductSpec['slug'] | null;
   setSelectedProductSlug: Dispatch<SetStateAction<ShopProductSpec['slug'] | null>>;
   onNavigate: (page: SignedInPage) => void;

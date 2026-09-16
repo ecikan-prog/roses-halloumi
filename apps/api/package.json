@@ -12,7 +12,9 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "update-admin-email": "tsx scripts/update-admin-email.ts",
-    "reset-admin-password": "tsx scripts/reset-admin-password.ts"
+    "reset-admin-password": "tsx scripts/reset-admin-password.ts",
+    "verify-halloumi-products": "tsx scripts/verify-halloumi-products.ts",
+    "fix-halloumi-products": "tsx scripts/fix-halloumi-products.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

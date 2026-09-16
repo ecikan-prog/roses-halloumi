@@ -270,8 +270,15 @@ function matchesAllowedProduct(product: ProductRecord, spec: ShopProductSpec) {
   return product.name.trim().toLowerCase() === spec.name.toLowerCase();
 }
 
+// All retail pricing is quoted in New Zealand Dollars. The catalog/order backend
+// (apps/api) is the source of truth for the actual amount; this only controls display
+// formatting so the same NZD figure shown here matches what checkout charges.
+function formatMoney(amount: number) {
+  return `NZD $${amount.toFixed(2)}`;
+}
+
 function formatPrice(product?: ProductRecord) {
-  return product ? `$${product.effectivePrice.toFixed(2)}` : 'Available Soon';
+  return product ? formatMoney(product.effectivePrice) : 'Available Soon';
 }
 
 function AppContent({
@@ -1428,7 +1435,7 @@ function CartPage({
                 <View key={item.id} style={styles.cartLineItem}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cartLineTitle}>{item.name}</Text>
-                    <Text style={styles.metaText}>{item.qty} × ${item.effectivePrice.toFixed(2)}</Text>
+                    <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
                     <View style={styles.quantityRow}>
                       <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty - 1)}>
                         <Text style={styles.quantityLabel}>-</Text>
@@ -1442,7 +1449,7 @@ function CartPage({
                       </Pressable>
                     </View>
                   </View>
-                  <Text style={styles.cartLineTotal}>${(item.qty * item.effectivePrice).toFixed(2)}</Text>
+                  <Text style={styles.cartLineTotal}>{formatMoney(item.qty * item.effectivePrice)}</Text>
                 </View>
               ))
             ) : (
@@ -1486,10 +1493,10 @@ function CartPage({
                 onChange={(value) => setPaymentMethod(value as PaymentMethod)}
               />
             ) : null}
-            <Text style={styles.summaryLine}>Subtotal: ${subtotal.toFixed(2)}</Text>
-            <Text style={styles.summaryLine}>Discount: -${discount.toFixed(2)}</Text>
-            <Text style={styles.summaryLine}>Delivery: {deliveryCharge > 0 ? `$${deliveryCharge.toFixed(2)}` : 'Free'}</Text>
-            <Text style={styles.summaryTotal}>Total: ${total.toFixed(2)}</Text>
+            <Text style={styles.summaryLine}>Subtotal: {formatMoney(subtotal)}</Text>
+            <Text style={styles.summaryLine}>Discount: -{formatMoney(discount)}</Text>
+            <Text style={styles.summaryLine}>Delivery: {deliveryCharge > 0 ? formatMoney(deliveryCharge) : 'Free'}</Text>
+            <Text style={styles.summaryTotal}>Total: {formatMoney(total)}</Text>
             <Pressable
               disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid}
               style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid) && styles.disabledPrimaryButton]}
@@ -1521,12 +1528,12 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
         <Text style={styles.inlineCardTitle}>Order {order.orderNumber}</Text>
         <Text style={styles.metaText}>Placed {new Date(order.createdAt).toLocaleString()}</Text>
         {order.items.map((item) => (
-          <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ ${item.unitPrice.toFixed(2)}</Text>
+          <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ {formatMoney(item.unitPrice)}</Text>
         ))}
-        <Text style={styles.summaryLine}>Subtotal: ${order.subtotal.toFixed(2)}</Text>
-        <Text style={styles.summaryLine}>Discount: -${order.discountApplied.toFixed(2)}</Text>
-        <Text style={styles.summaryLine}>Delivery: {order.deliveryCharge > 0 ? `$${order.deliveryCharge.toFixed(2)}` : 'Free'}</Text>
-        <Text style={styles.summaryTotal}>Total: ${order.total.toFixed(2)}</Text>
+        <Text style={styles.summaryLine}>Subtotal: {formatMoney(order.subtotal)}</Text>
+        <Text style={styles.summaryLine}>Discount: -{formatMoney(order.discountApplied)}</Text>
+        <Text style={styles.summaryLine}>Delivery: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text>
+        <Text style={styles.summaryTotal}>Total: {formatMoney(order.total)}</Text>
         <View style={styles.heroActionRow}>
           <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
             <Text style={styles.primaryButtonLabel}>View Order History</Text>
@@ -1560,7 +1567,7 @@ function PublicCartPage({
             <View key={item.id} style={styles.cartLineItem}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cartLineTitle}>{item.name}</Text>
-                <Text style={styles.metaText}>{item.qty} × ${item.effectivePrice.toFixed(2)}</Text>
+                <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
                 <View style={styles.quantityRow}>
                   <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
                     <Text style={styles.quantityLabel}>-</Text>
@@ -1574,7 +1581,7 @@ function PublicCartPage({
                   </Pressable>
                 </View>
               </View>
-              <Text style={styles.cartLineTotal}>${(item.qty * item.effectivePrice).toFixed(2)}</Text>
+              <Text style={styles.cartLineTotal}>{formatMoney(item.qty * item.effectivePrice)}</Text>
             </View>
           ))
         ) : (
@@ -1584,7 +1591,7 @@ function PublicCartPage({
           <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
         </Pressable>
       </View>
-      {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: ${subtotal.toFixed(2)}</Text> : null}
+      {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: {formatMoney(subtotal)}</Text> : null}
       <View style={styles.noticeCard}>
         <Text style={styles.noticeTitle}>Ready to order?</Text>
         <Text style={styles.noticeText}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
@@ -2017,7 +2024,7 @@ function SignedInAccountPage({
             {(ordersQuery.data ?? []).slice(0, 3).map((order) => (
               <View key={order.id} style={styles.accountOrderRow}>
                 <Text style={styles.cartLineTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
-                <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • ${order.total.toFixed(2)}</Text>
+                <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • {formatMoney(order.total)}</Text>
               </View>
             ))}
             <Pressable style={styles.secondaryButton} onPress={() => onNavigate('orders')}>
@@ -2200,7 +2207,7 @@ function OrdersPage({ title, description }: { title: string; description: string
           {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to: {order.deliveryAddress}</Text> : null}
           {order.orderNotes ? <Text style={styles.metaText}>Notes: {order.orderNotes}</Text> : null}
           {order.items.map((item) => (
-            <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ ${item.unitPrice.toFixed(2)}</Text>
+            <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ {formatMoney(item.unitPrice)}</Text>
           ))}
         </View>
       ))}

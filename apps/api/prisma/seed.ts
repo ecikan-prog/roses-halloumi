@@ -55,9 +55,9 @@ async function main() {
   });
 
   const products = [
-    { name: 'Grassland Cheese Halloumi — 1kg', unit: '1kg block', wholesalePrice: '18.50', retailPrice: '27.99' },
-    { name: 'Grassland Cheese Halloumi — 500g', unit: '500g block', wholesalePrice: '10.50', retailPrice: '15.99' },
-    { name: 'Grassland Cheese Halloumi — 200g', unit: '200g block', wholesalePrice: '5.50', retailPrice: '8.49' },
+    { name: 'Grassland Cheese Halloumi — 1kg', unit: '1kg block', wholesalePrice: '18.50', retailPrice: '25.00', active: true },
+    { name: 'Grassland Cheese Halloumi — 500g', unit: '500g block', wholesalePrice: '10.50', retailPrice: '15.00', active: true },
+    { name: 'Grassland Cheese Halloumi — 200g', unit: '200g block', wholesalePrice: '5.50', retailPrice: '6.00', active: true },
   ];
 
   for (const product of products) {

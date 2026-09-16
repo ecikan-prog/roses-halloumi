@@ -551,6 +551,7 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressForm>(emptyDeliveryAddress);
   const [orderNotes, setOrderNotes] = useState('');
   const [lastOrder, setLastOrder] = useState<ConfirmedOrder | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [selectedProductSlug, setSelectedProductSlug] = useState<ShopProductSpec['slug'] | null>(null);
   const isStaff = user.kind === 'staff';
   const effectiveCustomerId = user.kind === 'customer' ? user.id : selectedCustomerId;
@@ -647,13 +648,17 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   }
 
   async function submitOrder() {
+    setOrderError(null);
+
     if (!selectedItems.length) {
       Alert.alert('Add items', 'Choose at least one Halloumi product before confirming the order.');
+      setOrderError('Choose at least one Halloumi product before confirming the order.');
       return;
     }
 
     if (user.kind === 'staff' && !effectiveCustomerId) {
       Alert.alert('Choose customer', 'Select a customer before creating an admin order.');
+      setOrderError('Select a customer before creating an admin order.');
       return;
     }
 
@@ -662,11 +667,13 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         'Pay now is not available yet',
         'Online card payment is coming soon. Please select "Pay in 30" to place your order today without paying online.',
       );
+      setOrderError('Online card payment isn\u2019t available yet. Please select "Pay in 30" to place your order today without paying online.');
       return;
     }
 
     if (user.kind === 'customer' && !deliveryAddressReady) {
       Alert.alert('Delivery address required', 'Enter your name, address, suburb/town/city, postcode and country before confirming the order.');
+      setOrderError('Enter your name, address, suburb/town/city, postcode and country before confirming the order.');
       return;
     }
 
@@ -694,6 +701,7 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       await clearStoredCart();
       setDeliveryAddress(emptyDeliveryAddress);
       setOrderNotes('');
+      setOrderError(null);
       setLastOrder({
         orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
         subtotal: result.subtotal ?? subtotal,
@@ -709,7 +717,14 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       });
       setPage('order-confirmation');
     } catch (error) {
-      Alert.alert('Order failed', getErrorMessage(error));
+      // Alert.alert is a no-op on web (react-native-web), so on the web
+      // build the customer would otherwise see nothing happen at all when
+      // order creation fails. orderError is rendered directly in the
+      // checkout UI so the failure (and the real reason, e.g. a server
+      // error) is always visible regardless of platform.
+      const message = getErrorMessage(error);
+      Alert.alert('Order failed', message);
+      setOrderError(message);
     }
   }
 
@@ -774,6 +789,7 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
           onNavigate={setPage}
           onSubmitOrder={submitOrder}
           isSubmitting={createOrder.isPending}
+          orderError={orderError}
         />
       );
       break;
@@ -1466,6 +1482,7 @@ function CartPage({
   onNavigate,
   onSubmitOrder,
   isSubmitting,
+  orderError,
 }: {
   session: SessionState;
   paymentTerm: PaymentTerm;
@@ -1492,6 +1509,7 @@ function CartPage({
   onNavigate: (page: SignedInPage) => void;
   onSubmitOrder: () => Promise<void>;
   isSubmitting: boolean;
+  orderError: string | null;
 }) {
   const isCustomer = session.user?.kind === 'customer';
   const deliveryAddressValid = !isCustomer || deliveryAddressReady;
@@ -1601,6 +1619,7 @@ function CartPage({
               <Text style={styles.metaText}>Shipping shown uses a configurable NZ courier rate table pending our final courier rate card — this is not yet the official price.</Text>
             ) : null}
             <Text style={styles.summaryTotal}>Total: {formatMoney(total)}</Text>
+            {orderError ? <Text style={styles.errorText}>{orderError}</Text> : null}
             <Pressable
               disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow}
               style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow) && styles.disabledPrimaryButton]}

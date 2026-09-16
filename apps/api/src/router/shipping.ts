@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { calculateShipping, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
+import { calculateShipping, DEPOT_ADDRESS, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
 import { getProductWeightKg } from '../lib/productWeights.js';
 import { publicProcedure, router } from './trpc.js';
 
@@ -47,7 +47,7 @@ export const shippingRouter = router({
         postcode: input.destination.postcode,
       };
 
-      const result = calculateShipping({ destination, totalProductWeight });
+      const result = calculateShipping({ origin: DEPOT_ADDRESS, destination, totalWeight: totalProductWeight });
 
       return { ...result, totalProductWeight };
     }),

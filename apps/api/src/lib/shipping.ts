@@ -7,6 +7,11 @@
  * courier rate card is supplied, only that config file needs to change; this
  * engine and the checkout/order code do not need to be rewritten.
  *
+ * Every shipment is calculated from our depot (the ORIGIN, see
+ * `DEPOT_ADDRESS` in `nzCourierRateConfig.ts`) to the customer's delivery
+ * address (the DESTINATION). The origin is never the customer's address —
+ * callers must always pass `DEPOT_ADDRESS` as `origin`.
+ *
  * IMPORTANT: the rates produced here are placeholders (see
  * `nzCourierRateConfig.ts`) until a real courier rate card is configured —
  * `isTemporaryRate` is always `true` while that remains the case and must be
@@ -15,6 +20,7 @@
  */
 
 import {
+  DEPOT_ADDRESS,
   FREE_SHIPPING_THRESHOLD_NZD,
   MAX_PARCEL_WEIGHT_KG,
   NZ_WEIGHT_BANDS,
@@ -38,10 +44,20 @@ export type ShippingDestination = {
   isRural?: boolean;
 };
 
+/** The shipment's starting point. In production this is always `DEPOT_ADDRESS` — never the customer's address. */
+export type ShippingOrigin = {
+  country: string;
+  region?: string | null;
+  city?: string | null;
+  postcode?: string | null;
+};
+
 export type ShippingCalculationInput = {
+  /** Our dispatch/depot address. Always `DEPOT_ADDRESS` in production — the customer's address is never the origin. */
+  origin: ShippingOrigin;
   destination: ShippingDestination;
   /** Total product weight in kilograms (sum of productWeightKg * qty across the cart). Packaging weight is added internally. */
-  totalProductWeight: number;
+  totalWeight: number;
 };
 
 export type NzIsland = 'NORTH' | 'SOUTH';
@@ -55,6 +71,8 @@ export type ShippingCalculationResult = {
   island: NzIsland;
   serviceArea: NzServiceArea;
   isRemote: boolean;
+  /** True when the origin (depot) and destination are on different islands, i.e. the shipment requires an inter-island ferry/line-haul leg. */
+  crossesIslands: boolean;
   weightBandLabel: string;
   /** Total shipment weight used for rating, i.e. total product weight + packaging weight. */
   totalShipmentWeightKg: number;
@@ -111,7 +129,7 @@ function splitIntoParcels(totalShipmentWeightKg: number): number[] {
   return Array.from({ length: parcelCount }, () => perParcelWeight);
 }
 
-function ratePerParcel(weightKg: number, island: NzIsland, serviceArea: NzServiceArea, isRemote: boolean): number {
+function ratePerParcel(weightKg: number, crossesIslands: boolean, serviceArea: NzServiceArea, isRemote: boolean): number {
   const band = resolveWeightBand(weightKg);
   let rate = band.urbanRateNzd;
 
@@ -123,7 +141,7 @@ function ratePerParcel(weightKg: number, island: NzIsland, serviceArea: NzServic
     rate += REMOTE_SURCHARGE_NZD;
   }
 
-  if (island === 'SOUTH') {
+  if (crossesIslands) {
     rate += SOUTH_ISLAND_SURCHARGE_NZD;
   }
 
@@ -131,10 +149,13 @@ function ratePerParcel(weightKg: number, island: NzIsland, serviceArea: NzServic
 }
 
 /**
- * Calculates the NZ domestic shipping charge for a shipment.
+ * Calculates the NZ domestic shipping charge for a shipment FROM our depot
+ * (`origin`, always `DEPOT_ADDRESS`) TO the customer's delivery address
+ * (`destination`).
  *
+ * @param input.origin Dispatch origin — must always be `DEPOT_ADDRESS`, never the customer's address.
  * @param input.destination Delivery destination — must be within New Zealand.
- * @param input.totalProductWeight Total product weight in kilograms (sum of unit weight × quantity for every cart line, excluding packaging).
+ * @param input.totalWeight Total product weight in kilograms (sum of unit weight × quantity for every cart line, excluding packaging).
  * @param productSubtotal Optional product subtotal, used only to evaluate the (currently disabled) free-shipping threshold.
  */
 export function calculateShipping(
@@ -145,10 +166,16 @@ export function calculateShipping(
     throw new Error('calculateShipping only supports New Zealand destinations. Validate the destination country before calling this function.');
   }
 
-  const totalProductWeight = Math.max(0, input.totalProductWeight);
+  if (!isNewZealandDestination(input.origin.country)) {
+    throw new Error('calculateShipping origin must be our New Zealand depot address.');
+  }
+
+  const totalProductWeight = Math.max(0, input.totalWeight);
   const totalShipmentWeightKg = Number((totalProductWeight + PACKAGING_WEIGHT_KG).toFixed(3));
 
-  const island = resolveIslandFromPostcode(input.destination.postcode);
+  const originIsland = resolveIslandFromPostcode(input.origin.postcode);
+  const destinationIsland = resolveIslandFromPostcode(input.destination.postcode);
+  const crossesIslands = originIsland !== destinationIsland;
   const serviceArea = resolveServiceArea(input.destination);
   const isRemote = resolveIsRemote(input.destination);
 
@@ -158,20 +185,21 @@ export function calculateShipping(
   const parcelWeights = splitIntoParcels(totalShipmentWeightKg);
   const amount = freeShippingApplied
     ? 0
-    : Number(parcelWeights.reduce((sum, parcelWeight) => sum + ratePerParcel(parcelWeight, island, serviceArea, isRemote), 0).toFixed(2));
+    : Number(parcelWeights.reduce((sum, parcelWeight) => sum + ratePerParcel(parcelWeight, crossesIslands, serviceArea, isRemote), 0).toFixed(2));
 
   const weightBand = resolveWeightBand(parcelWeights[0]);
-  const islandLabel = island === 'SOUTH' ? 'South Island' : 'North Island';
+  const islandLabel = destinationIsland === 'SOUTH' ? 'South Island' : 'North Island';
   const areaLabel = serviceArea === 'RURAL' ? 'Rural' : 'Urban';
-  const zoneLabel = `${islandLabel} – ${areaLabel}${isRemote ? ' (remote surcharge applied)' : ''}`;
+  const zoneLabel = `${islandLabel} – ${areaLabel}${isRemote ? ' (remote surcharge applied)' : ''}${crossesIslands ? ' (inter-island)' : ''}`;
 
   return {
     amount,
     currency: 'NZD',
     zoneLabel,
-    island,
+    island: destinationIsland,
     serviceArea,
     isRemote,
+    crossesIslands,
     weightBandLabel: parcelWeights.length > 1 ? `${weightBand.label} × ${parcelWeights.length} parcels` : weightBand.label,
     totalShipmentWeightKg,
     packagingWeightKg: PACKAGING_WEIGHT_KG,
@@ -180,3 +208,6 @@ export function calculateShipping(
     freeShippingApplied,
   };
 }
+
+export { DEPOT_ADDRESS };
+

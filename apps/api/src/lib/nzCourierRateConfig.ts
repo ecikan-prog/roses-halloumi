@@ -15,6 +15,22 @@
  * current rate card before relying on this for real pricing.
  */
 
+/**
+ * Our dispatch/depot address — the ORIGIN of every shipment. The customer's
+ * delivery address is always the DESTINATION; it is never used as the
+ * origin. Update this if the depot ever moves.
+ */
+export const DEPOT_ADDRESS = {
+  name: 'Grassland Cheese Depot',
+  addressLine: '251 Glenbrook Road',
+  rd: 'RD4',
+  suburb: 'Karaka',
+  city: 'Pukekohe',
+  region: 'Auckland',
+  postcode: '2113',
+  country: 'New Zealand',
+} as const;
+
 /** Packaging weight added once per shipment before splitting into parcels (kg). PLACEHOLDER — update to the real box/packaging weight used. */
 export const PACKAGING_WEIGHT_KG = 0.15;
 

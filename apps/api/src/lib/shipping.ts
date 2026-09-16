@@ -1,124 +1,181 @@
 /**
- * Shipping calculation service.
+ * NZ domestic shipping calculation engine.
  *
- * IMPORTANT: We do not yet have a real courier/rate table for Grassland
- * Cheese. Everything in `TEMPORARY_RATE_TABLE` below is a clearly-labelled
- * PLACEHOLDER so the checkout has *something* structured to calculate from
- * instead of a single hard-coded flat fee. It must be replaced with the real
- * courier rates before this goes live for paying customers — do not treat
- * these numbers as final pricing.
+ * Grassland Cheese currently sells and ships within New Zealand only. This
+ * module contains the CALCULATION LOGIC only — every rate, surcharge, band
+ * and classification list lives in `nzCourierRateConfig.ts`. When the real
+ * courier rate card is supplied, only that config file needs to change; this
+ * engine and the checkout/order code do not need to be rewritten.
  *
- * The shape of `calculateShipping` is intentionally the long-term contract:
- * it takes a destination and a total shipment weight and returns a charge.
- * When real rates are supplied, only `TEMPORARY_RATE_TABLE` (and the zone
- * lookup) need to change — the checkout UI and the orders router do not need
- * to be rewritten.
+ * IMPORTANT: the rates produced here are placeholders (see
+ * `nzCourierRateConfig.ts`) until a real courier rate card is configured —
+ * `isTemporaryRate` is always `true` while that remains the case and must be
+ * surfaced to the customer (checkout UI, confirmation email) rather than
+ * presented as a final/official price.
  */
 
+import {
+  FREE_SHIPPING_THRESHOLD_NZD,
+  MAX_PARCEL_WEIGHT_KG,
+  NZ_WEIGHT_BANDS,
+  PACKAGING_WEIGHT_KG,
+  REMOTE_POSTCODES,
+  REMOTE_SURCHARGE_NZD,
+  RURAL_ADDRESS_KEYWORDS,
+  RURAL_SURCHARGE_NZD,
+  SOUTH_ISLAND_SURCHARGE_NZD,
+  resolveIslandFromPostcode,
+  type NzWeightBand,
+} from './nzCourierRateConfig.js';
+
 export type ShippingDestination = {
+  /** Must be New Zealand — Grassland Cheese does not currently ship internationally. */
   country: string;
   region?: string | null;
   city?: string | null;
   postcode?: string | null;
-  /** Set true if the destination is known to be rural/remote for surcharge purposes. */
+  /** Explicit override if the caller already knows the address is rural (e.g. from a future real rural-address lookup). */
   isRural?: boolean;
 };
 
 export type ShippingCalculationInput = {
   destination: ShippingDestination;
-  /** Total shipment weight in kilograms (sum of productWeightKg * qty across the cart). */
-  totalWeight: number;
+  /** Total product weight in kilograms (sum of productWeightKg * qty across the cart). Packaging weight is added internally. */
+  totalProductWeight: number;
 };
 
-export type ShippingZone = 'NZ_METRO' | 'NZ_RURAL' | 'INTERNATIONAL';
+export type NzIsland = 'NORTH' | 'SOUTH';
+export type NzServiceArea = 'URBAN' | 'RURAL';
 
 export type ShippingCalculationResult = {
   amount: number;
   currency: 'NZD';
-  zone: ShippingZone;
+  /** Human-readable destination classification, e.g. "North Island – Urban" or "South Island – Rural (remote surcharge applied)". */
+  zoneLabel: string;
+  island: NzIsland;
+  serviceArea: NzServiceArea;
+  isRemote: boolean;
   weightBandLabel: string;
+  /** Total shipment weight used for rating, i.e. total product weight + packaging weight. */
+  totalShipmentWeightKg: number;
+  packagingWeightKg: number;
+  /** Number of parcels the shipment was split into (> 1 when the shipment exceeds the configured max parcel weight). */
+  parcelCount: number;
   /**
-   * True while `TEMPORARY_RATE_TABLE` is in use. Callers (checkout UI, emails)
-   * should surface this so nobody mistakes the placeholder for a final rate.
+   * True while placeholder rates from `nzCourierRateConfig.ts` are in use.
+   * Callers (checkout UI, emails) must surface this so nobody mistakes the
+   * placeholder for a final rate.
    */
   isTemporaryRate: boolean;
   freeShippingApplied: boolean;
 };
 
-type WeightBand = {
-  label: string;
-  /** Upper bound (kg), inclusive. Use Infinity for the last band. */
-  maxWeightKg: number;
-  ratesByZone: Record<ShippingZone, number>;
-};
-
-/**
- * TEMPORARY placeholder weight bands / zone rates (NZD). Replace with the
- * actual courier rate card when it is supplied — see module comment above.
- */
-const TEMPORARY_RATE_TABLE: WeightBand[] = [
-  { label: 'Up to 1kg', maxWeightKg: 1, ratesByZone: { NZ_METRO: 6.5, NZ_RURAL: 9.5, INTERNATIONAL: 25 } },
-  { label: '1kg – 3kg', maxWeightKg: 3, ratesByZone: { NZ_METRO: 8.5, NZ_RURAL: 12.5, INTERNATIONAL: 40 } },
-  { label: '3kg – 5kg', maxWeightKg: 5, ratesByZone: { NZ_METRO: 11.5, NZ_RURAL: 16.5, INTERNATIONAL: 55 } },
-  { label: 'Over 5kg', maxWeightKg: Infinity, ratesByZone: { NZ_METRO: 15.5, NZ_RURAL: 22.5, INTERNATIONAL: 75 } },
-];
-
-/** Placeholder rural surcharge trigger. Configure real rural postcode/region logic when supplied. */
-const RURAL_REGION_KEYWORDS = ['rural', 'remote', 'island'];
-
-/** Placeholder free-shipping threshold; set to null to disable free shipping entirely. */
-const TEMPORARY_FREE_SHIPPING_THRESHOLD_NZD: number | null = null;
-
 function normalizeCountry(country: string) {
   return country.trim().toLowerCase();
 }
 
-function isNewZealand(country: string) {
+/** Returns true if the given country string refers to New Zealand (the only destination we currently ship to). */
+export function isNewZealandDestination(country: string) {
   const normalized = normalizeCountry(country);
-  return normalized === 'nz' || normalized === 'new zealand' || normalized === 'aotearoa';
+  return normalized === 'nz' || normalized === 'new zealand' || normalized === 'aotearoa' || normalized === 'aotearoa new zealand';
 }
 
-function resolveZone(destination: ShippingDestination): ShippingZone {
-  if (!isNewZealand(destination.country)) {
-    return 'INTERNATIONAL';
+function resolveServiceArea(destination: ShippingDestination): NzServiceArea {
+  if (destination.isRural) {
+    return 'RURAL';
   }
 
-  const regionText = `${destination.region ?? ''} ${destination.city ?? ''}`.toLowerCase();
-  const looksRural = Boolean(destination.isRural) || RURAL_REGION_KEYWORDS.some((keyword) => regionText.includes(keyword));
+  const addressText = `${destination.region ?? ''} ${destination.city ?? ''}`.toLowerCase();
+  const looksRural = RURAL_ADDRESS_KEYWORDS.some((keyword) => addressText.includes(keyword.toLowerCase()));
 
-  return looksRural ? 'NZ_RURAL' : 'NZ_METRO';
+  return looksRural ? 'RURAL' : 'URBAN';
 }
 
-function resolveWeightBand(totalWeight: number): WeightBand {
-  return TEMPORARY_RATE_TABLE.find((band) => totalWeight <= band.maxWeightKg) ?? TEMPORARY_RATE_TABLE[TEMPORARY_RATE_TABLE.length - 1];
+function resolveIsRemote(destination: ShippingDestination): boolean {
+  const postcode = (destination.postcode ?? '').trim();
+  return postcode.length > 0 && REMOTE_POSTCODES.includes(postcode);
+}
+
+function resolveWeightBand(weightKg: number): NzWeightBand {
+  return NZ_WEIGHT_BANDS.find((band) => weightKg <= band.maxWeightKg) ?? NZ_WEIGHT_BANDS[NZ_WEIGHT_BANDS.length - 1];
+}
+
+/** Splits a total shipment weight into evenly-sized parcels, none exceeding the configured max parcel weight. */
+function splitIntoParcels(totalShipmentWeightKg: number): number[] {
+  if (totalShipmentWeightKg <= 0) {
+    return [0];
+  }
+
+  const parcelCount = Math.max(1, Math.ceil(totalShipmentWeightKg / MAX_PARCEL_WEIGHT_KG));
+  const perParcelWeight = totalShipmentWeightKg / parcelCount;
+  return Array.from({ length: parcelCount }, () => perParcelWeight);
+}
+
+function ratePerParcel(weightKg: number, island: NzIsland, serviceArea: NzServiceArea, isRemote: boolean): number {
+  const band = resolveWeightBand(weightKg);
+  let rate = band.urbanRateNzd;
+
+  if (serviceArea === 'RURAL') {
+    rate += RURAL_SURCHARGE_NZD;
+  }
+
+  if (isRemote) {
+    rate += REMOTE_SURCHARGE_NZD;
+  }
+
+  if (island === 'SOUTH') {
+    rate += SOUTH_ISLAND_SURCHARGE_NZD;
+  }
+
+  return rate;
 }
 
 /**
- * Calculates the shipping charge for a shipment.
+ * Calculates the NZ domestic shipping charge for a shipment.
  *
- * @param input.destination Delivery destination (country is required; region/city/postcode refine the zone).
- * @param input.totalWeight Total product weight in kilograms (sum of unit weight × quantity for every cart line).
+ * @param input.destination Delivery destination — must be within New Zealand.
+ * @param input.totalProductWeight Total product weight in kilograms (sum of unit weight × quantity for every cart line, excluding packaging).
+ * @param productSubtotal Optional product subtotal, used only to evaluate the (currently disabled) free-shipping threshold.
  */
 export function calculateShipping(
   input: ShippingCalculationInput,
   productSubtotal?: number,
 ): ShippingCalculationResult {
-  const totalWeight = Math.max(0, input.totalWeight);
-  const zone = resolveZone(input.destination);
-  const band = resolveWeightBand(totalWeight);
+  if (!isNewZealandDestination(input.destination.country)) {
+    throw new Error('calculateShipping only supports New Zealand destinations. Validate the destination country before calling this function.');
+  }
+
+  const totalProductWeight = Math.max(0, input.totalProductWeight);
+  const totalShipmentWeightKg = Number((totalProductWeight + PACKAGING_WEIGHT_KG).toFixed(3));
+
+  const island = resolveIslandFromPostcode(input.destination.postcode);
+  const serviceArea = resolveServiceArea(input.destination);
+  const isRemote = resolveIsRemote(input.destination);
 
   const freeShippingApplied =
-    TEMPORARY_FREE_SHIPPING_THRESHOLD_NZD !== null &&
-    typeof productSubtotal === 'number' &&
-    productSubtotal >= TEMPORARY_FREE_SHIPPING_THRESHOLD_NZD;
+    FREE_SHIPPING_THRESHOLD_NZD !== null && typeof productSubtotal === 'number' && productSubtotal >= FREE_SHIPPING_THRESHOLD_NZD;
 
-  const amount = freeShippingApplied ? 0 : Number(band.ratesByZone[zone].toFixed(2));
+  const parcelWeights = splitIntoParcels(totalShipmentWeightKg);
+  const amount = freeShippingApplied
+    ? 0
+    : Number(parcelWeights.reduce((sum, parcelWeight) => sum + ratePerParcel(parcelWeight, island, serviceArea, isRemote), 0).toFixed(2));
+
+  const weightBand = resolveWeightBand(parcelWeights[0]);
+  const islandLabel = island === 'SOUTH' ? 'South Island' : 'North Island';
+  const areaLabel = serviceArea === 'RURAL' ? 'Rural' : 'Urban';
+  const zoneLabel = `${islandLabel} – ${areaLabel}${isRemote ? ' (remote surcharge applied)' : ''}`;
 
   return {
     amount,
     currency: 'NZD',
-    zone,
-    weightBandLabel: band.label,
+    zoneLabel,
+    island,
+    serviceArea,
+    isRemote,
+    weightBandLabel: parcelWeights.length > 1 ? `${weightBand.label} × ${parcelWeights.length} parcels` : weightBand.label,
+    totalShipmentWeightKg,
+    packagingWeightKg: PACKAGING_WEIGHT_KG,
+    parcelCount: parcelWeights.length,
     isTemporaryRate: true,
     freeShippingApplied,
   };

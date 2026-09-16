@@ -105,6 +105,8 @@ type ConfirmedOrder = {
   createdAt: Date | string;
   deliveryAddress?: string | null;
   isTemporaryShippingRate?: boolean;
+  shippingZoneLabel?: string | null;
+  totalShipmentWeightKg?: number | null;
   items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
 };
 
@@ -167,7 +169,7 @@ const emptyDeliveryAddress: DeliveryAddressForm = {
   suburb: '',
   region: '',
   postcode: '',
-  country: '',
+  country: 'New Zealand',
 };
 
 function isDeliveryAddressComplete(address: DeliveryAddressForm) {
@@ -701,6 +703,8 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         createdAt: result.createdAt,
         deliveryAddress: result.deliveryAddress,
         isTemporaryShippingRate: result.isTemporaryShippingRate,
+        shippingZoneLabel: result.shippingZoneLabel,
+        totalShipmentWeightKg: result.totalShipmentWeightKg,
         items: result.items ?? selectedItems.map((item) => ({ id: item.id, qty: item.qty, unitPrice: item.effectivePrice, product: { id: item.id, name: item.name, unit: item.unit } })),
       });
       setPage('order-confirmation');
@@ -1481,7 +1485,10 @@ function CartPage({
   total: number;
   totalWeightKg: number;
   deliveryAddressReady: boolean;
-  shippingEstimateQuery: { data?: { amount: number; isTemporaryRate: boolean } | null; isLoading: boolean };
+  shippingEstimateQuery: {
+    data?: { amount: number; isTemporaryRate: boolean; zoneLabel: string; totalShipmentWeightKg: number; parcelCount: number } | null;
+    isLoading: boolean;
+  };
   onNavigate: (page: SignedInPage) => void;
   onSubmitOrder: () => Promise<void>;
   isSubmitting: boolean;
@@ -1557,7 +1564,8 @@ function CartPage({
                 <Field label="Suburb / town / city" value={deliveryAddress.suburb} onChangeText={updateAddressField('suburb')} />
                 <Field label="Region (if applicable)" value={deliveryAddress.region} onChangeText={updateAddressField('region')} />
                 <Field label="Postcode" value={deliveryAddress.postcode} onChangeText={updateAddressField('postcode')} />
-                <Field label="Country" value={deliveryAddress.country} onChangeText={updateAddressField('country')} />
+                <Field label="Country" value={deliveryAddress.country} onChangeText={updateAddressField('country')} editable={false} />
+                <Text style={styles.metaText}>We currently sell and ship within New Zealand only.</Text>
                 <Field label="Order notes (optional)" value={orderNotes} onChangeText={setOrderNotes} />
                 {!deliveryAddressValid ? (
                   <Text style={styles.errorText}>Enter your name, address, suburb/town/city, postcode and country so shipping can be calculated.</Text>
@@ -1580,11 +1588,17 @@ function CartPage({
             )}
             <Text style={styles.summaryLine}>Subtotal: {formatMoney(subtotal)}</Text>
             <Text style={styles.summaryLine}>Discount: -{formatMoney(discount)}</Text>
+            {deliveryAddressReady && shippingEstimateQuery.data ? (
+              <Text style={styles.metaText}>
+                Delivery destination: {shippingEstimateQuery.data.zoneLabel} · Shipment weight: {shippingEstimateQuery.data.totalShipmentWeightKg.toFixed(3)} kg
+                {shippingEstimateQuery.data.parcelCount > 1 ? ` (${shippingEstimateQuery.data.parcelCount} parcels)` : ''}
+              </Text>
+            ) : null}
             <Text style={styles.summaryLine}>
               Shipping: {deliveryAddressReady ? (shippingEstimateQuery.isLoading ? 'Calculating…' : deliveryCharge > 0 ? formatMoney(deliveryCharge) : 'Free') : 'Enter delivery address to calculate'}
             </Text>
             {deliveryAddressReady && shippingEstimateQuery.data?.isTemporaryRate ? (
-              <Text style={styles.metaText}>Shipping shown is a temporary estimate based on weight and destination — final courier rates have not been configured yet.</Text>
+              <Text style={styles.metaText}>Shipping shown uses a configurable NZ courier rate table pending our final courier rate card — this is not yet the official price.</Text>
             ) : null}
             <Text style={styles.summaryTotal}>Total: {formatMoney(total)}</Text>
             <Pressable
@@ -1623,8 +1637,14 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
         <Text style={styles.summaryLine}>Subtotal: {formatMoney(order.subtotal)}</Text>
         <Text style={styles.summaryLine}>Discount: -{formatMoney(order.discountApplied)}</Text>
         <Text style={styles.summaryLine}>Shipping: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text>
+        {order.shippingZoneLabel ? (
+          <Text style={styles.metaText}>
+            Delivery destination: {order.shippingZoneLabel}
+            {order.totalShipmentWeightKg ? ` · Shipment weight: ${order.totalShipmentWeightKg.toFixed(3)} kg` : ''}
+          </Text>
+        ) : null}
         {order.isTemporaryShippingRate ? (
-          <Text style={styles.metaText}>Shipping was calculated using a temporary estimate based on weight and destination — final courier rates have not been configured yet.</Text>
+          <Text style={styles.metaText}>Shipping was calculated using a configurable NZ courier rate table pending our final courier rate card — this is not yet the official price.</Text>
         ) : null}
         <Text style={styles.summaryTotal}>Total: {formatMoney(order.total)}</Text>
         {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to:{'\n'}{order.deliveryAddress}</Text> : null}
@@ -2414,6 +2434,7 @@ function Field(props: {
   secureTextEntry?: boolean;
   keyboardType?: 'default' | 'email-address';
   autoCapitalize?: 'none' | 'sentences';
+  editable?: boolean;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -2422,6 +2443,7 @@ function Field(props: {
         autoCapitalize={props.autoCapitalize ?? 'sentences'}
         keyboardType={props.keyboardType ?? 'default'}
         secureTextEntry={props.secureTextEntry}
+        editable={props.editable ?? true}
         style={styles.input}
         value={props.value}
         onChangeText={props.onChangeText}

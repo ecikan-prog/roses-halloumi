@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { buildOrderConfirmationEmail } from '../lib/emailTemplates.js';
 import { sendMail } from '../lib/mailer.js';
-import { calculateShipping, type ShippingDestination } from '../lib/shipping.js';
+import { calculateShipping, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
 import { getProductWeightKg } from '../lib/productWeights.js';
 import { protectedProcedure, router, staffProcedure } from './trpc.js';
 
@@ -82,6 +82,13 @@ export const ordersRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'A delivery address is required before shipping can be calculated.' });
       }
 
+      // We currently only sell and ship within New Zealand, so shipping can't
+      // be calculated (and the order shouldn't be created) for any other
+      // destination.
+      if (input.deliveryAddress && !isNewZealandDestination(input.deliveryAddress.country)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'We currently only ship within New Zealand.' });
+      }
+
       const products = await ctx.prisma.product.findMany({
         where: {
           id: { in: input.items.map((item) => item.productId) },
@@ -111,7 +118,7 @@ export const ordersRouter = router({
       });
 
       const subtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
-      const totalWeight = orderItems.reduce((sum, item) => sum + item.weightKg, 0);
+      const totalProductWeight = orderItems.reduce((sum, item) => sum + item.weightKg, 0);
 
       // No discount is currently offered: the only discounted term (Pay Now)
       // is not available yet. Kept as a variable (rather than removed) so the
@@ -130,7 +137,7 @@ export const ordersRouter = router({
             postcode: input.deliveryAddress.postcode,
           }
         : null;
-      const shipping = destination ? calculateShipping({ destination, totalWeight }, subtotal) : null;
+      const shipping = destination ? calculateShipping({ destination, totalProductWeight }, subtotal) : null;
       const deliveryCharge = shipping?.amount ?? 0;
       const total = Number((subtotal - discountApplied + deliveryCharge).toFixed(2));
       // At this point PAY_NOW has already been rejected above, so paymentTerm
@@ -212,6 +219,8 @@ export const ordersRouter = router({
         subtotal: order.subtotal?.toNumber() ?? subtotal,
         deliveryCharge: order.deliveryCharge.toNumber(),
         isTemporaryShippingRate: shipping?.isTemporaryRate ?? false,
+        shippingZoneLabel: shipping?.zoneLabel ?? null,
+        totalShipmentWeightKg: shipping?.totalShipmentWeightKg ?? null,
         deliveryAddress: order.deliveryAddress,
         orderNotes: order.orderNotes,
         total: order.total.toNumber(),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { calculateShipping, type ShippingDestination } from '../lib/shipping.js';
+import { calculateShipping, isNewZealandDestination, type ShippingDestination } from '../lib/shipping.js';
 import { getProductWeightKg } from '../lib/productWeights.js';
 import { publicProcedure, router } from './trpc.js';
 
@@ -23,6 +23,10 @@ export const shippingRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      if (!isNewZealandDestination(input.destination.country)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'We currently only ship within New Zealand.' });
+      }
+
       const products = await ctx.prisma.product.findMany({
         where: { id: { in: input.items.map((item) => item.productId) } },
       });
@@ -31,7 +35,7 @@ export const shippingRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'One or more products are unavailable.' });
       }
 
-      const totalWeight = input.items.reduce((sum, item) => {
+      const totalProductWeight = input.items.reduce((sum, item) => {
         const product = products.find((candidate) => candidate.id === item.productId);
         return sum + (product ? getProductWeightKg(product) * item.qty : 0);
       }, 0);
@@ -43,8 +47,8 @@ export const shippingRouter = router({
         postcode: input.destination.postcode,
       };
 
-      const result = calculateShipping({ destination, totalWeight });
+      const result = calculateShipping({ destination, totalProductWeight });
 
-      return { ...result, totalWeight };
+      return { ...result, totalProductWeight };
     }),
 });

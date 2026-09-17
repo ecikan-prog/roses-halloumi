@@ -65,6 +65,30 @@ export function buildWelcomeEmail(params: { name: string }) {
   return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
 }
 
+export function buildPasswordResetEmail(params: { name: string; resetLink: string }) {
+  const subject = `Reset your ${BRAND_NAME} password`;
+  const bodyHtml = `
+    <p style="font-size:14px;line-height:22px;">Hi ${escapeHtml(params.name)},</p>
+    <p style="font-size:14px;line-height:22px;">We received a request to reset the password for your ${BRAND_NAME} account. Click the button below to choose a new password.</p>
+    <p style="text-align:center;margin:24px 0;">
+      <a href="${escapeHtml(params.resetLink)}" style="background-color:#1f5c43;color:#f4e7c1;padding:12px 24px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:bold;display:inline-block;">Reset password</a>
+    </p>
+    <p style="font-size:13px;line-height:20px;color:#6b7a70;">This link is single-use and expires in 1 hour. If you didn't request a password reset, you can safely ignore this email — your password will not be changed.</p>
+  `;
+
+  const text = [
+    `Hi ${params.name},`,
+    '',
+    `We received a request to reset the password for your ${BRAND_NAME} account. Open the link below to choose a new password:`,
+    '',
+    params.resetLink,
+    '',
+    "This link is single-use and expires in 1 hour. If you didn't request a password reset, you can safely ignore this email — your password will not be changed.",
+  ].join('\n');
+
+  return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
+}
+
 export type OrderConfirmationItem = {
   qty: number;
   unitPrice: number;

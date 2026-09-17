@@ -44,8 +44,11 @@ app.use(
 // columns/indexes or widens narrow text columns — it never touches existing
 // data — so it is safe to run on every startup.
 async function start() {
+  console.log('[startup] Verifying/repairing Order table schema...');
+
   try {
     await ensureOrderSchema(prisma);
+    console.log('[startup] Order table schema self-heal pass complete.');
   } catch (error) {
     console.error('[startup] Failed to verify/repair Order table schema. Order creation may fail until this is resolved:', error);
   }

@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   ImageBackground,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -20,6 +21,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
+import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
+import AdminDashboardScreen from './src/admin/AdminDashboard';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
 const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg(1).jpg');
@@ -32,6 +35,9 @@ const halloumiSharingPlatterImage = require('./assets/grassland/halloumi-sharing
 const halloumi1kgImage = require('./assets/grassland/grassland-halloumi-1kg.jpg');
 const halloumi500gImage = require('./assets/grassland/grassland-halloumi-500g.jpg');
 const halloumi200gImage = require('./assets/grassland/grassland-halloumi-200g.jpg');
+const mpiRegistrationPdf = require('./assets/quality-compliance/01-MPI-Animal-Products-Exporter-Registration.pdf');
+const foodSafetyAuditPdf = require('./assets/quality-compliance/02-Food-Safety-Quality-Audit-Certificate.pdf');
+const halloumiProductSpecPdf = require('./assets/quality-compliance/03-Roses-Dairy-Halloumi-Product-Specification.pdf');
 const storySectionImages = {
   '01': require('./assets/grassland/grassland-cows-calves.jpeg'),
   '02': require('./assets/grassland/grassland-fresh-milk.jpeg'),
@@ -86,11 +92,25 @@ type StaffUser = {
 };
 
 type SessionUser = CustomerUser | StaffUser;
-type AuthMode = 'customer-login' | 'staff-login' | 'customer-register';
-type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
-type SignedInPage = PublicPage | 'orders' | 'customers';
+type AuthMode = 'customer-login' | 'admin-login' | 'customer-register' | 'customer-forgot-password' | 'customer-reset-password';
+type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
+type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
 
-type SessionState = {
+type ConfirmedOrder = {
+  orderNumber: string;
+  subtotal: number;
+  deliveryCharge: number;
+  discountApplied: number;
+  total: number;
+  createdAt: Date | string;
+  deliveryAddress?: string | null;
+  isTemporaryShippingRate?: boolean;
+  shippingZoneLabel?: string | null;
+  totalShipmentWeightKg?: number | null;
+  items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
+};
+
+export type SessionState = {
   token: string | null;
   user: SessionUser | null;
 };
@@ -119,6 +139,49 @@ type ShopProductView = ShopProductSpec & {
   product?: ProductRecord;
 };
 
+// Mirrors apps/api/src/lib/productWeights.ts so the checkout can preview a
+// shipping estimate before the order is submitted (the API always
+// recalculates shipping itself from the same weights when the order is
+// created — this is only used for the live on-screen estimate).
+const PRODUCT_WEIGHT_KG_BY_SLUG: Record<ShopProductSpec['slug'], number> = {
+  '1kg': 1.0,
+  '500g': 0.5,
+  '200g': 0.2,
+};
+
+function getProductWeightKg(product: ProductRecord): number {
+  const spec = shopProductSpecs.find((candidate) => candidate.name.toLowerCase() === product.name.trim().toLowerCase());
+  return spec ? PRODUCT_WEIGHT_KG_BY_SLUG[spec.slug] : 0;
+}
+
+type DeliveryAddressForm = {
+  name: string;
+  addressLine: string;
+  suburb: string;
+  region: string;
+  postcode: string;
+  country: string;
+};
+
+const emptyDeliveryAddress: DeliveryAddressForm = {
+  name: '',
+  addressLine: '',
+  suburb: '',
+  region: '',
+  postcode: '',
+  country: 'New Zealand',
+};
+
+function isDeliveryAddressComplete(address: DeliveryAddressForm) {
+  return (
+    address.name.trim().length >= 2 &&
+    address.addressLine.trim().length >= 3 &&
+    address.suburb.trim().length >= 1 &&
+    address.postcode.trim().length >= 1 &&
+    address.country.trim().length >= 2
+  );
+}
+
 type RecipeFeature = {
   title: string;
   description: string;
@@ -137,7 +200,7 @@ const paymentStatusOptions: Array<PaymentStatus | 'ALL'> = ['ALL', PaymentStatus
 const shopProductSpecs: ShopProductSpec[] = [
   {
     slug: '1kg',
-    name: '1 kg Halloumi',
+    name: 'Grassland Cheese Halloumi — 1kg',
     size: '1 kg',
     description: 'A generous halloumi format for bigger family meals, grilling trays, and sharing platters.',
     detail: 'Designed for customers who want a larger halloumi format ready for slicing, grilling, frying, and sharing.',
@@ -145,7 +208,7 @@ const shopProductSpecs: ShopProductSpec[] = [
   },
   {
     slug: '500g',
-    name: '500 g Halloumi',
+    name: 'Grassland Cheese Halloumi — 500g',
     size: '500 g',
     description: 'A versatile mid-size halloumi option for weeknight meals, salads, and pan-frying.',
     detail: 'A balanced everyday halloumi size that suits quick dinners, lunch plates, and smaller entertaining moments.',
@@ -153,7 +216,7 @@ const shopProductSpecs: ShopProductSpec[] = [
   },
   {
     slug: '200g',
-    name: '200 g Halloumi',
+    name: 'Grassland Cheese Halloumi — 200g',
     size: '200 g',
     description: 'A smaller halloumi size that is ideal for lighter meals, snacks, and trial purchases.',
     detail: 'A compact halloumi option for individual meals, smaller households, or customers trying the range for the first time.',
@@ -254,8 +317,15 @@ function matchesAllowedProduct(product: ProductRecord, spec: ShopProductSpec) {
   return product.name.trim().toLowerCase() === spec.name.toLowerCase();
 }
 
+// All retail pricing is quoted in New Zealand Dollars. The catalog/order backend
+// (apps/api) is the source of truth for the actual amount; this only controls display
+// formatting so the same NZD figure shown here matches what checkout charges.
+function formatMoney(amount: number) {
+  return `NZD $${amount.toFixed(2)}`;
+}
+
 function formatPrice(product?: ProductRecord) {
-  return product ? `$${product.effectivePrice.toFixed(2)}` : 'Available Soon';
+  return product ? formatMoney(product.effectivePrice) : 'Available Soon';
 }
 
 function AppContent({
@@ -323,11 +393,15 @@ function AppContent({
     );
   }
 
-  return session.token && session.user ? (
-    <Dashboard session={session} onSignOut={handleSignOut} />
-  ) : (
-    <PublicWebsite currentPage={publicPage} onNavigate={setPublicPage} onAuthenticated={handleAuthenticated} />
-  );
+  if (session.token && session.user) {
+    if (session.user.kind === 'staff') {
+      return <AdminDashboardScreen session={session} onSignOut={handleSignOut} />;
+    }
+
+    return <Dashboard session={session} onSignOut={handleSignOut} />;
+  }
+
+  return <PublicWebsite currentPage={publicPage} onNavigate={setPublicPage} onAuthenticated={handleAuthenticated} />;
 }
 
 function PublicWebsite({
@@ -339,10 +413,68 @@ function PublicWebsite({
   onNavigate: (page: PublicPage) => void;
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
 }) {
-  const content = renderPublicPage(currentPage, onNavigate, onAuthenticated);
+  // Retail visitors can browse live halloumi pricing and build a cart before creating
+  // an account. This is the same cart storage the signed-in checkout reads on login.
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const productsQuery = trpc.catalog.listProducts.useQuery();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
+
+  const shopProducts = useMemo<ShopProductView[]>(() => {
+    const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
+    return shopProductSpecs.map((spec) => ({
+      ...spec,
+      product: backendProducts.find((product) => matchesAllowedProduct(product, spec)),
+    }));
+  }, [productsQuery.data]);
+
+  const selectedItems = shopProducts
+    .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
+    .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
+
+  const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  const content = renderPublicPage(currentPage, onNavigate, onAuthenticated, {
+    productsQuery,
+    shopProducts,
+    quantities,
+    adjustQuantity,
+    selectedItems,
+  });
 
   return (
-    <SiteScreen currentPage={currentPage} onNavigate={onNavigate} session={null}>
+    <SiteScreen currentPage={currentPage} onNavigate={onNavigate} session={null} cartCount={cartCount}>
       {content}
     </SiteScreen>
   );
@@ -352,18 +484,41 @@ function renderPublicPage(
   currentPage: PublicPage,
   onNavigate: (page: PublicPage) => void,
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>,
+  cart: {
+    productsQuery: ReturnType<typeof trpc.catalog.listProducts.useQuery>;
+    shopProducts: ShopProductView[];
+    quantities: Record<number, number>;
+    adjustQuantity: (productId: number, nextQuantity: number) => void;
+    selectedItems: Array<ProductRecord & { qty: number }>;
+  },
 ) {
   switch (currentPage) {
     case 'shop':
-      return <PublicShopPage onNavigate={onNavigate} />;
+      return (
+        <PublicShopPage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          isLoading={cart.productsQuery.isLoading}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
     case 'recipes':
       return <RecipesPage />;
     case 'wholesale':
       return <WholesalePage onNavigate={onNavigate} />;
     case 'about':
       return <AboutPage />;
+    case 'quality-compliance':
+      return <QualityCompliancePage />;
     case 'cart':
-      return <PublicCartPage onNavigate={onNavigate} />;
+      return (
+        <PublicCartPage
+          onNavigate={onNavigate}
+          selectedItems={cart.selectedItems}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
     case 'account':
       return <AccountPage onNavigate={onNavigate} onAuthenticated={onAuthenticated} />;
     case 'contact':
@@ -374,7 +529,14 @@ function renderPublicPage(
       return <TermsPage />;
     case 'home':
     default:
-      return <HomePage onNavigate={onNavigate} />;
+      return (
+        <HomePage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
   }
 }
 
@@ -382,9 +544,14 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const user = session.user as SessionUser;
   const [page, setPage] = useState<SignedInPage>('home');
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>(user.kind === 'customer' ? user.id : undefined);
-  const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_NOW);
+  const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_30);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.IN_APP);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressForm>(emptyDeliveryAddress);
+  const [orderNotes, setOrderNotes] = useState('');
+  const [lastOrder, setLastOrder] = useState<ConfirmedOrder | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [selectedProductSlug, setSelectedProductSlug] = useState<ShopProductSpec['slug'] | null>(null);
   const isStaff = user.kind === 'staff';
   const effectiveCustomerId = user.kind === 'customer' ? user.id : selectedCustomerId;
@@ -409,14 +576,38 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   }, [isStaff, page]);
 
   useEffect(() => {
-    if (!isStaff && page === 'orders') {
-      setPage('account');
-    }
-  }, [isStaff, page]);
-
-  useEffect(() => {
     setQuantities({});
   }, [effectiveCustomerId]);
+
+  // Restore any cart saved before a refresh so the customer doesn't lose their selections.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist the cart whenever it changes so it survives navigation and page refreshes.
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
 
   const shopProducts = useMemo<ShopProductView[]>(() => {
     const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
@@ -430,34 +621,110 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
     .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
-  const discount = paymentTerm === PaymentTerm.PAY_NOW ? subtotal * 0.1 : 0;
-  const total = subtotal - discount;
+  // Pay Now would previously apply a 10% discount, but Pay Now cannot be
+  // completed yet (no payment gateway is connected), so no discount is
+  // currently offered at checkout.
+  const discount = 0;
+  const totalWeightKg = selectedItems.reduce((sum, item) => sum + getProductWeightKg(item) * item.qty, 0);
+  const deliveryAddressReady = isDeliveryAddressComplete(deliveryAddress);
+  const shippingEstimateQuery = trpc.shipping.estimate.useQuery(
+    {
+      items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
+      destination: {
+        country: deliveryAddress.country.trim(),
+        region: deliveryAddress.region.trim() || undefined,
+        city: deliveryAddress.suburb.trim() || undefined,
+        postcode: deliveryAddress.postcode.trim() || undefined,
+      },
+    },
+    { enabled: selectedItems.length > 0 && deliveryAddressReady },
+  );
+  const deliveryCharge = deliveryAddressReady ? shippingEstimateQuery.data?.amount ?? 0 : 0;
+  const total = subtotal - discount + deliveryCharge;
   const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
   async function submitOrder() {
+    setOrderError(null);
+
     if (!selectedItems.length) {
       Alert.alert('Add items', 'Choose at least one Halloumi product before confirming the order.');
+      setOrderError('Choose at least one Halloumi product before confirming the order.');
       return;
     }
 
     if (user.kind === 'staff' && !effectiveCustomerId) {
-      Alert.alert('Choose customer', 'Select a customer before creating a staff order.');
+      Alert.alert('Choose customer', 'Select a customer before creating an admin order.');
+      setOrderError('Select a customer before creating an admin order.');
+      return;
+    }
+
+    if (paymentTerm === PaymentTerm.PAY_NOW) {
+      Alert.alert(
+        'Pay now is not available yet',
+        'Online card payment is coming soon. Please select "Pay in 30" to place your order today without paying online.',
+      );
+      setOrderError('Online card payment isn\u2019t available yet. Please select "Pay in 30" to place your order today without paying online.');
+      return;
+    }
+
+    if (user.kind === 'customer' && !deliveryAddressReady) {
+      Alert.alert('Delivery address required', 'Enter your name, address, suburb/town/city, postcode and country before confirming the order.');
+      setOrderError('Enter your name, address, suburb/town/city, postcode and country before confirming the order.');
       return;
     }
 
     try {
-      await createOrder.mutateAsync({
+      const result = await createOrder.mutateAsync({
         customerId: user.kind === 'staff' ? effectiveCustomerId : undefined,
         paymentTerm,
-        ...(paymentTerm === PaymentTerm.PAY_NOW ? { paymentMethod } : {}),
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
+        ...(deliveryAddressReady
+          ? {
+              deliveryAddress: {
+                name: deliveryAddress.name.trim(),
+                addressLine: deliveryAddress.addressLine.trim(),
+                suburb: deliveryAddress.suburb.trim(),
+                region: deliveryAddress.region.trim() || undefined,
+                postcode: deliveryAddress.postcode.trim(),
+                country: deliveryAddress.country.trim(),
+              },
+            }
+          : {}),
+        ...(orderNotes.trim() ? { orderNotes: orderNotes.trim() } : {}),
       });
       await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
       setQuantities({});
-      setPage('account');
-      Alert.alert('Order confirmed', paymentTerm === PaymentTerm.PAY_NOW ? 'Discount applied and payment marked as paid.' : 'Order saved with 30 day terms.');
+      await clearStoredCart();
+      setDeliveryAddress(emptyDeliveryAddress);
+      setOrderNotes('');
+      setOrderError(null);
+      setLastOrder({
+        orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
+        subtotal: result.subtotal ?? subtotal,
+        deliveryCharge: result.deliveryCharge ?? deliveryCharge,
+        discountApplied: result.discountApplied,
+        total: result.total,
+        createdAt: result.createdAt,
+        deliveryAddress: result.deliveryAddress,
+        isTemporaryShippingRate: result.isTemporaryShippingRate,
+        shippingZoneLabel: result.shippingZoneLabel,
+        totalShipmentWeightKg: result.totalShipmentWeightKg,
+        items: result.items ?? selectedItems.map((item) => ({ id: item.id, qty: item.qty, unitPrice: item.effectivePrice, product: { id: item.id, name: item.name, unit: item.unit } })),
+      });
+      setPage('order-confirmation');
     } catch (error) {
-      Alert.alert('Order failed', getErrorMessage(error));
+      // Alert.alert is a no-op on web (react-native-web), so on the web
+      // build the customer would otherwise see nothing happen at all when
+      // order creation fails. orderError is rendered directly in the
+      // checkout UI so the failure (and the real reason, e.g. a server
+      // error) is always visible regardless of platform.
+      const message = getErrorMessage(error);
+      Alert.alert('Order failed', message);
+      setOrderError(message);
     }
   }
 
@@ -494,6 +761,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     case 'about':
       content = <AboutPage />;
       break;
+    case 'quality-compliance':
+      content = <QualityCompliancePage />;
+      break;
     case 'cart':
       content = (
         <CartPage
@@ -503,20 +773,39 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           selectedItems={selectedItems}
+          quantities={quantities}
+          setQuantities={setQuantities}
+          deliveryAddress={deliveryAddress}
+          setDeliveryAddress={setDeliveryAddress}
+          orderNotes={orderNotes}
+          setOrderNotes={setOrderNotes}
           subtotal={subtotal}
           discount={discount}
+          deliveryCharge={deliveryCharge}
           total={total}
+          totalWeightKg={totalWeightKg}
+          deliveryAddressReady={deliveryAddressReady}
+          shippingEstimateQuery={shippingEstimateQuery}
           onNavigate={setPage}
           onSubmitOrder={submitOrder}
           isSubmitting={createOrder.isPending}
+          orderError={orderError}
         />
       );
+      break;
+    case 'order-confirmation':
+      content = <OrderConfirmationPage order={lastOrder} onNavigate={setPage} />;
       break;
     case 'account':
       content = <SignedInAccountPage session={session} onNavigate={setPage} onSignOut={onSignOut} />;
       break;
     case 'orders':
-      content = <OrdersPage title="Order history" description="Review customer orders and payment status." />;
+      content = (
+        <OrdersPage
+          title={isStaff ? 'Order history' : 'My orders'}
+          description={isStaff ? 'Review customer orders and payment status.' : 'Review your Halloumi order history, current orders, and status.'}
+        />
+      );
       break;
     case 'customers':
       content = <CustomersScreen />;
@@ -532,7 +821,14 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       break;
     case 'home':
     default:
-      content = <HomePage onNavigate={setPage} />;
+      content = (
+        <HomePage
+          onNavigate={setPage}
+          shopProducts={shopProducts}
+          quantities={quantities}
+          adjustQuantity={adjustQuantity}
+        />
+      );
       break;
   }
 
@@ -606,6 +902,7 @@ function SiteHeader({
     { label: 'Our Story', page: 'about' },
     { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
     { label: session ? 'Customer Account' : 'Login', page: 'account' },
+    ...(session && !isStaff ? [{ label: 'My Orders', page: 'orders' as const }] : []),
     ...(isStaff ? [{ label: 'Orders', page: 'orders' as const }, { label: 'Customers', page: 'customers' as const }] : []),
   ];
 
@@ -651,6 +948,7 @@ function SiteFooter({
     { label: 'Recipes', page: 'recipes' },
     { label: 'Wholesale', page: 'wholesale' },
     { label: 'About', page: 'about' },
+    { label: 'Quality & Compliance', page: 'quality-compliance' },
     { label: 'Contact', page: 'contact' },
     { label: 'Privacy', page: 'privacy' },
     { label: 'Terms', page: 'terms' },
@@ -683,11 +981,21 @@ function SiteFooter({
   );
 }
 
-function HomePage({ onNavigate }: { onNavigate: (page: any) => void }) {
+function HomePage({
+  onNavigate,
+  shopProducts = [],
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
   return (
     <>
       <HeroSection onPrimary={() => onNavigate('shop')} onSecondary={() => onNavigate('about')} />
-      <PublicShopSection onNavigate={onNavigate} />
+      <PublicShopSection onNavigate={onNavigate} shopProducts={shopProducts} quantities={quantities} adjustQuantity={adjustQuantity} />
       <WhyGrasslandSection />
       <RecipesSection onNavigate={onNavigate} />
       <StorySection />
@@ -776,26 +1084,109 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
   );
 }
 
-function PublicShopSection({ onNavigate }: { onNavigate: (page: any) => void }) {
+function PublicShopSection({
+  onNavigate,
+  shopProducts = [],
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts?: ShopProductView[] | null;
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  // Defensive default: shopProducts should always be an array by the time it reaches this
+  // component (it is derived from a fixed list of product specs, never directly from the
+  // API response), but a missing/null prop here previously crashed the whole app with
+  // "shopProducts.map is not a function". Never let a data-flow regression upstream take
+  // down the homepage (and, transitively, customer login) again. The `= []` default only
+  // covers `undefined`, so `?? []` below also guards against an explicit `null`.
+  const safeShopProducts = shopProducts ?? [];
+
+  if (safeShopProducts.length === 0) {
+    return (
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
+        <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+      </SectionShell>
+    );
+  }
+
   return (
-    <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three customer-facing sizes. Pricing and ordering appear as soon as matching live product records are available.">
+    <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
       <View style={styles.productGrid}>
-        {shopProductSpecs.map((product) => (
-          <ProductCard key={product.slug} product={product} quantity={0} onAdd={() => onNavigate('account')} onOpenDetails={() => onNavigate('shop')} disabled ctaLabel="Available Soon" />
-        ))}
+        {safeShopProducts.map((product) => {
+          const backendProduct = product.product;
+          const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+          return (
+            <ProductCard
+              key={product.slug}
+              product={product}
+              quantity={quantity}
+              onAdd={() => {
+                if (!backendProduct) {
+                  return;
+                }
+                adjustQuantity(backendProduct.id, quantity + 1);
+              }}
+              onOpenDetails={() => onNavigate('shop')}
+              onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+              onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+              disabled={!backendProduct}
+              ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+            />
+          );
+        })}
       </View>
     </SectionShell>
   );
 }
 
-function PublicShopPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+function PublicShopPage({
+  onNavigate,
+  shopProducts = [],
+  isLoading,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts?: ShopProductView[] | null;
+  isLoading: boolean;
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
+  const safeShopProducts = shopProducts ?? [];
+
   return (
     <>
-      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Create an account or sign in to access ordering when live product records are available.">
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Add halloumi to your cart now, then sign in or create an account to complete checkout.">
+        {isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
+        {!isLoading && safeShopProducts.length === 0 ? (
+          <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+        ) : null}
         <View style={styles.productGrid}>
-          {shopProductSpecs.map((product) => (
-            <ProductCard key={product.slug} product={product} quantity={0} onAdd={() => onNavigate('account')} onOpenDetails={() => {}} disabled ctaLabel="Available Soon" />
-          ))}
+          {safeShopProducts.map((product) => {
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+            return (
+              <ProductCard
+                key={product.slug}
+                product={product}
+                quantity={quantity}
+                onAdd={() => {
+                  if (!backendProduct) {
+                    return;
+                  }
+                  adjustQuantity(backendProduct.id, quantity + 1);
+                }}
+                onOpenDetails={() => {}}
+                onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+                onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+              />
+            );
+          })}
         </View>
         <View style={styles.noticeCard}>
           <Text style={styles.noticeTitle}>Halloumi only</Text>
@@ -820,7 +1211,7 @@ function ShopPage({
   setPaymentMethod,
   quantities,
   setQuantities,
-  shopProducts,
+  shopProducts = [],
   selectedProductSlug,
   setSelectedProductSlug,
   onNavigate,
@@ -837,12 +1228,14 @@ function ShopPage({
   setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
   quantities: Record<number, number>;
   setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
-  shopProducts: ShopProductView[];
+  shopProducts?: ShopProductView[] | null;
   selectedProductSlug: ShopProductSpec['slug'] | null;
   setSelectedProductSlug: Dispatch<SetStateAction<ShopProductSpec['slug'] | null>>;
   onNavigate: (page: SignedInPage) => void;
 }) {
-  const featuredProduct = shopProducts.find((product) => product.slug === selectedProductSlug) ?? null;
+  // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
+  const safeShopProducts = shopProducts ?? [];
+  const featuredProduct = safeShopProducts.find((product) => product.slug === selectedProductSlug) ?? null;
   const customers = (customerQuery.data ?? []) as Array<{ id: number; name: string; type: 'WHOLESALE' | 'RETAIL' }>;
 
   function adjustQuantity(productId: number, nextQuantity: number) {
@@ -880,24 +1273,12 @@ function ShopPage({
                 groupLabel="Payment term"
                 value={paymentTerm}
                 options={[
-                  { label: 'Pay now (-10%)', value: PaymentTerm.PAY_NOW },
+                  { label: 'Pay now (coming soon)', value: PaymentTerm.PAY_NOW, disabled: true },
                   { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
                 ]}
                 onChange={(value) => setPaymentTerm(value as PaymentTerm)}
               />
-              {paymentTerm === PaymentTerm.PAY_NOW ? (
-                <SegmentedControl
-                  groupLabel="Payment method"
-                  value={paymentMethod}
-                  options={[
-                    { label: 'In-app placeholder', value: PaymentMethod.IN_APP },
-                    { label: 'Mark EFTPOS paid', value: PaymentMethod.EFTPOS },
-                  ]}
-                  onChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                />
-              ) : (
-                <Text style={styles.metaText}>Due date will be set to 30 days from confirmation.</Text>
-              )}
+              <Text style={styles.metaText}>Online card payment (Pay now) is not connected yet, so it can&apos;t be selected. Choose Pay in 30 to confirm your order today — due date will be set to 30 days from confirmation.</Text>
             </View>
           </View>
           <View style={styles.inlineCardColumn}>
@@ -938,8 +1319,11 @@ function ShopPage({
         ) : null}
 
         {productsQuery.isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
+        {!productsQuery.isLoading && safeShopProducts.length === 0 ? (
+          <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+        ) : null}
         <View style={styles.productGrid}>
-          {shopProducts.map((product) => {
+          {safeShopProducts.map((product) => {
             const backendProduct = product.product;
             const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (
@@ -1081,29 +1465,72 @@ function CartPage({
   session,
   paymentTerm,
   setPaymentTerm,
-  paymentMethod,
-  setPaymentMethod,
   selectedItems,
+  quantities,
+  setQuantities,
+  deliveryAddress,
+  setDeliveryAddress,
+  orderNotes,
+  setOrderNotes,
   subtotal,
   discount,
+  deliveryCharge,
   total,
+  totalWeightKg,
+  deliveryAddressReady,
+  shippingEstimateQuery,
   onNavigate,
   onSubmitOrder,
   isSubmitting,
+  orderError,
 }: {
   session: SessionState;
   paymentTerm: PaymentTerm;
   setPaymentTerm: Dispatch<SetStateAction<PaymentTerm>>;
-  paymentMethod: PaymentMethod;
-  setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
+  paymentMethod?: PaymentMethod;
+  setPaymentMethod?: Dispatch<SetStateAction<PaymentMethod>>;
   selectedItems: Array<ProductRecord & { qty: number }>;
+  quantities: Record<number, number>;
+  setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
+  deliveryAddress: DeliveryAddressForm;
+  setDeliveryAddress: Dispatch<SetStateAction<DeliveryAddressForm>>;
+  orderNotes: string;
+  setOrderNotes: Dispatch<SetStateAction<string>>;
   subtotal: number;
   discount: number;
+  deliveryCharge: number;
   total: number;
+  totalWeightKg: number;
+  deliveryAddressReady: boolean;
+  shippingEstimateQuery: {
+    data?: { amount: number; isTemporaryRate: boolean; zoneLabel: string; totalShipmentWeightKg: number; parcelCount: number } | null;
+    isLoading: boolean;
+  };
   onNavigate: (page: SignedInPage) => void;
   onSubmitOrder: () => Promise<void>;
   isSubmitting: boolean;
+  orderError: string | null;
 }) {
+  const isCustomer = session.user?.kind === 'customer';
+  const deliveryAddressValid = !isCustomer || deliveryAddressReady;
+  const isPayNow = paymentTerm === PaymentTerm.PAY_NOW;
+
+  function changeQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  function removeItem(productId: number) {
+    setQuantities((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+  }
+
+  function updateAddressField(field: keyof DeliveryAddressForm) {
+    return (value: string) => setDeliveryAddress((current) => ({ ...current, [field]: value }));
+  }
+
   return (
     <SectionShell eyebrow="Cart & Checkout" title="Review your Halloumi order" description="Your cart and checkout stay connected to the existing ordering flow.">
       <View style={styles.inlineTwoColumnRow}>
@@ -1115,14 +1542,27 @@ function CartPage({
                 <View key={item.id} style={styles.cartLineItem}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cartLineTitle}>{item.name}</Text>
-                    <Text style={styles.metaText}>{item.qty} × ${item.effectivePrice.toFixed(2)}</Text>
+                    <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
+                    <View style={styles.quantityRow}>
+                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty - 1)}>
+                        <Text style={styles.quantityLabel}>-</Text>
+                      </Pressable>
+                      <Text style={styles.quantityValue}>{item.qty}</Text>
+                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty + 1)}>
+                        <Text style={styles.quantityLabel}>+</Text>
+                      </Pressable>
+                      <Pressable style={styles.secondaryButton} onPress={() => removeItem(item.id)}>
+                        <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                  <Text style={styles.cartLineTotal}>${(item.qty * item.effectivePrice).toFixed(2)}</Text>
+                  <Text style={styles.cartLineTotal}>{formatMoney(item.qty * item.effectivePrice)}</Text>
                 </View>
               ))
             ) : (
               <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
             )}
+            {selectedItems.length ? <Text style={styles.metaText}>Total product weight: {totalWeightKg.toFixed(3)} kg</Text> : null}
             <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
             </Pressable>
@@ -1132,30 +1572,59 @@ function CartPage({
           <View style={styles.inlineCard}>
             <Text style={styles.inlineCardTitle}>Checkout</Text>
             <Text style={styles.metaText}>Ordering as {session.user?.name}</Text>
+            <Text style={styles.metaText}>{session.user?.email}</Text>
+            {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
+            {isCustomer ? (
+              <>
+                <Text style={styles.inlineCardTitle}>Delivery address</Text>
+                <Field label="Full name" value={deliveryAddress.name} onChangeText={updateAddressField('name')} />
+                <Field label="Address" value={deliveryAddress.addressLine} onChangeText={updateAddressField('addressLine')} />
+                <Field label="Suburb / town / city" value={deliveryAddress.suburb} onChangeText={updateAddressField('suburb')} />
+                <Field label="Region (if applicable)" value={deliveryAddress.region} onChangeText={updateAddressField('region')} />
+                <Field label="Postcode" value={deliveryAddress.postcode} onChangeText={updateAddressField('postcode')} />
+                <Field label="Country" value={deliveryAddress.country} onChangeText={updateAddressField('country')} editable={false} />
+                <Text style={styles.metaText}>We currently sell and ship within New Zealand only.</Text>
+                <Field label="Order notes (optional)" value={orderNotes} onChangeText={setOrderNotes} />
+                {!deliveryAddressValid ? (
+                  <Text style={styles.errorText}>Enter your name, address, suburb/town/city, postcode and country so shipping can be calculated.</Text>
+                ) : null}
+              </>
+            ) : null}
             <SegmentedControl
               groupLabel="Checkout payment term"
               value={paymentTerm}
               options={[
-                { label: 'Pay now (-10%)', value: PaymentTerm.PAY_NOW },
+                { label: 'Pay now (coming soon)', value: PaymentTerm.PAY_NOW, disabled: true },
                 { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
               ]}
               onChange={(value) => setPaymentTerm(value as PaymentTerm)}
             />
-            {paymentTerm === PaymentTerm.PAY_NOW ? (
-              <SegmentedControl
-                groupLabel="Checkout payment method"
-                value={paymentMethod}
-                options={[
-                  { label: 'In-app placeholder', value: PaymentMethod.IN_APP },
-                  { label: 'Mark EFTPOS paid', value: PaymentMethod.EFTPOS },
-                ]}
-                onChange={(value) => setPaymentMethod(value as PaymentMethod)}
-              />
+            {isPayNow ? (
+              <Text style={styles.errorText}>Online card payment isn&apos;t connected yet. Please select "Pay in 30" to confirm your order — no payment is required today.</Text>
+            ) : (
+              <Text style={styles.metaText}>Pay in 30: confirm now, no payment gateway required. Due date is set to 30 days from confirmation.</Text>
+            )}
+            <Text style={styles.summaryLine}>Subtotal: {formatMoney(subtotal)}</Text>
+            <Text style={styles.summaryLine}>Discount: -{formatMoney(discount)}</Text>
+            {deliveryAddressReady && shippingEstimateQuery.data ? (
+              <Text style={styles.metaText}>
+                Delivery destination: {shippingEstimateQuery.data.zoneLabel} · Shipment weight: {shippingEstimateQuery.data.totalShipmentWeightKg.toFixed(3)} kg
+                {shippingEstimateQuery.data.parcelCount > 1 ? ` (${shippingEstimateQuery.data.parcelCount} parcels)` : ''}
+              </Text>
             ) : null}
-            <Text style={styles.summaryLine}>Subtotal: ${subtotal.toFixed(2)}</Text>
-            <Text style={styles.summaryLine}>Discount: -${discount.toFixed(2)}</Text>
-            <Text style={styles.summaryTotal}>Total: ${total.toFixed(2)}</Text>
-            <Pressable disabled={!selectedItems.length || isSubmitting} style={[styles.primaryButton, (!selectedItems.length || isSubmitting) && styles.disabledPrimaryButton]} onPress={() => void onSubmitOrder()}>
+            <Text style={styles.summaryLine}>
+              Shipping: {deliveryAddressReady ? (shippingEstimateQuery.isLoading ? 'Calculating…' : deliveryCharge > 0 ? formatMoney(deliveryCharge) : 'Free') : 'Enter delivery address to calculate'}
+            </Text>
+            {deliveryAddressReady && shippingEstimateQuery.data?.isTemporaryRate ? (
+              <Text style={styles.metaText}>Shipping shown uses a configurable NZ courier rate table pending our final courier rate card — this is not yet the official price.</Text>
+            ) : null}
+            <Text style={styles.summaryTotal}>Total: {formatMoney(total)}</Text>
+            {orderError ? <Text style={styles.errorText}>{orderError}</Text> : null}
+            <Pressable
+              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow}
+              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow) && styles.disabledPrimaryButton]}
+              onPress={() => void onSubmitOrder()}
+            >
               <Text style={styles.primaryButtonLabel}>{isSubmitting ? 'Processing…' : 'Confirm order'}</Text>
             </Pressable>
           </View>
@@ -1165,12 +1634,103 @@ function CartPage({
   );
 }
 
-function PublicCartPage({ onNavigate }: { onNavigate: (page: PublicPage) => void }) {
+function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | null; onNavigate: (page: SignedInPage) => void }) {
+  if (!order) {
+    return (
+      <SectionShell eyebrow="Order Confirmation" title="No recent order found" description="Place an order from the shop to see your confirmation here.">
+        <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
+          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+        </Pressable>
+      </SectionShell>
+    );
+  }
+
   return (
-    <SectionShell eyebrow="Cart" title="Cart and checkout" description="Create an account to continue into ordering once matching live halloumi products are published.">
+    <SectionShell eyebrow="Order Confirmation" title="Thank you for your order!" description={`Order ${order.orderNumber} has been received and confirmed.`}>
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Order {order.orderNumber}</Text>
+        <Text style={styles.metaText}>Placed {new Date(order.createdAt).toLocaleString()}</Text>
+        {order.items.map((item) => (
+          <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ {formatMoney(item.unitPrice)}</Text>
+        ))}
+        <Text style={styles.summaryLine}>Subtotal: {formatMoney(order.subtotal)}</Text>
+        <Text style={styles.summaryLine}>Discount: -{formatMoney(order.discountApplied)}</Text>
+        <Text style={styles.summaryLine}>Shipping: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text>
+        {order.shippingZoneLabel ? (
+          <Text style={styles.metaText}>
+            Delivery destination: {order.shippingZoneLabel}
+            {order.totalShipmentWeightKg ? ` · Shipment weight: ${order.totalShipmentWeightKg.toFixed(3)} kg` : ''}
+          </Text>
+        ) : null}
+        {order.isTemporaryShippingRate ? (
+          <Text style={styles.metaText}>Shipping was calculated using a configurable NZ courier rate table pending our final courier rate card — this is not yet the official price.</Text>
+        ) : null}
+        <Text style={styles.summaryTotal}>Total: {formatMoney(order.total)}</Text>
+        {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to:{'\n'}{order.deliveryAddress}</Text> : null}
+        <Text style={styles.metaText}>Payment method: Pay in 30</Text>
+        <Text style={styles.metaText}>Payment status: Deferred / unpaid</Text>
+        <Text style={styles.metaText}>A confirmation email has been sent to your registered email address.</Text>
+        <View style={styles.heroActionRow}>
+          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+            <Text style={styles.primaryButtonLabel}>View Order History</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+            <Text style={styles.secondaryButtonLabel}>Continue Shopping</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function PublicCartPage({
+  onNavigate,
+  selectedItems,
+  adjustQuantity,
+}: {
+  onNavigate: (page: PublicPage) => void;
+  selectedItems: Array<ProductRecord & { qty: number }>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
+
+  return (
+    <SectionShell eyebrow="Cart" title="Cart and checkout" description="Sign in or create an account to complete checkout with existing server-side pricing.">
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Cart</Text>
+        {selectedItems.length ? (
+          selectedItems.map((item) => (
+            <View key={item.id} style={styles.cartLineItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cartLineTitle}>{item.name}</Text>
+                <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
+                <View style={styles.quantityRow}>
+                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
+                    <Text style={styles.quantityLabel}>-</Text>
+                  </Pressable>
+                  <Text style={styles.quantityValue}>{item.qty}</Text>
+                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
+                    <Text style={styles.quantityLabel}>+</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => adjustQuantity(item.id, 0)}>
+                    <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={styles.cartLineTotal}>{formatMoney(item.qty * item.effectivePrice)}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
+        )}
+        <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
+        </Pressable>
+      </View>
+      {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: {formatMoney(subtotal)}</Text> : null}
       <View style={styles.noticeCard}>
         <Text style={styles.noticeTitle}>Ready to order?</Text>
-        <Text style={styles.noticeText}>Sign in or register to manage your customer account and move into the live ordering flow when product availability is published.</Text>
+        <Text style={styles.noticeText}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
         <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
           <Text style={styles.primaryButtonLabel}>Go to Account</Text>
         </Pressable>
@@ -1261,6 +1821,18 @@ function OurStoryPageSection() {
         </ImageBackground>
       </View>
 
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Family Story</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            At Rose’s Dairy, cheese-making is more than a craft — it’s a family tradition. Since 2010 we have been producing specialty Halloumi on our boutique dairy farm in Pukekohe, Auckland, using a recipe that has been passed down through generations of our family dynasty.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            We believe good food nourishes both body and spirit. That simple belief guides everything we do. Every batch of our Halloumi begins with fresh, pasteurised whole cow’s milk from the paddock next door. It doesn’t get fresher than that.
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.storyJourneyShell}>
         {storyJourneyStages.map((stage, index) => {
           const reverseDesktop = !isMobile && index % 2 === 1;
@@ -1281,6 +1853,58 @@ function OurStoryPageSection() {
           );
         })}
       </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>What Makes Our Halloumi Special</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            Our Halloumi is soft and gently squeaky, with a clean, creamy flavour that is never overly salty. We use just the right amount of rock salt so the natural taste of the milk shines through.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            Because it is made the traditional way and finished with modern precision, our cheese holds its shape beautifully when cooked. Chefs love it — it flips easily with tongs, browns evenly, and stays consistent batch after batch.
+          </Text>
+          <Text style={styles.storyParagraph}>
+            Whether you fry, grill, bake, or pan-sear it in a little olive oil, Rose’s Halloumi delivers the same wonderful creamy taste every time. It is ready to enjoy straight from the pack and works equally well in savoury or sweet dishes.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>How to Enjoy It</Text>
+        <View style={styles.storyCard}>
+          <View style={styles.storyBulletList}>
+            <Text style={styles.storyBulletItem}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
+            <Text style={styles.storyBulletItem}>• Grill or bake for a delicious centrepiece</Text>
+            <Text style={styles.storyBulletItem}>• Pair with honey and pancakes for a sweet treat</Text>
+            <Text style={styles.storyBulletItem}>• Add to a plated toaster or simple skillet meal</Text>
+          </View>
+          <Text style={styles.storyParagraph}>
+            Our Halloumi is naturally vegetarian and loved by everyone from age 7 to 70. Once you taste it, you’ll understand why this centuries-old style of cheese has never gone out of favour.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFarmToTableSection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>From Our Farm to Your Table</Text>
+        <View style={styles.storyCard}>
+          <Text style={styles.storyParagraph}>
+            We operate a small, carefully run facility right on the dairy farm. Modern equipment helps us maintain the highest standards of hygiene and consistency, while the heart of the process remains the time-honoured family methods we have perfected over many years.
+          </Text>
+        </View>
+        <View style={styles.storyBrandStatementCard}>
+          <Text style={styles.storyBrandStatement}>Fresh milk. Honest ingredients. A recipe rooted in family history.</Text>
+          <Text style={styles.storyBrandClosingLine}>That’s the Rose’s Dairy difference.</Text>
+          <Text style={styles.storyBrandClosingLine}>Good food. Good life.</Text>
+          <Text style={styles.storyBrandClosingLine}>Rose’s Halloumi — one of a kind.</Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Halloumi</Text>
+        <View style={styles.storyBrandStatementCard}>
+          <Text style={styles.storyBrandStatement}>One cheese, so many possibilities.</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -1289,8 +1913,121 @@ function AboutPage() {
   return (
     <>
       <OurStoryPageSection />
-      <WhyGrasslandSection />
     </>
+  );
+}
+
+function openQualityDocument(source: ImageSourcePropType) {
+  const uri = resolveWebImageUri(source);
+  if (!uri) {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+    return;
+  }
+  if (Platform.OS === 'web') {
+    // Open in a new browser tab, as PDFs should not replace the current page.
+    (globalThis as any).open?.(uri, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  Linking.openURL(uri).catch(() => {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+  });
+}
+
+function QualityDocumentCard({
+  title,
+  description,
+  meta,
+  source,
+  viewLabel,
+  showDownload,
+}: {
+  title: string;
+  description: string;
+  meta: Array<{ label: string; value: string }>;
+  source: ImageSourcePropType;
+  viewLabel: string;
+  showDownload?: boolean;
+}) {
+  return (
+    <View style={styles.qualityDocCard}>
+      <Text style={styles.qualityDocTitle}>{title}</Text>
+      <Text style={styles.qualityDocDescription}>{description}</Text>
+      {meta.length > 0 ? (
+        <View style={styles.qualityDocMetaList}>
+          {meta.map((item) => (
+            <View key={item.label} style={styles.qualityDocMetaRow}>
+              <Text style={styles.qualityDocMetaLabel}>{item.label}</Text>
+              <Text style={styles.qualityDocMetaValue}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.heroActionRow}>
+        <Pressable style={styles.primaryButton} onPress={() => openQualityDocument(source)}>
+          <Text style={styles.primaryButtonLabel}>{viewLabel}</Text>
+        </Pressable>
+        {showDownload ? (
+          <Pressable style={styles.secondaryButton} onPress={() => openQualityDocument(source)}>
+            <Text style={styles.secondaryButtonLabel}>Download PDF</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function QualityCompliancePage() {
+  return (
+    <SectionShell
+      eyebrow="Quality & Compliance"
+      title="Quality, safety and product information"
+      description="We believe in being transparent about the products we make and the standards that support them. Explore our official Rose's Dairy registration, audit certification and Halloumi product information below."
+    >
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Official Certifications</Text>
+        <View style={styles.qualityDocGrid}>
+          <QualityDocumentCard
+            title="MPI Animal Products Exporter Registration"
+            description="Official MPI Animal Products Exporter registration for AYYILDIZ Limited trading as Roses Dairy (Halloumi Cheese)."
+            meta={[
+              { label: 'MPI ID', value: 'AEX000656' },
+              { label: 'Validity', value: '16 March 2026 – 16 March 2027' },
+            ]}
+            source={mpiRegistrationPdf}
+            viewLabel="View Certificate"
+            showDownload
+          />
+          <QualityDocumentCard
+            title="Food Safety & Quality Audit Certificate"
+            description="Certificate of Audit for Ayyildiz Ltd, trading as Rose's Halloumi."
+            meta={[{ label: 'Certificate expiry', value: '2 January 2027' }]}
+            source={foodSafetyAuditPdf}
+            viewLabel="View Certificate"
+            showDownload
+          />
+        </View>
+      </View>
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Halloumi Product Information</Text>
+        <View style={styles.qualityDocGrid}>
+          <QualityDocumentCard
+            title="Rose’s Dairy Halloumi Product Specification"
+            description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
+            meta={[
+              { label: 'Product', value: 'Rose’s Dairy Halloumi' },
+              { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
+              { label: 'Ingredients', value: 'Pasteurised Cow’s Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
+              { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
+              { label: 'Opened', value: 'Consume within 5 days once opened.' },
+            ]}
+            source={halloumiProductSpecPdf}
+            viewLabel="View Product Specification"
+            showDownload
+          />
+        </View>
+      </View>
+    </SectionShell>
   );
 }
 
@@ -1316,18 +2053,195 @@ function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
   );
 }
 
+const generalEnquiryTypeOptions: Array<{ label: string; value: GeneralEnquiryType }> = [
+  { label: 'General enquiry', value: 'GENERAL' },
+  { label: 'Product enquiry', value: 'PRODUCT' },
+  { label: 'Order enquiry', value: 'ORDER' },
+  { label: 'Delivery enquiry', value: 'DELIVERY' },
+  { label: 'Other', value: 'OTHER' },
+];
+
+type GeneralEnquiryType = 'GENERAL' | 'PRODUCT' | 'ORDER' | 'DELIVERY' | 'OTHER';
+
+function GeneralContactForm() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [enquiryType, setEnquiryType] = useState<GeneralEnquiryType>('GENERAL');
+  const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitGeneral = trpc.contact.submitGeneral.useMutation();
+
+  function validate(): string | null {
+    if (name.trim().length < 1) {
+      return 'Enter your name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (message.trim().length < 1) {
+      return 'Enter a message.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      setSubmitted(false);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await submitGeneral.mutateAsync({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        enquiryType,
+        message: message.trim(),
+      });
+      setSubmitted(true);
+      setName('');
+      setEmail('');
+      setPhone('');
+      setEnquiryType('GENERAL');
+      setMessage('');
+    } catch (error) {
+      setSubmitted(false);
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>General enquiry</Text>
+      <Field label="Name" value={name} onChangeText={setName} />
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <View style={styles.fieldWrap}>
+        <Text style={styles.fieldLabel}>Enquiry type</Text>
+        <SegmentedControl
+          groupLabel="Enquiry type"
+          value={enquiryType}
+          options={generalEnquiryTypeOptions}
+          onChange={(value) => setEnquiryType(value as GeneralEnquiryType)}
+        />
+      </View>
+      <Field label="Message" value={message} onChangeText={setMessage} multiline />
+      {submitted ? <Text style={styles.successText}>Thanks — your enquiry has been sent. We'll be in touch soon.</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable
+        disabled={submitGeneral.isPending}
+        style={[styles.primaryButton, submitGeneral.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitGeneral.isPending ? 'Sending…' : 'Send enquiry'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function WholesaleContactForm() {
+  const [businessName, setBusinessName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [businessLocation, setBusinessLocation] = useState('');
+  const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitWholesale = trpc.contact.submitWholesale.useMutation();
+
+  function validate(): string | null {
+    if (businessName.trim().length < 1) {
+      return 'Enter your business name.';
+    }
+    if (contactName.trim().length < 1) {
+      return 'Enter a contact name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (businessLocation.trim().length < 1) {
+      return 'Enter your business/location.';
+    }
+    if (message.trim().length < 1) {
+      return 'Enter a message.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      setSubmitted(false);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await submitWholesale.mutateAsync({
+        businessName: businessName.trim(),
+        contactName: contactName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        businessLocation: businessLocation.trim(),
+        message: message.trim(),
+      });
+      setSubmitted(true);
+      setBusinessName('');
+      setContactName('');
+      setEmail('');
+      setPhone('');
+      setBusinessLocation('');
+      setMessage('');
+    } catch (error) {
+      setSubmitted(false);
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>Wholesale enquiry</Text>
+      <Field label="Business name" value={businessName} onChangeText={setBusinessName} />
+      <Field label="Contact name" value={contactName} onChangeText={setContactName} />
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <Field label="Business/location" value={businessLocation} onChangeText={setBusinessLocation} />
+      <Field label="Message" value={message} onChangeText={setMessage} multiline />
+      {submitted ? <Text style={styles.successText}>Thanks — your wholesale enquiry has been sent. We'll be in touch soon.</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable
+        disabled={submitWholesale.isPending}
+        style={[styles.primaryButton, submitWholesale.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitWholesale.isPending ? 'Sending…' : 'Send wholesale enquiry'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
   return (
-    <SectionShell eyebrow="Contact" title="Get in touch" description="Use the existing account path for customer and wholesale enquiries.">
+    <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
+      <GeneralContactForm />
+      <WholesaleContactForm />
       <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Customer and wholesale enquiries</Text>
-        <Text style={styles.noticeText}>Create an account or sign in, then use your customer account context for enquiries related to halloumi ordering and wholesale access.</Text>
+        <Text style={styles.noticeTitle}>Already a customer?</Text>
+        <Text style={styles.noticeText}>Sign in to your customer account to place orders and view order history.</Text>
         <View style={styles.heroActionRow}>
-          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
-            <Text style={styles.primaryButtonLabel}>Open Account</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('wholesale')}>
-            <Text style={styles.secondaryButtonLabel}>Wholesale</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('account')}>
+            <Text style={styles.secondaryButtonLabel}>Open Account</Text>
           </Pressable>
         </View>
       </View>
@@ -1404,7 +2318,7 @@ function SignedInAccountPage({
           <View style={styles.inlineCard}>
             <Text style={styles.inlineCardTitle}>Account details</Text>
             <Text style={styles.metaText}>{session.user?.email}</Text>
-            <Text style={styles.metaText}>{session.user?.kind === 'staff' ? `${session.user.role} team access` : `${session.user?.type} customer access`}</Text>
+            <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
             <View style={styles.heroActionRow}>
               <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
@@ -1422,12 +2336,15 @@ function SignedInAccountPage({
             {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
             {(ordersQuery.data ?? []).slice(0, 3).map((order) => (
               <View key={order.id} style={styles.accountOrderRow}>
-                <Text style={styles.cartLineTitle}>Order #{order.id}</Text>
-                <Text style={styles.metaText}>{order.paymentStatus} • ${order.total.toFixed(2)}</Text>
+                <Text style={styles.cartLineTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+                <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • {formatMoney(order.total)}</Text>
               </View>
             ))}
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate(session.user?.kind === 'staff' ? 'orders' : 'cart')}>
-              <Text style={styles.secondaryButtonLabel}>{session.user?.kind === 'staff' ? 'View All Orders' : 'Open Cart & Checkout'}</Text>
+            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('orders')}>
+              <Text style={styles.secondaryButtonLabel}>View All Orders</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('cart')}>
+              <Text style={styles.secondaryButtonLabel}>Open Cart & Checkout</Text>
             </Pressable>
           </View>
         </View>
@@ -1436,66 +2353,246 @@ function SignedInAccountPage({
   );
 }
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Reads a `?token=` query param from the current web URL (used for password reset links). Native platforms never have a URL to read, so this always returns null there. */
+function getResetTokenFromWebLocation(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get('token');
+}
+
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
-  const [mode, setMode] = useState<AuthMode>('customer-login');
+  const initialResetToken = useMemo(() => getResetTokenFromWebLocation(), []);
+  const [mode, setMode] = useState<AuthMode>(initialResetToken ? 'customer-reset-password' : 'customer-login');
+  const [resetToken] = useState<string | null>(initialResetToken);
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   const customerLogin = trpc.auth.customerLogin.useMutation();
   const staffLogin = trpc.auth.staffLogin.useMutation();
   const customerRegister = trpc.auth.customerRegister.useMutation();
+  const requestPasswordReset = trpc.auth.requestPasswordReset.useMutation();
+  const resetPassword = trpc.auth.resetPassword.useMutation();
 
-  const loading = customerLogin.isPending || staffLogin.isPending || customerRegister.isPending;
+  const loading =
+    customerLogin.isPending ||
+    staffLogin.isPending ||
+    customerRegister.isPending ||
+    requestPasswordReset.isPending ||
+    resetPassword.isPending;
+
+  function changeMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setFormError(null);
+    setInfoMessage(null);
+  }
+
+  function validate(): string | null {
+    if (mode === 'customer-forgot-password') {
+      if (!emailPattern.test(email.trim())) {
+        return 'Enter a valid email address.';
+      }
+      return null;
+    }
+
+    if (mode === 'customer-reset-password') {
+      if (password.length < 8) {
+        return 'Password must be at least 8 characters.';
+      }
+      if (confirmPassword !== password) {
+        return 'Passwords do not match.';
+      }
+      return null;
+    }
+
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters.';
+    }
+
+    if (mode === 'customer-register') {
+      if (name.trim().length < 2) {
+        return 'Enter your full name.';
+      }
+
+      if (emailPattern.test(name.trim())) {
+        return 'Enter your full name, not your email address.';
+      }
+
+      if (contact.trim().length < 6) {
+        return 'Enter a valid mobile number.';
+      }
+
+      if (confirmPassword !== password) {
+        return 'Passwords do not match.';
+      }
+    }
+
+    return null;
+  }
 
   async function submit() {
+    const validationError = validate();
+
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError(null);
+
     try {
       if (mode === 'customer-register') {
         const result = await customerRegister.mutateAsync({
-          name,
-          contact: contact.trim() || undefined,
-          email,
+          name: name.trim(),
+          contact: contact.trim(),
+          email: email.trim(),
           password,
         });
         await onAuthenticated(result.token, result.user as SessionUser);
+      } else if (mode === 'customer-forgot-password') {
+        await requestPasswordReset.mutateAsync({ email: email.trim() });
+        setInfoMessage("If an account exists for that email, we've sent a password reset link. Check your inbox.");
+      } else if (mode === 'customer-reset-password') {
+        if (!resetToken) {
+          setFormError('This password reset link is invalid or has expired.');
+          return;
+        }
+        await resetPassword.mutateAsync({ token: resetToken, password });
+        setPassword('');
+        setConfirmPassword('');
+        setInfoMessage('Your password has been reset. You can now sign in with your new password.');
+        changeMode('customer-login');
       } else if (mode === 'customer-login') {
-        const result = await customerLogin.mutateAsync({ email, password });
+        const result = await customerLogin.mutateAsync({ email: email.trim(), password });
         await onAuthenticated(result.token, result.user as SessionUser);
       } else {
-        const result = await staffLogin.mutateAsync({ email, password });
+        const result = await staffLogin.mutateAsync({ email: email.trim(), password });
         await onAuthenticated(result.token, result.user as SessionUser);
       }
     } catch (error) {
-      Alert.alert('Authentication failed', getErrorMessage(error));
+      setFormError(getErrorMessage(error));
     }
+  }
+
+  if (mode === 'admin-login') {
+    return (
+      <View style={styles.authPanel}>
+        <Text style={styles.authPanelTitle}>Admin Login</Text>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Sign in'}</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (mode === 'customer-forgot-password') {
+    return (
+      <View style={styles.authPanel}>
+        <Text style={styles.authPanelTitle}>Reset your password</Text>
+        <Text style={styles.authPanelSubtitle}>Enter your account email and we'll send you a link to set a new password.</Text>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Send reset link'}</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (mode === 'customer-reset-password') {
+    return (
+      <View style={styles.authPanel}>
+        <Text style={styles.authPanelTitle}>Set a new password</Text>
+        {!resetToken ? (
+          <Text style={styles.errorText}>This password reset link is invalid or has expired. Request a new one below.</Text>
+        ) : (
+          <>
+            <Field label="New password" value={password} onChangeText={setPassword} secureTextEntry />
+            <Field label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+          </>
+        )}
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        {resetToken ? (
+          <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+            <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Reset password'}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-forgot-password')}>
+          <Text style={styles.secondaryButtonLabel}>Request a new reset link</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (
     <View style={styles.authPanel}>
-      <Text style={styles.authPanelTitle}>{brandName}</Text>
-      <Text style={styles.authPanelSubtitle}>Customer account access and registration for halloumi ordering.</Text>
-      <SegmentedControl
-        groupLabel="Authentication mode"
-        value={mode}
-        options={[
-          { label: 'Customer', value: 'customer-login' },
-          { label: 'Staff', value: 'staff-login' },
-          { label: 'Register', value: 'customer-register' },
-        ]}
-        onChange={(value) => setMode(value as AuthMode)}
-      />
+      <Text style={styles.authPanelTitle}>Welcome to {brandName}</Text>
+      <Text style={styles.authPanelSubtitle}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
       {mode === 'customer-register' ? (
         <>
-          <Field label="Business / account name" value={name} onChangeText={setName} />
-          <Field label="Contact" value={contact} onChangeText={setContact} />
+          <Field label="Full name" value={name} onChangeText={setName} />
+          <Field label="Mobile number" value={contact} onChangeText={setContact} keyboardType="default" />
         </>
       ) : null}
       <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      {mode === 'customer-register' ? (
+        <Field label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+      ) : null}
+      {mode === 'customer-login' ? (
+        <Pressable onPress={() => changeMode('customer-forgot-password')}>
+          <Text style={styles.adminAccessLink}>Forgot your password?</Text>
+        </Pressable>
+      ) : null}
+      {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
       </Pressable>
+      {mode === 'customer-login' ? (
+        <>
+          <Text style={styles.metaText}>Don&apos;t have an account?</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-register')}>
+            <Text style={styles.secondaryButtonLabel}>Create a customer account</Text>
+          </Pressable>
+        </>
+      ) : (
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      )}
+      <View style={styles.adminAccessSection}>
+        <Text style={styles.adminAccessLabel}>Admin Access</Text>
+        <Pressable onPress={() => changeMode('admin-login')}>
+          <Text style={styles.adminAccessLink}>Admin Login</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -1518,13 +2615,17 @@ function OrdersPage({ title, description }: { title: string; description: string
       {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
       {(ordersQuery.data ?? []).map((order) => (
         <View key={order.id} style={styles.inlineCard}>
-          <Text style={styles.inlineCardTitle}>Order #{order.id}</Text>
+          <Text style={styles.inlineCardTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+          <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleString()} • Status: {order.status}</Text>
           <Text style={styles.metaText}>{order.customer.name} • {order.paymentStatus} • ${order.total.toFixed(2)}</Text>
           <Text style={styles.metaText}>{order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now' : 'Pay in 30'} • {order.paymentMethod}</Text>
+          {order.subtotal !== null ? <Text style={styles.metaText}>Subtotal: {formatMoney(order.subtotal)} • Shipping: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text> : null}
           {order.staff ? <Text style={styles.metaText}>Created by {order.staff.name}</Text> : null}
           {order.dueDate ? <Text style={styles.metaText}>Due {new Date(order.dueDate).toLocaleDateString()}</Text> : null}
+          {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to: {order.deliveryAddress}</Text> : null}
+          {order.orderNotes ? <Text style={styles.metaText}>Notes: {order.orderNotes}</Text> : null}
           {order.items.map((item) => (
-            <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ ${item.unitPrice.toFixed(2)}</Text>
+            <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ {formatMoney(item.unitPrice)}</Text>
           ))}
         </View>
       ))}
@@ -1535,40 +2636,11 @@ function OrdersPage({ title, description }: { title: string; description: string
 function CustomersScreen() {
   const utils = trpc.useUtils();
   const customersQuery = trpc.staff.listCustomers.useQuery();
-  const createCustomer = trpc.staff.createCustomer.useMutation({
-    onSuccess: async () => {
-      await utils.staff.listCustomers.invalidate();
-    },
-  });
   const updateCustomerType = trpc.staff.updateCustomerType.useMutation({
     onSuccess: async () => {
       await utils.staff.listCustomers.invalidate();
     },
   });
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [contact, setContact] = useState('');
-  const [password, setPassword] = useState('');
-  const [type, setType] = useState<'WHOLESALE' | 'RETAIL'>('RETAIL');
-
-  async function submit() {
-    try {
-      await createCustomer.mutateAsync({
-        name,
-        email,
-        contact: contact.trim() || undefined,
-        password,
-        type,
-      });
-      setName('');
-      setEmail('');
-      setContact('');
-      setPassword('');
-      setType('RETAIL');
-    } catch (error) {
-      Alert.alert('Unable to create customer', getErrorMessage(error));
-    }
-  }
 
   async function toggleTier(customerId: number, nextType: 'WHOLESALE' | 'RETAIL') {
     try {
@@ -1579,26 +2651,7 @@ function CustomersScreen() {
   }
 
   return (
-    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Staff can create and manage customer access without changing the halloumi product rules.">
-      <View style={styles.inlineCard}>
-        <Text style={styles.inlineCardTitle}>Create customer account</Text>
-        <Field label="Name" value={name} onChangeText={setName} />
-        <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-        <Field label="Contact" value={contact} onChangeText={setContact} />
-        <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
-        <SegmentedControl
-          groupLabel="Customer tier"
-          value={type}
-          options={[
-            { label: 'Retail', value: 'RETAIL' },
-            { label: 'Wholesale', value: 'WHOLESALE' },
-          ]}
-          onChange={(value) => setType(value as 'WHOLESALE' | 'RETAIL')}
-        />
-        <Pressable style={styles.primaryButton} onPress={() => void submit()}>
-          <Text style={styles.primaryButtonLabel}>Create customer</Text>
-        </Pressable>
-      </View>
+    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Admins manage each customer's Retail/Wholesale tier. Customers manage their own account details and password.">
       {customersQuery.isLoading ? <Text style={styles.metaText}>Loading customers…</Text> : null}
       {(customersQuery.data ?? []).map((customer) => (
         <View key={customer.id} style={styles.inlineCard}>
@@ -1631,8 +2684,10 @@ function Field(props: {
   value: string;
   onChangeText: (value: string) => void;
   secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'email-address';
+  keyboardType?: 'default' | 'email-address' | 'phone-pad';
   autoCapitalize?: 'none' | 'sentences';
+  editable?: boolean;
+  multiline?: boolean;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -1641,7 +2696,9 @@ function Field(props: {
         autoCapitalize={props.autoCapitalize ?? 'sentences'}
         keyboardType={props.keyboardType ?? 'default'}
         secureTextEntry={props.secureTextEntry}
-        style={styles.input}
+        editable={props.editable ?? true}
+        multiline={props.multiline}
+        style={[styles.input, props.multiline && styles.inputMultiline]}
         value={props.value}
         onChangeText={props.onChangeText}
       />
@@ -1656,7 +2713,7 @@ function SegmentedControl({
   onChange,
 }: {
   groupLabel: string;
-  options: Array<{ label: string; value: string }>;
+  options: Array<{ label: string; value: string; disabled?: boolean }>;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -1667,11 +2724,17 @@ function SegmentedControl({
         return (
           <Pressable
             key={option.value}
+            disabled={option.disabled}
             accessibilityLabel={option.label}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
-            style={[styles.segment, selected && styles.segmentSelected]}
-            onPress={() => onChange(option.value)}
+            accessibilityState={{ selected, disabled: option.disabled }}
+            style={[styles.segment, selected && styles.segmentSelected, option.disabled && styles.disabledButton]}
+            onPress={() => {
+              if (option.disabled) {
+                return;
+              }
+              onChange(option.value);
+            }}
           >
             <Text style={[styles.segmentLabel, selected && styles.segmentLabelSelected]}>{option.label}</Text>
           </Pressable>
@@ -2018,6 +3081,57 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
+  qualitySection: {
+    gap: 16,
+  },
+  qualitySectionHeading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  qualityDocCard: {
+    flexBasis: 320,
+    flexGrow: 1,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 12,
+  },
+  qualityDocTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocDescription: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#4d5c54',
+  },
+  qualityDocMetaList: {
+    gap: 6,
+  },
+  qualityDocMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  qualityDocMetaLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7d6744',
+  },
+  qualityDocMetaValue: {
+    fontSize: 14,
+    color: '#4d5c54',
+    flexShrink: 1,
+  },
   noticeCard: {
     backgroundColor: '#fffdf8',
     borderRadius: 24,
@@ -2235,6 +3349,43 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     maxWidth: 520,
   },
+  storyFamilySection: {
+    gap: 16,
+  },
+  storyFarmToTableSection: {
+    gap: 16,
+  },
+  storyBrandStatementCard: {
+    backgroundColor: '#1f5c43',
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    gap: 10,
+    alignItems: 'center',
+  },
+  storyBrandStatement: {
+    color: '#fffdf8',
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    maxWidth: 640,
+  },
+  storyBrandClosingLine: {
+    color: '#f5e7b2',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  storyBulletList: {
+    gap: 10,
+  },
+  storyBulletItem: {
+    color: '#4d5c54',
+    fontSize: 16,
+    lineHeight: 26,
+  },
   wholesaleCard: {
     backgroundColor: '#123524',
     borderRadius: 28,
@@ -2265,6 +3416,25 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: '#4d5c54',
   },
+  adminAccessSection: {
+    marginTop: 12,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#e7ddc9',
+    alignItems: 'center',
+    gap: 4,
+  },
+  adminAccessLabel: {
+    fontSize: 12,
+    color: '#8a8375',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminAccessLink: {
+    fontSize: 13,
+    color: '#4d5c54',
+    textDecorationLine: 'underline',
+  },
   inlineTwoColumnRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2291,6 +3461,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     color: '#4d5c54',
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#b3261e',
+    fontWeight: '600',
   },
   segmentedControl: {
     flexDirection: 'row',
@@ -2330,6 +3506,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#d7ceb9',
+  },
+  inputMultiline: {
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  successText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#1f5c43',
+    fontWeight: '600',
   },
   brandPanelCard: {
     backgroundColor: '#123524',

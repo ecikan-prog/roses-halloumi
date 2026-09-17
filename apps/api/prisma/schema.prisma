@@ -45,16 +45,42 @@ enum StaffRole {
 }
 
 model Customer {
-  id             Int           @id @default(autoincrement())
-  name           String
-  email          String        @unique
-  passwordHash   String
-  type           CustomerType  @default(RETAIL)
-  contact        String?
-  accountSource  AccountSource
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  orders         Order[]
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  passwordHash         String
+  type                 CustomerType          @default(RETAIL)
+  contact              String?
+  accountSource        AccountSource
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  /// Soft-delete marker. When set, this customer account is deactivated: the
+  /// customer can no longer log in (or use an existing session token), but
+  /// the row — and any historical orders that reference it via
+  /// `Order.customerId` — is preserved for accounting/audit purposes rather
+  /// than being hard-deleted, which would otherwise violate the FK on
+  /// `Order.customerId` or destroy order history.
+  deletedAt            DateTime?
+  orders               Order[]
+  passwordResetTokens  PasswordResetToken[]
+}
+
+/**
+ * Single-use, time-limited tokens issued for the customer "forgot your
+ * password" flow. Only a SHA-256 hash of the token is ever stored — the
+ * plaintext token is emailed to the customer and never persisted — so a
+ * database read alone can never be used to reset an account's password.
+ */
+model PasswordResetToken {
+  id         Int       @id @default(autoincrement())
+  customerId Int
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
 }
 
 model Product {
@@ -81,10 +107,15 @@ model Recipe {
 
 model Order {
   id               Int            @id @default(autoincrement())
+  orderNumber      String?        @unique
   customerId       Int
   staffId          Int?
   status           OrderStatus    @default(CONFIRMED)
   paymentTerm      PaymentTerm
+  subtotal         Decimal?       @db.Decimal(10, 2)
+  deliveryCharge   Decimal        @default(0) @db.Decimal(10, 2)
+  deliveryAddress  String?        @db.Text
+  orderNotes       String?        @db.Text
   discountApplied  Decimal        @db.Decimal(10, 2)
   total            Decimal        @db.Decimal(10, 2)
   dueDate          DateTime?

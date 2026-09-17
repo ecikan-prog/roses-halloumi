@@ -15,6 +15,32 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Please try again.';
 }
 
+const MIN_PASSWORD_LENGTH = 8;
+const PASSWORD_TOO_SHORT_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+
+// The API validates input with Zod, which can surface as a raw JSON issue array in the
+// error message. Never show that to the admin — translate it into a friendly message instead.
+function getCreateCustomerErrorMessage(error: unknown): string {
+  const raw = getErrorMessage(error);
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const passwordIssue = parsed.find(
+        (issue) => issue && Array.isArray(issue.path) && issue.path.includes('password'),
+      );
+      if (passwordIssue) {
+        return PASSWORD_TOO_SHORT_MESSAGE;
+      }
+      return 'Please check the form and try again.';
+    }
+  } catch {
+    // Not a JSON payload — it's already a plain-language error (e.g. duplicate email).
+  }
+
+  return raw;
+}
+
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -289,8 +315,15 @@ function AdminCustomersPage() {
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
   const [type, setType] = useState<'WHOLESALE' | 'RETAIL'>('RETAIL');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   async function submit() {
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setPasswordError(PASSWORD_TOO_SHORT_MESSAGE);
+      return;
+    }
+    setPasswordError(null);
+
     try {
       await createCustomer.mutateAsync({
         name,
@@ -305,7 +338,12 @@ function AdminCustomersPage() {
       setPassword('');
       setType('RETAIL');
     } catch (error) {
-      Alert.alert('Unable to create customer', getErrorMessage(error));
+      const message = getCreateCustomerErrorMessage(error);
+      if (message === PASSWORD_TOO_SHORT_MESSAGE) {
+        setPasswordError(message);
+        return;
+      }
+      Alert.alert('Unable to create customer', message);
     }
   }
 
@@ -327,7 +365,18 @@ function AdminCustomersPage() {
         <AdminField label="Name" value={name} onChangeText={setName} />
         <AdminField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
         <AdminField label="Mobile" value={contact} onChangeText={setContact} />
-        <AdminField label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+        <AdminField
+          label="Password"
+          value={password}
+          onChangeText={(value) => {
+            setPassword(value);
+            if (passwordError) {
+              setPasswordError(null);
+            }
+          }}
+          secureTextEntry
+          errorText={passwordError}
+        />
         <View style={styles.filterRow}>
           {(['RETAIL', 'WHOLESALE'] as const).map((option) => {
             const active = option === type;
@@ -379,6 +428,7 @@ function AdminField({
   secureTextEntry,
   keyboardType,
   autoCapitalize,
+  errorText,
 }: {
   label: string;
   value: string;
@@ -386,6 +436,7 @@ function AdminField({
   secureTextEntry?: boolean;
   keyboardType?: 'default' | 'email-address';
   autoCapitalize?: 'none' | 'sentences';
+  errorText?: string | null;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -394,10 +445,11 @@ function AdminField({
         autoCapitalize={autoCapitalize ?? 'sentences'}
         keyboardType={keyboardType ?? 'default'}
         secureTextEntry={secureTextEntry}
-        style={styles.input}
+        style={[styles.input, errorText ? styles.inputError : null]}
         value={value}
         onChangeText={onChangeText}
       />
+      {errorText ? <Text style={styles.fieldErrorText}>{errorText}</Text> : null}
     </View>
   );
 }
@@ -639,6 +691,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+  },
+  inputError: {
+    borderColor: '#b3261e',
+  },
+  fieldErrorText: {
+    fontSize: 12,
+    color: '#b3261e',
   },
   primaryButton: {
     backgroundColor: '#1f5c43',

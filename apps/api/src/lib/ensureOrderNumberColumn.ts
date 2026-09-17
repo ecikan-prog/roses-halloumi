@@ -13,12 +13,17 @@
  *   The column `railway.Order.orderNumber` does not exist in the current
  *   database.
  *   Data too long for column 'deliveryAddress' at row 1
+ *   The column `railway.Order.paymentTerm` does not exist in the current
+ *   database.
  *
- * Both are concrete, previously-seen root causes of "Confirm order" failing
+ * All are concrete, previously-seen root causes of "Confirm order" failing
  * in production with a generic server error: the `orders.create` mutation's
  * `prisma.$transaction(...)` throws before any response is returned, so the
  * customer sees "We could not place your order because of a server error."
- * even though nothing about the request itself was invalid.
+ * even though nothing about the request itself was invalid. The
+ * `paymentTerm` case specifically broke Pay in 30 order submission, since
+ * `paymentTerm` is the column that records "Pay in 30" vs "Pay now" on every
+ * order and is required (`NOT NULL`, no default) on every insert.
  *
  * `ensureOrderSchema` is called once at API startup (see `server.ts`) so
  * these fixes are applied automatically on every deploy instead of
@@ -167,6 +172,19 @@ export async function ensureOrderSchema(prisma: PrismaClient, log: (message: str
   await ensureColumn(prisma, 'Order', 'dueDate', 'DATETIME(3) NULL', log);
   await ensureColumn(prisma, 'Order', 'paymentStatus', "ENUM('PAID','OUTSTANDING','OVERDUE') NOT NULL DEFAULT 'OUTSTANDING'", log);
   await ensureColumn(prisma, 'Order', 'paymentMethod', "ENUM('IN_APP','EFTPOS') NOT NULL DEFAULT 'IN_APP'", log);
+  // `paymentTerm` and `total` are also required (NOT NULL, no default) on
+  // every `orders.create` insert, and `status` is set implicitly by its
+  // schema default on every insert too. All three were missed by the
+  // original defensive list above, which reproduces the exact same
+  // "column does not exist" failure class documented above — just for
+  // these columns instead of `orderNumber`/`deliveryAddress`. This is the
+  // confirmed root cause of "Confirm order" failing for Pay in 30: the
+  // production `Order` table was missing `paymentTerm` (the column that
+  // distinguishes Pay in 30 from Pay now), so every insert failed before a
+  // response could be returned.
+  await ensureColumn(prisma, 'Order', 'paymentTerm', "ENUM('PAY_NOW','PAY_30') NOT NULL DEFAULT 'PAY_30'", log);
+  await ensureColumn(prisma, 'Order', 'total', "DECIMAL(10,2) NOT NULL DEFAULT '0.00'", log);
+  await ensureColumn(prisma, 'Order', 'status', "ENUM('CONFIRMED','FULFILLED','CANCELLED') NOT NULL DEFAULT 'CONFIRMED'", log);
 
   // deliveryAddress/orderNotes must be TEXT, not the default VARCHAR(191) —
   // see ensureWideTextColumn for why the narrower type breaks order

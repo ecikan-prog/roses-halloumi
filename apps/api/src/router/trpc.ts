@@ -8,9 +8,25 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 export const middleware = t.middleware;
 
-const enforceUser = middleware(({ ctx, next }) => {
+const enforceUser = middleware(async ({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({ code: 'UNAUTHORIZED' });
+  }
+
+  // A customer's JWT stays valid until it expires even after an admin
+  // deletes (soft-deletes) their account, since the token is self-contained
+  // and not otherwise revocable. Re-check the account's deletedAt status on
+  // every protected call so a deleted customer can never keep using an
+  // already-issued session.
+  if (ctx.user.kind === 'customer') {
+    const customer = await ctx.prisma.customer.findUnique({
+      where: { id: ctx.user.id },
+      select: { deletedAt: true },
+    });
+
+    if (!customer || customer.deletedAt) {
+      throw new TRPCError({ code: 'UNAUTHORIZED' });
+    }
   }
 
   return next({

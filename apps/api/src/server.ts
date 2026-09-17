@@ -3,6 +3,7 @@ import express from 'express';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { allowedOrigins, env } from './config.js';
 import { createContext } from './context.js';
+import { ensureCustomerDeletedAtColumn } from './lib/ensureCustomerDeletedAtColumn.js';
 import { ensureOrderSchema } from './lib/ensureOrderNumberColumn.js';
 import { ensurePasswordResetTokenTable } from './lib/ensurePasswordResetTokenTable.js';
 import { prisma } from './lib/prisma.js';
@@ -56,6 +57,9 @@ async function start() {
 
   console.log('[startup] Verifying/repairing PasswordResetToken table...');
   await ensurePasswordResetTokenTable(prisma);
+
+  console.log('[startup] Verifying/repairing Customer.deletedAt column...');
+  await ensureCustomerDeletedAtColumn(prisma);
 
   app.listen(env.PORT, () => {
     console.log(`API listening on http://localhost:${env.PORT}`);

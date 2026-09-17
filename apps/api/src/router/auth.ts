@@ -1,11 +1,10 @@
 import { AccountSource, CustomerType } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
-import crypto from 'node:crypto';
 import { z } from 'zod';
-import { env } from '../config.js';
 import { hashPassword, signToken, verifyPassword } from '../lib/auth.js';
-import { buildPasswordResetEmail, buildWelcomeEmail } from '../lib/emailTemplates.js';
+import { buildWelcomeEmail } from '../lib/emailTemplates.js';
 import { sendMail } from '../lib/mailer.js';
+import { hashResetToken, issuePasswordResetEmail } from '../lib/passwordReset.js';
 import { protectedProcedure, publicProcedure, router } from './trpc.js';
 
 const credentialsSchema = z.object({
@@ -13,25 +12,7 @@ const credentialsSchema = z.object({
   password: z.string().min(8),
 });
 
-// A single reset link is valid for 1 hour, matching the expiry stated in the
-// password reset email copy (see buildPasswordResetEmail).
-const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function hashResetToken(token: string) {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-/**
- * Builds the absolute link sent in "forgot your password" emails. Prefers an
- * explicit APP_BASE_URL (recommended for production), falling back to the
- * Origin header of the request that triggered the reset so the link still
- * points at whichever frontend the customer is actually using.
- */
-function buildResetLink(origin: string | undefined, token: string) {
-  const baseUrl = (env.APP_BASE_URL ?? origin ?? '').replace(/\/+$/, '');
-  return `${baseUrl}/reset-password?token=${token}`;
-}
 
 export const authRouter = router({
   customerRegister: publicProcedure
@@ -96,7 +77,11 @@ export const authRouter = router({
   customerLogin: publicProcedure.input(credentialsSchema).mutation(async ({ ctx, input }) => {
     const customer = await ctx.prisma.customer.findUnique({ where: { email: input.email } });
 
-    if (!customer || !(await verifyPassword(input.password, customer.passwordHash))) {
+    if (
+      !customer ||
+      customer.deletedAt ||
+      !(await verifyPassword(input.password, customer.passwordHash))
+    ) {
       throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid customer credentials.' });
     }
 
@@ -156,22 +141,8 @@ export const authRouter = router({
       // Always perform the same work and return the same generic response
       // whether or not the email matches a customer account, so this
       // endpoint never reveals which email addresses are registered.
-      if (customer) {
-        const rawToken = crypto.randomBytes(32).toString('hex');
-
-        await ctx.prisma.passwordResetToken.create({
-          data: {
-            customerId: customer.id,
-            tokenHash: hashResetToken(rawToken),
-            expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
-          },
-        });
-
-        const resetEmail = buildPasswordResetEmail({
-          name: customer.name,
-          resetLink: buildResetLink(ctx.origin, rawToken),
-        });
-        void sendMail({ to: customer.email, ...resetEmail });
+      if (customer && !customer.deletedAt) {
+        await issuePasswordResetEmail(ctx.prisma, customer, ctx.origin);
       }
 
       return { ok: true as const };
@@ -186,9 +157,15 @@ export const authRouter = router({
     .mutation(async ({ ctx, input }) => {
       const resetToken = await ctx.prisma.passwordResetToken.findUnique({
         where: { tokenHash: hashResetToken(input.token) },
+        include: { customer: true },
       });
 
-      if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+      if (
+        !resetToken ||
+        resetToken.usedAt ||
+        resetToken.expiresAt < new Date() ||
+        resetToken.customer.deletedAt
+      ) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'This password reset link is invalid or has expired.' });
       }
 

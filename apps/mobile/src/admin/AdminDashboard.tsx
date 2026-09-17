@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { trpc } from '../lib/trpc';
 import type { SessionState } from '../../App';
 
@@ -13,6 +13,38 @@ type PaymentStatus = 'PAID' | 'OUTSTANDING' | 'OVERDUE';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Please try again.';
+}
+
+/**
+ * `Alert.alert` from `react-native` is a no-op on web (react-native-web has
+ * no native alert/confirm dialog implementation), and this app is primarily
+ * accessed as a web app (see serve-web.mjs). Route confirmations and
+ * notifications through `window.confirm`/`window.alert` on web, and fall
+ * back to the native `Alert.alert` (with Cancel/Confirm buttons) everywhere
+ * else, so destructive-action confirmations always actually appear.
+ */
+function confirmAction(title: string, message: string, confirmLabel = 'Confirm') {
+  if (Platform.OS === 'web') {
+    return Promise.resolve(typeof window !== 'undefined' ? window.confirm(`${title}\n\n${message}`) : false);
+  }
+
+  return new Promise<boolean>((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: confirmLabel, style: 'destructive', onPress: () => resolve(true) },
+    ]);
+  });
+}
+
+function notify(title: string, message: string) {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.alert(`${title}\n\n${message}`);
+    }
+    return;
+  }
+
+  Alert.alert(title, message);
 }
 
 function isSameDay(a: Date, b: Date) {
@@ -45,7 +77,7 @@ export default function AdminDashboardScreen({
       content = <AdminProductsPage />;
       break;
     case 'customers':
-      content = <AdminCustomersPage />;
+      content = <AdminCustomersPage isAdmin={admin?.role === 'ADMIN'} />;
       break;
     case 'overview':
     default:
@@ -271,10 +303,16 @@ function AdminProductsPage() {
   );
 }
 
-function AdminCustomersPage() {
+function AdminCustomersPage({ isAdmin }: { isAdmin: boolean }) {
   const utils = trpc.useUtils();
   const customersQuery = trpc.staff.listCustomers.useQuery();
   const updateCustomerType = trpc.staff.updateCustomerType.useMutation({
+    onSuccess: async () => {
+      await utils.staff.listCustomers.invalidate();
+    },
+  });
+  const resetCustomerPassword = trpc.staff.resetCustomerPassword.useMutation();
+  const deleteCustomer = trpc.staff.deleteCustomer.useMutation({
     onSuccess: async () => {
       await utils.staff.listCustomers.invalidate();
     },
@@ -285,6 +323,44 @@ function AdminCustomersPage() {
       await updateCustomerType.mutateAsync({ customerId, type: nextType });
     } catch (error) {
       Alert.alert('Unable to update tier', getErrorMessage(error));
+    }
+  }
+
+  async function resetPassword(customerId: number, name: string, email: string) {
+    const confirmed = await confirmAction(
+      'Reset password',
+      `Send a password reset link to ${name} (${email})? Their current password will keep working until they complete the reset.`,
+      'Reset password',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await resetCustomerPassword.mutateAsync({ customerId });
+      notify('Success', 'Password reset initiated successfully.');
+    } catch (error) {
+      notify('Unable to reset password', getErrorMessage(error));
+    }
+  }
+
+  async function deleteCustomerAccount(customerId: number, name: string, email: string) {
+    const confirmed = await confirmAction(
+      'Delete customer',
+      `Delete ${name} (${email})? They will no longer be able to log in. Existing order history is kept for accounting records. This cannot be undone.`,
+      'Delete customer',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteCustomer.mutateAsync({ customerId });
+      notify('Success', 'Customer account deleted successfully.');
+    } catch (error) {
+      notify('Unable to delete customer', getErrorMessage(error));
     }
   }
 
@@ -304,14 +380,34 @@ function AdminCustomersPage() {
           <Text style={styles.metaText}>{customer.email}</Text>
           <Text style={styles.metaText}>Mobile: {customer.contact || 'Not recorded'}</Text>
           <Text style={styles.metaText}>{customer.type} • {customer.accountSource.replace('_', ' ')}</Text>
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => void toggleTier(customer.id, customer.type === 'WHOLESALE' ? 'RETAIL' : 'WHOLESALE')}
-          >
-            <Text style={styles.secondaryButtonText}>
-              Set {customer.type === 'WHOLESALE' ? 'retail' : 'wholesale'}
-            </Text>
-          </Pressable>
+          <View style={styles.cardActionsRow}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => void toggleTier(customer.id, customer.type === 'WHOLESALE' ? 'RETAIL' : 'WHOLESALE')}
+            >
+              <Text style={styles.secondaryButtonText}>
+                Set {customer.type === 'WHOLESALE' ? 'retail' : 'wholesale'}
+              </Text>
+            </Pressable>
+            {isAdmin ? (
+              <>
+                <Pressable
+                  style={styles.secondaryButton}
+                  disabled={resetCustomerPassword.isPending}
+                  onPress={() => void resetPassword(customer.id, customer.name, customer.email)}
+                >
+                  <Text style={styles.secondaryButtonText}>Reset password</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.dangerButton}
+                  disabled={deleteCustomer.isPending}
+                  onPress={() => void deleteCustomerAccount(customer.id, customer.name, customer.email)}
+                >
+                  <Text style={styles.dangerButtonText}>Delete customer</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
         </View>
       ))}
     </View>
@@ -584,6 +680,25 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#1f5c43',
+    fontWeight: '700',
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  dangerButton: {
+    borderWidth: 1,
+    borderColor: '#b3261e',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    backgroundColor: '#fdecea',
+  },
+  dangerButtonText: {
+    color: '#b3261e',
     fontWeight: '700',
   },
 });

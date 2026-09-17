@@ -54,6 +54,13 @@ model Customer {
   accountSource        AccountSource
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  /// Soft-delete marker. When set, this customer account is deactivated: the
+  /// customer can no longer log in (or use an existing session token), but
+  /// the row — and any historical orders that reference it via
+  /// `Order.customerId` — is preserved for accounting/audit purposes rather
+  /// than being hard-deleted, which would otherwise violate the FK on
+  /// `Order.customerId` or destroy order history.
+  deletedAt            DateTime?
   orders               Order[]
   passwordResetTokens  PasswordResetToken[]
 }

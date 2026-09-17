@@ -18,16 +18,21 @@ function getTransporter() {
 
   transporterInitialized = true;
 
-  if (!env.SMTP_HOST) {
-    // No SMTP configured for this environment (e.g. local development). Emails will be logged instead of sent.
+  if (!env.BREVO_SMTP_HOST || !env.BREVO_SMTP_USER || !env.BREVO_SMTP_PASS) {
+    // Brevo SMTP is not fully configured for this environment (e.g. local
+    // development). Emails will be logged instead of sent. This must never
+    // silently fall back to the old Google SMTP_* configuration.
+    console.error(
+      '[mailer] Brevo SMTP is not configured (missing BREVO_SMTP_HOST, BREVO_SMTP_USER, and/or BREVO_SMTP_PASS). Emails will be logged instead of sent.',
+    );
     return null;
   }
 
   transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: env.SMTP_SECURE,
-    auth: env.SMTP_USER && env.SMTP_PASS ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+    host: env.BREVO_SMTP_HOST,
+    port: env.BREVO_SMTP_PORT,
+    secure: env.BREVO_SMTP_SECURE,
+    auth: { user: env.BREVO_SMTP_USER, pass: env.BREVO_SMTP_PASS },
   });
 
   return transporter;

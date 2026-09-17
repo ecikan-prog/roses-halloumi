@@ -13,6 +13,16 @@ const envSchema = z.object({
   SMTP_SECURE: z.coerce.boolean().default(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  // Brevo (formerly Sendinblue) SMTP credentials used to send all Grassland
+  // Cheese transactional emails (welcome, password reset, order
+  // confirmation, etc). This is a distinct configuration from the SMTP_*
+  // variables above (existing Google configuration) and must not be
+  // conflated with them.
+  BREVO_SMTP_HOST: z.string().optional(),
+  BREVO_SMTP_PORT: z.coerce.number().default(587),
+  BREVO_SMTP_SECURE: z.coerce.boolean().default(false),
+  BREVO_SMTP_USER: z.string().optional(),
+  BREVO_SMTP_PASS: z.string().optional(),
   // NZ Post Domestic Rating API credentials. When ALL of these are set, the
   // API rates shipments through the real NZ Post API instead of the
   // temporary static rate table (see lib/shippingProvider.ts). Leave unset

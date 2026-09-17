@@ -34,6 +34,17 @@ const envSchema = z.object({
   // used instead (see context.ts) so the link still points at whichever
   // frontend the customer is actually using.
   APP_BASE_URL: z.string().optional(),
+  // Overrides the "Name <email@domain>" sender identity used by sendMail()
+  // for every transactional email (welcome, password reset, order
+  // confirmation, etc). Must be an address on the authenticated/verified
+  // Grassland Cheese sending domain. If unset, falls back to the
+  // info@grasslandcheese.com identity below.
+  MAIL_FROM: z.string().optional(),
+  // Recipient for admin-facing transactional notifications (e.g. contact
+  // form submissions, new order alerts), so the address is configurable per
+  // environment instead of hard-coded to a specific person's inbox. Unused
+  // until an admin-facing notification email is implemented.
+  ADMIN_EMAIL: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
@@ -45,4 +56,8 @@ export const allowedOrigins = new Set(
 // All customer-facing Grassland Cheese communications must be sent from this identity.
 export const BRAND_NAME = 'Grassland Cheese';
 export const BRAND_EMAIL = 'info@grasslandcheese.com';
-export const BRAND_FROM = `${BRAND_NAME} <${BRAND_EMAIL}>`;
+export const BRAND_FROM = env.MAIL_FROM ?? `${BRAND_NAME} <${BRAND_EMAIL}>`;
+// Configurable recipient for future admin-facing notifications; no email
+// currently sends to this address (see requirement audit — no contact form
+// or admin order-notification email exists yet).
+export const ADMIN_EMAIL = env.ADMIN_EMAIL;

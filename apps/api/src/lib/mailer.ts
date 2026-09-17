@@ -1,5 +1,4 @@
-import nodemailer from 'nodemailer';
-import { BRAND_FROM, env } from '../config.js';
+import { BRAND_FROM_EMAIL, BRAND_FROM_NAME, env } from '../config.js';
 
 export type MailMessage = {
   to: string;
@@ -8,57 +7,50 @@ export type MailMessage = {
   text: string;
 };
 
-let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
-let transporterInitialized = false;
-
-function getTransporter() {
-  if (transporterInitialized) {
-    return transporter;
-  }
-
-  transporterInitialized = true;
-
-  if (!env.BREVO_SMTP_HOST || !env.BREVO_SMTP_USER || !env.BREVO_SMTP_PASS) {
-    // Brevo SMTP is not fully configured for this environment (e.g. local
-    // development). Emails will be logged instead of sent. This must never
-    // silently fall back to the old Google SMTP_* configuration.
-    console.error(
-      '[mailer] Brevo SMTP is not configured (missing BREVO_SMTP_HOST, BREVO_SMTP_USER, and/or BREVO_SMTP_PASS). Emails will be logged instead of sent.',
-    );
-    return null;
-  }
-
-  transporter = nodemailer.createTransport({
-    host: env.BREVO_SMTP_HOST,
-    port: env.BREVO_SMTP_PORT,
-    secure: env.BREVO_SMTP_SECURE,
-    auth: { user: env.BREVO_SMTP_USER, pass: env.BREVO_SMTP_PASS },
-  });
-
-  return transporter;
-}
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 /**
- * Sends a customer-facing email from the Grassland Cheese brand identity.
- * This never throws: a failure to send an email must never break registration,
- * checkout, or any other customer-facing flow. Failures are logged instead.
+ * Sends a customer-facing email from the Grassland Cheese brand identity
+ * using the Brevo HTTPS Transactional Email API (not SMTP). Railway Hobby
+ * blocks/times out outbound SMTP connections, so this avoids the
+ * `ETIMEDOUT` / `command: 'CONN'` failures seen with the previous BREVO_SMTP_*
+ * based transport.
+ *
+ * This never throws: a failure to send an email must never break
+ * registration, checkout, or any other customer-facing flow. Failures are
+ * logged instead.
  */
 export async function sendMail(message: MailMessage) {
-  const activeTransporter = getTransporter();
-
-  if (!activeTransporter) {
-    console.log(`[mailer] SMTP not configured, skipping send. Would have sent "${message.subject}" to ${message.to}`);
+  if (!env.BREVO_API_KEY) {
+    console.error(
+      '[mailer] Brevo API key is not configured (missing BREVO_API_KEY). Emails will be logged instead of sent.',
+    );
+    console.log(`[mailer] Brevo API not configured, skipping send. Would have sent "${message.subject}" to ${message.to}`);
     return { sent: false as const };
   }
 
   try {
-    await activeTransporter.sendMail({
-      from: BRAND_FROM,
-      to: message.to,
-      subject: message.subject,
-      html: message.html,
-      text: message.text,
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'api-key': env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: BRAND_FROM_NAME, email: BRAND_FROM_EMAIL },
+        to: [{ email: message.to }],
+        subject: message.subject,
+        htmlContent: message.html,
+        textContent: message.text,
+      }),
     });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Brevo API responded with ${response.status} ${response.statusText}: ${body}`);
+    }
+
     return { sent: true as const };
   } catch (error) {
     console.error(`[mailer] Failed to send "${message.subject}" to ${message.to}:`, error);

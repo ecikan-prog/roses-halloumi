@@ -4,6 +4,7 @@ import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { allowedOrigins, env } from './config.js';
 import { createContext } from './context.js';
 import { ensureOrderSchema } from './lib/ensureOrderNumberColumn.js';
+import { ensurePasswordResetTokenTable } from './lib/ensurePasswordResetTokenTable.js';
 import { prisma } from './lib/prisma.js';
 import { appRouter } from './router/index.js';
 
@@ -52,6 +53,9 @@ async function start() {
   } catch (error) {
     console.error('[startup] Failed to verify/repair Order table schema. Order creation may fail until this is resolved:', error);
   }
+
+  console.log('[startup] Verifying/repairing PasswordResetToken table...');
+  await ensurePasswordResetTokenTable(prisma);
 
   app.listen(env.PORT, () => {
     console.log(`API listening on http://localhost:${env.PORT}`);

@@ -28,6 +28,12 @@ const envSchema = z.object({
   // product code. Confirm the exact code with the NZ Post account team/API
   // docs for the connected account before going live — do not guess a code.
   NZ_POST_SERVICE_CODE: z.string().optional(),
+  // Absolute base URL of the deployed customer-facing web app (e.g.
+  // "https://shop.grasslandcheese.com"), used to build the link sent in
+  // "forgot your password" emails. If unset, the request's Origin header is
+  // used instead (see context.ts) so the link still points at whichever
+  // frontend the customer is actually using.
+  APP_BASE_URL: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

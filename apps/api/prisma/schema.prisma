@@ -45,16 +45,35 @@ enum StaffRole {
 }
 
 model Customer {
-  id             Int           @id @default(autoincrement())
-  name           String
-  email          String        @unique
-  passwordHash   String
-  type           CustomerType  @default(RETAIL)
-  contact        String?
-  accountSource  AccountSource
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  orders         Order[]
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  passwordHash         String
+  type                 CustomerType          @default(RETAIL)
+  contact              String?
+  accountSource        AccountSource
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  orders               Order[]
+  passwordResetTokens  PasswordResetToken[]
+}
+
+/**
+ * Single-use, time-limited tokens issued for the customer "forgot your
+ * password" flow. Only a SHA-256 hash of the token is ever stored — the
+ * plaintext token is emailed to the customer and never persisted — so a
+ * database read alone can never be used to reset an account's password.
+ */
+model PasswordResetToken {
+  id         Int       @id @default(autoincrement())
+  customerId Int
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
 }
 
 model Product {

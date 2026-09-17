@@ -92,7 +92,7 @@ type StaffUser = {
 };
 
 type SessionUser = CustomerUser | StaffUser;
-type AuthMode = 'customer-login' | 'admin-login' | 'customer-register';
+type AuthMode = 'customer-login' | 'admin-login' | 'customer-register' | 'customer-forgot-password' | 'customer-reset-password';
 type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
 type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
 
@@ -2178,27 +2178,65 @@ function SignedInAccountPage({
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Reads a `?token=` query param from the current web URL (used for password reset links). Native platforms never have a URL to read, so this always returns null there. */
+function getResetTokenFromWebLocation(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get('token');
+}
+
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
-  const [mode, setMode] = useState<AuthMode>('customer-login');
+  const initialResetToken = useMemo(() => getResetTokenFromWebLocation(), []);
+  const [mode, setMode] = useState<AuthMode>(initialResetToken ? 'customer-reset-password' : 'customer-login');
+  const [resetToken] = useState<string | null>(initialResetToken);
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   const customerLogin = trpc.auth.customerLogin.useMutation();
   const staffLogin = trpc.auth.staffLogin.useMutation();
   const customerRegister = trpc.auth.customerRegister.useMutation();
+  const requestPasswordReset = trpc.auth.requestPasswordReset.useMutation();
+  const resetPassword = trpc.auth.resetPassword.useMutation();
 
-  const loading = customerLogin.isPending || staffLogin.isPending || customerRegister.isPending;
+  const loading =
+    customerLogin.isPending ||
+    staffLogin.isPending ||
+    customerRegister.isPending ||
+    requestPasswordReset.isPending ||
+    resetPassword.isPending;
 
   function changeMode(nextMode: AuthMode) {
     setMode(nextMode);
     setFormError(null);
+    setInfoMessage(null);
   }
 
   function validate(): string | null {
+    if (mode === 'customer-forgot-password') {
+      if (!emailPattern.test(email.trim())) {
+        return 'Enter a valid email address.';
+      }
+      return null;
+    }
+
+    if (mode === 'customer-reset-password') {
+      if (password.length < 8) {
+        return 'Password must be at least 8 characters.';
+      }
+      if (confirmPassword !== password) {
+        return 'Passwords do not match.';
+      }
+      return null;
+    }
+
     if (!emailPattern.test(email.trim())) {
       return 'Enter a valid email address.';
     }
@@ -2210,6 +2248,10 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
     if (mode === 'customer-register') {
       if (name.trim().length < 2) {
         return 'Enter your full name.';
+      }
+
+      if (emailPattern.test(name.trim())) {
+        return 'Enter your full name, not your email address.';
       }
 
       if (contact.trim().length < 6) {
@@ -2243,6 +2285,19 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
           password,
         });
         await onAuthenticated(result.token, result.user as SessionUser);
+      } else if (mode === 'customer-forgot-password') {
+        await requestPasswordReset.mutateAsync({ email: email.trim() });
+        setInfoMessage("If an account exists for that email, we've sent a password reset link. Check your inbox.");
+      } else if (mode === 'customer-reset-password') {
+        if (!resetToken) {
+          setFormError('This password reset link is invalid or has expired.');
+          return;
+        }
+        await resetPassword.mutateAsync({ token: resetToken, password });
+        setPassword('');
+        setConfirmPassword('');
+        setInfoMessage('Your password has been reset. You can now sign in with your new password.');
+        changeMode('customer-login');
       } else if (mode === 'customer-login') {
         const result = await customerLogin.mutateAsync({ email: email.trim(), password });
         await onAuthenticated(result.token, result.user as SessionUser);
@@ -2272,6 +2327,52 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
     );
   }
 
+  if (mode === 'customer-forgot-password') {
+    return (
+      <View style={styles.authPanel}>
+        <Text style={styles.authPanelTitle}>Reset your password</Text>
+        <Text style={styles.authPanelSubtitle}>Enter your account email and we'll send you a link to set a new password.</Text>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Send reset link'}</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (mode === 'customer-reset-password') {
+    return (
+      <View style={styles.authPanel}>
+        <Text style={styles.authPanelTitle}>Set a new password</Text>
+        {!resetToken ? (
+          <Text style={styles.errorText}>This password reset link is invalid or has expired. Request a new one below.</Text>
+        ) : (
+          <>
+            <Field label="New password" value={password} onChangeText={setPassword} secureTextEntry />
+            <Field label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+          </>
+        )}
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        {resetToken ? (
+          <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+            <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Reset password'}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-forgot-password')}>
+          <Text style={styles.secondaryButtonLabel}>Request a new reset link</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.authPanel}>
       <Text style={styles.authPanelTitle}>Welcome to {brandName}</Text>
@@ -2288,8 +2389,11 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
         <Field label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
       ) : null}
       {mode === 'customer-login' ? (
-        <Text style={styles.metaText}>Forgot your password? Contact support to reset your account access.</Text>
+        <Pressable onPress={() => changeMode('customer-forgot-password')}>
+          <Text style={styles.adminAccessLink}>Forgot your password?</Text>
+        </Pressable>
       ) : null}
+      {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
@@ -2355,40 +2459,11 @@ function OrdersPage({ title, description }: { title: string; description: string
 function CustomersScreen() {
   const utils = trpc.useUtils();
   const customersQuery = trpc.staff.listCustomers.useQuery();
-  const createCustomer = trpc.staff.createCustomer.useMutation({
-    onSuccess: async () => {
-      await utils.staff.listCustomers.invalidate();
-    },
-  });
   const updateCustomerType = trpc.staff.updateCustomerType.useMutation({
     onSuccess: async () => {
       await utils.staff.listCustomers.invalidate();
     },
   });
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [contact, setContact] = useState('');
-  const [password, setPassword] = useState('');
-  const [type, setType] = useState<'WHOLESALE' | 'RETAIL'>('RETAIL');
-
-  async function submit() {
-    try {
-      await createCustomer.mutateAsync({
-        name,
-        email,
-        contact: contact.trim() || undefined,
-        password,
-        type,
-      });
-      setName('');
-      setEmail('');
-      setContact('');
-      setPassword('');
-      setType('RETAIL');
-    } catch (error) {
-      Alert.alert('Unable to create customer', getErrorMessage(error));
-    }
-  }
 
   async function toggleTier(customerId: number, nextType: 'WHOLESALE' | 'RETAIL') {
     try {
@@ -2399,26 +2474,7 @@ function CustomersScreen() {
   }
 
   return (
-    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Admins can create and manage customer access without changing the halloumi product rules.">
-      <View style={styles.inlineCard}>
-        <Text style={styles.inlineCardTitle}>Create customer account</Text>
-        <Field label="Name" value={name} onChangeText={setName} />
-        <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-        <Field label="Contact" value={contact} onChangeText={setContact} />
-        <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
-        <SegmentedControl
-          groupLabel="Customer tier"
-          value={type}
-          options={[
-            { label: 'Retail', value: 'RETAIL' },
-            { label: 'Wholesale', value: 'WHOLESALE' },
-          ]}
-          onChange={(value) => setType(value as 'WHOLESALE' | 'RETAIL')}
-        />
-        <Pressable style={styles.primaryButton} onPress={() => void submit()}>
-          <Text style={styles.primaryButtonLabel}>Create customer</Text>
-        </Pressable>
-      </View>
+    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Admins manage each customer's Retail/Wholesale tier. Customers manage their own account details and password.">
       {customersQuery.isLoading ? <Text style={styles.metaText}>Loading customers…</Text> : null}
       {(customersQuery.data ?? []).map((customer) => (
         <View key={customer.id} style={styles.inlineCard}>

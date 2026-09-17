@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { trpc } from '../lib/trpc';
 import type { SessionState } from '../../App';
 
@@ -13,32 +13,6 @@ type PaymentStatus = 'PAID' | 'OUTSTANDING' | 'OVERDUE';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Please try again.';
-}
-
-const MIN_PASSWORD_LENGTH = 8;
-const PASSWORD_TOO_SHORT_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
-
-// The API validates input with Zod, which can surface as a raw JSON issue array in the
-// error message. Never show that to the admin — translate it into a friendly message instead.
-function getCreateCustomerErrorMessage(error: unknown): string {
-  const raw = getErrorMessage(error);
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      const passwordIssue = parsed.find(
-        (issue) => issue && Array.isArray(issue.path) && issue.path.includes('password'),
-      );
-      if (passwordIssue) {
-        return PASSWORD_TOO_SHORT_MESSAGE;
-      }
-      return 'Please check the form and try again.';
-    }
-  } catch {
-    // Not a JSON payload — it's already a plain-language error (e.g. duplicate email).
-  }
-
-  return raw;
 }
 
 function isSameDay(a: Date, b: Date) {
@@ -300,52 +274,11 @@ function AdminProductsPage() {
 function AdminCustomersPage() {
   const utils = trpc.useUtils();
   const customersQuery = trpc.staff.listCustomers.useQuery();
-  const createCustomer = trpc.staff.createCustomer.useMutation({
-    onSuccess: async () => {
-      await utils.staff.listCustomers.invalidate();
-    },
-  });
   const updateCustomerType = trpc.staff.updateCustomerType.useMutation({
     onSuccess: async () => {
       await utils.staff.listCustomers.invalidate();
     },
   });
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [contact, setContact] = useState('');
-  const [password, setPassword] = useState('');
-  const [type, setType] = useState<'WHOLESALE' | 'RETAIL'>('RETAIL');
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-
-  async function submit() {
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setPasswordError(PASSWORD_TOO_SHORT_MESSAGE);
-      return;
-    }
-    setPasswordError(null);
-
-    try {
-      await createCustomer.mutateAsync({
-        name,
-        email,
-        contact: contact.trim() || undefined,
-        password,
-        type,
-      });
-      setName('');
-      setEmail('');
-      setContact('');
-      setPassword('');
-      setType('RETAIL');
-    } catch (error) {
-      const message = getCreateCustomerErrorMessage(error);
-      if (message === PASSWORD_TOO_SHORT_MESSAGE) {
-        setPasswordError(message);
-        return;
-      }
-      Alert.alert('Unable to create customer', message);
-    }
-  }
 
   async function toggleTier(customerId: number, nextType: 'WHOLESALE' | 'RETAIL') {
     try {
@@ -358,45 +291,9 @@ function AdminCustomersPage() {
   return (
     <View style={styles.pageWrap}>
       <Text style={styles.pageTitle}>Customers</Text>
-      <Text style={styles.pageDescription}>View registered customers and create new customer accounts.</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Create customer account</Text>
-        <AdminField label="Name" value={name} onChangeText={setName} />
-        <AdminField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-        <AdminField label="Mobile" value={contact} onChangeText={setContact} />
-        <AdminField
-          label="Password"
-          value={password}
-          onChangeText={(value) => {
-            setPassword(value);
-            if (passwordError) {
-              setPasswordError(null);
-            }
-          }}
-          secureTextEntry
-          errorText={passwordError}
-        />
-        <View style={styles.filterRow}>
-          {(['RETAIL', 'WHOLESALE'] as const).map((option) => {
-            const active = option === type;
-            return (
-              <Pressable
-                key={option}
-                style={[styles.filterChip, active && styles.filterChipActive]}
-                onPress={() => setType(option)}
-              >
-                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                  {option === 'RETAIL' ? 'Retail' : 'Wholesale'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Pressable style={styles.primaryButton} onPress={() => void submit()}>
-          <Text style={styles.primaryButtonText}>Create customer</Text>
-        </Pressable>
-      </View>
+      <Text style={styles.pageDescription}>
+        View registered customers and set each customer's Retail/Wholesale tier. Customers manage their own name, email, and password.
+      </Text>
 
       {customersQuery.isLoading ? <Text style={styles.metaText}>Loading customers…</Text> : null}
       {customersQuery.isError ? <Text style={styles.errorText}>{getErrorMessage(customersQuery.error)}</Text> : null}
@@ -417,39 +314,6 @@ function AdminCustomersPage() {
           </Pressable>
         </View>
       ))}
-    </View>
-  );
-}
-
-function AdminField({
-  label,
-  value,
-  onChangeText,
-  secureTextEntry,
-  keyboardType,
-  autoCapitalize,
-  errorText,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'email-address';
-  autoCapitalize?: 'none' | 'sentences';
-  errorText?: string | null;
-}) {
-  return (
-    <View style={styles.fieldWrap}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        autoCapitalize={autoCapitalize ?? 'sentences'}
-        keyboardType={keyboardType ?? 'default'}
-        secureTextEntry={secureTextEntry}
-        style={[styles.input, errorText ? styles.inputError : null]}
-        value={value}
-        onChangeText={onChangeText}
-      />
-      {errorText ? <Text style={styles.fieldErrorText}>{errorText}</Text> : null}
     </View>
   );
 }

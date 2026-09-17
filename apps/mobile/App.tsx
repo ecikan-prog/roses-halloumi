@@ -2053,18 +2053,195 @@ function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
   );
 }
 
+const generalEnquiryTypeOptions: Array<{ label: string; value: GeneralEnquiryType }> = [
+  { label: 'General enquiry', value: 'GENERAL' },
+  { label: 'Product enquiry', value: 'PRODUCT' },
+  { label: 'Order enquiry', value: 'ORDER' },
+  { label: 'Delivery enquiry', value: 'DELIVERY' },
+  { label: 'Other', value: 'OTHER' },
+];
+
+type GeneralEnquiryType = 'GENERAL' | 'PRODUCT' | 'ORDER' | 'DELIVERY' | 'OTHER';
+
+function GeneralContactForm() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [enquiryType, setEnquiryType] = useState<GeneralEnquiryType>('GENERAL');
+  const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitGeneral = trpc.contact.submitGeneral.useMutation();
+
+  function validate(): string | null {
+    if (name.trim().length < 1) {
+      return 'Enter your name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (message.trim().length < 1) {
+      return 'Enter a message.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      setSubmitted(false);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await submitGeneral.mutateAsync({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        enquiryType,
+        message: message.trim(),
+      });
+      setSubmitted(true);
+      setName('');
+      setEmail('');
+      setPhone('');
+      setEnquiryType('GENERAL');
+      setMessage('');
+    } catch (error) {
+      setSubmitted(false);
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>General enquiry</Text>
+      <Field label="Name" value={name} onChangeText={setName} />
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <View style={styles.fieldWrap}>
+        <Text style={styles.fieldLabel}>Enquiry type</Text>
+        <SegmentedControl
+          groupLabel="Enquiry type"
+          value={enquiryType}
+          options={generalEnquiryTypeOptions}
+          onChange={(value) => setEnquiryType(value as GeneralEnquiryType)}
+        />
+      </View>
+      <Field label="Message" value={message} onChangeText={setMessage} multiline />
+      {submitted ? <Text style={styles.successText}>Thanks — your enquiry has been sent. We'll be in touch soon.</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable
+        disabled={submitGeneral.isPending}
+        style={[styles.primaryButton, submitGeneral.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitGeneral.isPending ? 'Sending…' : 'Send enquiry'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function WholesaleContactForm() {
+  const [businessName, setBusinessName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [businessLocation, setBusinessLocation] = useState('');
+  const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitWholesale = trpc.contact.submitWholesale.useMutation();
+
+  function validate(): string | null {
+    if (businessName.trim().length < 1) {
+      return 'Enter your business name.';
+    }
+    if (contactName.trim().length < 1) {
+      return 'Enter a contact name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (businessLocation.trim().length < 1) {
+      return 'Enter your business/location.';
+    }
+    if (message.trim().length < 1) {
+      return 'Enter a message.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      setSubmitted(false);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await submitWholesale.mutateAsync({
+        businessName: businessName.trim(),
+        contactName: contactName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        businessLocation: businessLocation.trim(),
+        message: message.trim(),
+      });
+      setSubmitted(true);
+      setBusinessName('');
+      setContactName('');
+      setEmail('');
+      setPhone('');
+      setBusinessLocation('');
+      setMessage('');
+    } catch (error) {
+      setSubmitted(false);
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>Wholesale enquiry</Text>
+      <Field label="Business name" value={businessName} onChangeText={setBusinessName} />
+      <Field label="Contact name" value={contactName} onChangeText={setContactName} />
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <Field label="Business/location" value={businessLocation} onChangeText={setBusinessLocation} />
+      <Field label="Message" value={message} onChangeText={setMessage} multiline />
+      {submitted ? <Text style={styles.successText}>Thanks — your wholesale enquiry has been sent. We'll be in touch soon.</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable
+        disabled={submitWholesale.isPending}
+        style={[styles.primaryButton, submitWholesale.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitWholesale.isPending ? 'Sending…' : 'Send wholesale enquiry'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
   return (
-    <SectionShell eyebrow="Contact" title="Get in touch" description="Use the existing account path for customer and wholesale enquiries.">
+    <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
+      <GeneralContactForm />
+      <WholesaleContactForm />
       <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Customer and wholesale enquiries</Text>
-        <Text style={styles.noticeText}>Create an account or sign in, then use your customer account context for enquiries related to halloumi ordering and wholesale access.</Text>
+        <Text style={styles.noticeTitle}>Already a customer?</Text>
+        <Text style={styles.noticeText}>Sign in to your customer account to place orders and view order history.</Text>
         <View style={styles.heroActionRow}>
-          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
-            <Text style={styles.primaryButtonLabel}>Open Account</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('wholesale')}>
-            <Text style={styles.secondaryButtonLabel}>Wholesale</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('account')}>
+            <Text style={styles.secondaryButtonLabel}>Open Account</Text>
           </Pressable>
         </View>
       </View>
@@ -2507,9 +2684,10 @@ function Field(props: {
   value: string;
   onChangeText: (value: string) => void;
   secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'email-address';
+  keyboardType?: 'default' | 'email-address' | 'phone-pad';
   autoCapitalize?: 'none' | 'sentences';
   editable?: boolean;
+  multiline?: boolean;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -2519,7 +2697,8 @@ function Field(props: {
         keyboardType={props.keyboardType ?? 'default'}
         secureTextEntry={props.secureTextEntry}
         editable={props.editable ?? true}
-        style={styles.input}
+        multiline={props.multiline}
+        style={[styles.input, props.multiline && styles.inputMultiline]}
         value={props.value}
         onChangeText={props.onChangeText}
       />
@@ -3327,6 +3506,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#d7ceb9',
+  },
+  inputMultiline: {
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  successText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#1f5c43',
+    fontWeight: '600',
   },
   brandPanelCard: {
     backgroundColor: '#123524',

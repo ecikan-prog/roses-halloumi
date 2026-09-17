@@ -1,5 +1,6 @@
 import { authRouter } from './auth.js';
 import { catalogRouter } from './catalog.js';
+import { contactRouter } from './contact.js';
 import { ordersRouter } from './orders.js';
 import { recipesRouter } from './recipes.js';
 import { shippingRouter } from './shipping.js';
@@ -13,6 +14,7 @@ export const appRouter = router({
   orders: ordersRouter,
   shipping: shippingRouter,
   staff: staffRouter,
+  contact: contactRouter,
 });
 
 export type AppRouter = typeof appRouter;

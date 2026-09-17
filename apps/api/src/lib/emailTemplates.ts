@@ -89,6 +89,125 @@ export function buildPasswordResetEmail(params: { name: string; resetLink: strin
   return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
 }
 
+const GENERAL_ENQUIRY_TYPE_LABELS: Record<string, string> = {
+  GENERAL: 'General enquiry',
+  PRODUCT: 'Product enquiry',
+  ORDER: 'Order enquiry',
+  DELIVERY: 'Delivery enquiry',
+  OTHER: 'Other',
+};
+
+export function getGeneralEnquiryTypeLabel(enquiryType: string) {
+  return GENERAL_ENQUIRY_TYPE_LABELS[enquiryType] ?? enquiryType;
+}
+
+export function buildGeneralContactAdminEmail(params: {
+  name: string;
+  email: string;
+  phone?: string | null;
+  enquiryType: string;
+  message: string;
+}) {
+  const enquiryTypeLabel = getGeneralEnquiryTypeLabel(params.enquiryType);
+  const subject = `New General Contact Enquiry from ${params.name}`;
+  const bodyHtml = `
+    <p style="font-size:14px;line-height:22px;"><strong>Submission type:</strong> General Contact Enquiry</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Name:</strong> ${escapeHtml(params.name)}</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Email:</strong> ${escapeHtml(params.email)}</p>
+    ${params.phone ? `<p style="font-size:14px;line-height:22px;"><strong>Phone:</strong> ${escapeHtml(params.phone)}</p>` : ''}
+    <p style="font-size:14px;line-height:22px;"><strong>Enquiry type:</strong> ${escapeHtml(enquiryTypeLabel)}</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Message:</strong><br/>${escapeHtml(params.message).replace(/\n/g, '<br/>')}</p>
+  `;
+
+  const text = [
+    'Submission type: General Contact Enquiry',
+    `Name: ${params.name}`,
+    `Email: ${params.email}`,
+    ...(params.phone ? [`Phone: ${params.phone}`] : []),
+    `Enquiry type: ${enquiryTypeLabel}`,
+    '',
+    'Message:',
+    params.message,
+  ].join('\n');
+
+  return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
+}
+
+export function buildGeneralContactAcknowledgementEmail(params: { name: string; enquiryType: string }) {
+  const enquiryTypeLabel = getGeneralEnquiryTypeLabel(params.enquiryType);
+  const subject = `Thanks for contacting ${BRAND_NAME}`;
+  const bodyHtml = `
+    <p style="font-size:14px;line-height:22px;">Hi ${escapeHtml(params.name)},</p>
+    <p style="font-size:14px;line-height:22px;">Thank you for contacting ${BRAND_NAME}. We've received your ${escapeHtml(enquiryTypeLabel.toLowerCase())} and the ${BRAND_NAME} team will respond as soon as possible.</p>
+    <p style="font-size:14px;line-height:22px;">Thanks,<br/>The ${BRAND_NAME} Team</p>
+  `;
+
+  const text = [
+    `Hi ${params.name},`,
+    '',
+    `Thank you for contacting ${BRAND_NAME}. We've received your ${enquiryTypeLabel.toLowerCase()} and the ${BRAND_NAME} team will respond as soon as possible.`,
+    '',
+    'Thanks,',
+    `The ${BRAND_NAME} Team`,
+  ].join('\n');
+
+  return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
+}
+
+export function buildWholesaleEnquiryAdminEmail(params: {
+  businessName: string;
+  contactName: string;
+  email: string;
+  phone?: string | null;
+  businessLocation: string;
+  message: string;
+}) {
+  const subject = `New Wholesale Enquiry from ${params.businessName}`;
+  const bodyHtml = `
+    <p style="font-size:14px;line-height:22px;"><strong>Submission type:</strong> Wholesale Enquiry</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Business name:</strong> ${escapeHtml(params.businessName)}</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Contact name:</strong> ${escapeHtml(params.contactName)}</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Email:</strong> ${escapeHtml(params.email)}</p>
+    ${params.phone ? `<p style="font-size:14px;line-height:22px;"><strong>Phone:</strong> ${escapeHtml(params.phone)}</p>` : ''}
+    <p style="font-size:14px;line-height:22px;"><strong>Business/location:</strong> ${escapeHtml(params.businessLocation)}</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Message:</strong><br/>${escapeHtml(params.message).replace(/\n/g, '<br/>')}</p>
+  `;
+
+  const text = [
+    'Submission type: Wholesale Enquiry',
+    `Business name: ${params.businessName}`,
+    `Contact name: ${params.contactName}`,
+    `Email: ${params.email}`,
+    ...(params.phone ? [`Phone: ${params.phone}`] : []),
+    `Business/location: ${params.businessLocation}`,
+    '',
+    'Message:',
+    params.message,
+  ].join('\n');
+
+  return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
+}
+
+export function buildWholesaleEnquiryAcknowledgementEmail(params: { contactName: string }) {
+  const subject = `Thanks for your wholesale enquiry — ${BRAND_NAME}`;
+  const bodyHtml = `
+    <p style="font-size:14px;line-height:22px;">Hi ${escapeHtml(params.contactName)},</p>
+    <p style="font-size:14px;line-height:22px;">Thank you for contacting ${BRAND_NAME}. We've received your wholesale enquiry and the ${BRAND_NAME} team will respond as soon as possible.</p>
+    <p style="font-size:14px;line-height:22px;">Thanks,<br/>The ${BRAND_NAME} Team</p>
+  `;
+
+  const text = [
+    `Hi ${params.contactName},`,
+    '',
+    `Thank you for contacting ${BRAND_NAME}. We've received your wholesale enquiry and the ${BRAND_NAME} team will respond as soon as possible.`,
+    '',
+    'Thanks,',
+    `The ${BRAND_NAME} Team`,
+  ].join('\n');
+
+  return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
+}
+
 export type OrderConfirmationItem = {
   qty: number;
   unitPrice: number;

@@ -69,7 +69,12 @@ export const contactRouter = router({
         enquiryType: input.enquiryType,
         message: input.message,
       });
-      void sendMail({ to: ADMIN_EMAIL, ...adminEmail });
+      const adminResult = await sendMail({ to: ADMIN_EMAIL, ...adminEmail });
+      if (!adminResult.sent) {
+        console.error(
+          `[contact] Failed to send admin notification for general enquiry to ${ADMIN_EMAIL}. See mailer logs above for the Brevo error.`,
+        );
+      }
     } else {
       console.error('[contact] ADMIN_EMAIL is not configured; skipping admin notification for general enquiry.');
     }
@@ -94,7 +99,12 @@ export const contactRouter = router({
         businessLocation: input.businessLocation,
         message: input.message,
       });
-      void sendMail({ to: ADMIN_EMAIL, ...adminEmail });
+      const adminResult = await sendMail({ to: ADMIN_EMAIL, ...adminEmail });
+      if (!adminResult.sent) {
+        console.error(
+          `[contact] Failed to send admin notification for wholesale enquiry to ${ADMIN_EMAIL}. See mailer logs above for the Brevo error.`,
+        );
+      }
     } else {
       console.error('[contact] ADMIN_EMAIL is not configured; skipping admin notification for wholesale enquiry.');
     }

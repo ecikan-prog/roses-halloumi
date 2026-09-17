@@ -23,6 +23,13 @@ const envSchema = z.object({
   BREVO_SMTP_SECURE: z.coerce.boolean().default(false),
   BREVO_SMTP_USER: z.string().optional(),
   BREVO_SMTP_PASS: z.string().optional(),
+  // Brevo Transactional Email HTTPS API key. Railway Hobby blocks/times out
+  // outbound SMTP (ETIMEDOUT on the 'CONN' command), so all Grassland
+  // Cheese transactional emails (welcome, password reset, order
+  // confirmation, etc) are now sent via the Brevo HTTPS API instead of the
+  // BREVO_SMTP_* credentials above. Those SMTP variables are left in place
+  // (unused) for now and must not be removed.
+  BREVO_API_KEY: z.string().optional(),
   // NZ Post Domestic Rating API credentials. When ALL of these are set, the
   // API rates shipments through the real NZ Post API instead of the
   // temporary static rate table (see lib/shippingProvider.ts). Leave unset
@@ -67,6 +74,12 @@ export const allowedOrigins = new Set(
 export const BRAND_NAME = 'Grassland Cheese';
 export const BRAND_EMAIL = 'info@grasslandcheese.com';
 export const BRAND_FROM = env.MAIL_FROM ?? `${BRAND_NAME} <${BRAND_EMAIL}>`;
+// Brevo's transactional email API expects the sender as separate name/email
+// fields rather than a single "Name <email@domain>" string. Parsed once here
+// from BRAND_FROM so MAIL_FROM overrides continue to work unchanged.
+const BRAND_FROM_MATCH = BRAND_FROM.match(/^(.*)<(.+)>$/);
+export const BRAND_FROM_NAME = BRAND_FROM_MATCH ? BRAND_FROM_MATCH[1].trim() : BRAND_NAME;
+export const BRAND_FROM_EMAIL = BRAND_FROM_MATCH ? BRAND_FROM_MATCH[2].trim() : BRAND_FROM.trim();
 // Configurable recipient for future admin-facing notifications; no email
 // currently sends to this address (see requirement audit — no contact form
 // or admin order-notification email exists yet).

@@ -46,6 +46,21 @@ const storySectionImages = {
   '05': require('./assets/grassland/grassland-halloumi-curds.jpeg'),
 } as const;
 const storyHeroImage = storySectionImages['01'];
+const facebookSocialIcon = {
+  uri: `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#1877F2"/><path fill="#fff" d="M37 18h8v9h-6c-1.7 0-2 .7-2 2v5h8l-1 9h-7v21h-9V43h-7v-9h7v-6c0-6.6 4-10 9.9-10Z"/></svg>`,
+  )}`,
+} as const;
+const tiktokSocialIcon = {
+  uri: `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#000"/><path fill="#fff" d="M36 14h7.2c.7 4 3.1 7.2 6.8 8.8v7.4a19 19 0 0 1-7.7-2.6v13.8c0 7.2-5.8 13.1-13 13.1s-13-5.9-13-13.1 5.8-13.1 13-13.1c.9 0 1.8.1 2.7.3v7.6a6.7 6.7 0 0 0-2.7-.6c-3.2 0-5.9 2.6-5.9 5.8s2.7 5.8 5.9 5.8 5.9-2.6 5.9-5.8V14Z"/></svg>`,
+  )}`,
+} as const;
+const instagramSocialIcon = {
+  uri: `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#F58529"/><stop offset="50%" stop-color="#DD2A7B"/><stop offset="100%" stop-color="#8134AF"/></linearGradient></defs><rect x="6" y="6" width="52" height="52" rx="16" fill="url(#g)"/><rect x="18" y="18" width="28" height="28" rx="9" fill="none" stroke="#fff" stroke-width="4"/><circle cx="32" cy="32" r="7" fill="none" stroke="#fff" stroke-width="4"/><circle cx="45" cy="19" r="3.5" fill="#fff"/></svg>`,
+  )}`,
+} as const;
 
 const brandName = 'Grassland Cheese';
 const brandTagline = 'PURE GOODNESS FROM OUR PASTURES';
@@ -934,6 +949,20 @@ function SiteHeader({
   );
 }
 
+async function openExternalUrl(url: string) {
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (!supported) {
+      Alert.alert('Unable to open link', 'This link is not available right now.');
+      return;
+    }
+
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('Unable to open link', 'This link is not available right now.');
+  }
+}
+
 function SiteFooter({
   currentPage,
   onNavigate,
@@ -955,6 +984,23 @@ function SiteFooter({
     { label: 'Cart', page: 'cart' },
     { label: session ? 'Account' : 'Login', page: 'account' },
   ];
+  const socialLinks = [
+    {
+      label: 'Facebook',
+      iconSource: facebookSocialIcon,
+      url: 'https://www.facebook.com/profile.php?id=61594610902425',
+    },
+    {
+      label: 'TikTok',
+      iconSource: tiktokSocialIcon,
+      url: 'https://www.tiktok.com/@grassland.cheese',
+    },
+    {
+      label: 'Instagram',
+      iconSource: instagramSocialIcon,
+      url: 'https://www.instagram.com/grasslandcheese',
+    },
+  ] as const;
 
   return (
     <View style={styles.footerShell}>
@@ -975,6 +1021,25 @@ function SiteFooter({
             </Pressable>
           );
         })}
+      </View>
+      <View style={styles.footerSocialSection}>
+        <Text style={styles.footerSectionLabel}>Follow us</Text>
+        <View style={styles.footerSocialRow}>
+          {socialLinks.map((item) => (
+            <Pressable
+              key={item.label}
+              style={styles.footerSocialButton}
+              onPress={() => void openExternalUrl(item.url)}
+              accessibilityRole="link"
+              accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
+            >
+              <View style={styles.footerSocialIcon} accessible={false}>
+                <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} />
+              </View>
+              <Text style={styles.footerSocialText}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
       <Text style={styles.footerMeta}>Grassland Cheese halloumi recipes are inspiration only and never sold as products.</Text>
     </View>
@@ -3653,6 +3718,43 @@ const styles = StyleSheet.create({
   },
   footerLinkTextActive: {
     color: '#f2d77e',
+  },
+  footerSocialSection: {
+    gap: 12,
+  },
+  footerSectionLabel: {
+    color: '#fffef8',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footerSocialRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  footerSocialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#1f4630',
+  },
+  footerSocialIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerSocialIconImage: {
+    width: 28,
+    height: 28,
+  },
+  footerSocialText: {
+    color: '#f0e7d2',
+    fontWeight: '600',
   },
   footerMeta: {
     color: '#d7ddda',

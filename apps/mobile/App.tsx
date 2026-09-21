@@ -1015,7 +1015,7 @@ function SiteFooter({
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >
-              <View style={[styles.footerSocialIcon, item.iconStyle]}>
+              <View style={[styles.footerSocialIcon, item.iconStyle]} accessible={false} importantForAccessibility="no-hide-descendants">
                 <Text style={styles.footerSocialIconText}>{item.icon}</Text>
               </View>
               <Text style={styles.footerSocialText}>{item.label}</Text>

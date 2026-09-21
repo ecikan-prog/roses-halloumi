@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -958,6 +958,13 @@ function SiteFooter({
   session: SessionState | null;
 }) {
   const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
+  type SocialLink = {
+    label: string;
+    iconName: ComponentProps<typeof FontAwesome5>['name'];
+    backgroundColor: string;
+    webBackgroundImage?: string;
+    url: string;
+  };
   const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage }> = [
     { label: 'Shop Halloumi', page: 'shop' },
     { label: 'Recipes', page: 'recipes' },
@@ -970,23 +977,27 @@ function SiteFooter({
     { label: 'Cart', page: 'cart' },
     { label: session ? 'Account' : 'Login', page: 'account' },
   ];
-  const socialLinks = [
+  const socialLinks: ReadonlyArray<SocialLink> = [
     {
       label: 'Facebook',
       iconName: 'facebook-f',
+      backgroundColor: '#1877f2',
       url: 'https://www.facebook.com/profile.php?id=61594610902425',
     },
     {
       label: 'TikTok',
       iconName: 'tiktok',
+      backgroundColor: '#000000',
       url: 'https://www.tiktok.com/@grassland.cheese',
     },
     {
       label: 'Instagram',
       iconName: 'instagram',
+      backgroundColor: '#d62976',
+      webBackgroundImage: 'linear-gradient(135deg, #f9ce34 0%, #ee2a7b 45%, #6228d7 100%)',
       url: 'https://www.instagram.com/grasslandcheese',
     },
-  ] as const satisfies ReadonlyArray<{ label: string; iconName: React.ComponentProps<typeof FontAwesome5>['name']; url: string }>;
+  ] as const;
 
   return (
     <View style={styles.footerShell}>
@@ -1014,7 +1025,14 @@ function SiteFooter({
           {socialLinks.map((item) => (
             <Pressable
               key={item.label}
-              style={[styles.footerSocialButton, focusedSocialLabel === item.label && styles.footerSocialButtonFocused]}
+              style={[
+                styles.footerSocialButton,
+                { backgroundColor: item.backgroundColor },
+                item.webBackgroundImage && Platform.OS === 'web'
+                  ? ({ backgroundImage: item.webBackgroundImage } as any)
+                  : null,
+                focusedSocialLabel === item.label && styles.footerSocialButtonFocused,
+              ]}
               onPress={() => void openExternalUrl(item.url)}
               onFocus={() => setFocusedSocialLabel(item.label)}
               onBlur={() => setFocusedSocialLabel((current) => (current === item.label ? null : current))}
@@ -3721,7 +3739,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#1f4630',
     alignItems: 'center',
     justifyContent: 'center',
   },

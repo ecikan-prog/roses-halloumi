@@ -972,6 +972,7 @@ function SiteFooter({
   onNavigate: (page: any) => void;
   session: SessionState | null;
 }) {
+  const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
   const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage }> = [
     { label: 'Shop Halloumi', page: 'shop' },
     { label: 'Recipes', page: 'recipes' },
@@ -1028,8 +1029,10 @@ function SiteFooter({
           {socialLinks.map((item) => (
             <Pressable
               key={item.label}
-              style={({ focused }) => [styles.footerSocialButton, focused && styles.footerSocialButtonFocused]}
+              style={[styles.footerSocialButton, focusedSocialLabel === item.label && styles.footerSocialButtonFocused]}
               onPress={() => void openExternalUrl(item.url)}
+              onFocus={() => setFocusedSocialLabel(item.label)}
+              onBlur={() => setFocusedSocialLabel((current) => (current === item.label ? null : current))}
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >

@@ -13,6 +13,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "@tanstack/react-query": "5.102.8",
     "@trpc/client": "11.18.0",
     "@trpc/react-query": "11.18.0",

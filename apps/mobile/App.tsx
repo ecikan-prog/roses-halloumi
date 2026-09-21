@@ -1033,7 +1033,9 @@ function SiteFooter({
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >
-              <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} />
+              <View accessible={false} importantForAccessibility="no-hide-descendants">
+                <Image source={item.iconSource} style={styles.footerSocialIconImage} />
+              </View>
             </Pressable>
           ))}
         </View>

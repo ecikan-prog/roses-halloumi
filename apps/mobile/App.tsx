@@ -950,9 +950,17 @@ function openExternalUrl(url: string) {
     return;
   }
 
-  Linking.openURL(url).catch(() => {
-    Alert.alert('Unable to open link', 'This link is not available right now.');
-  });
+  Linking.canOpenURL(url)
+    .then((supported) => {
+      if (!supported) {
+        throw new Error('Unsupported URL');
+      }
+
+      return Linking.openURL(url);
+    })
+    .catch(() => {
+      Alert.alert('Unable to open link', 'This link is not available right now.');
+    });
 }
 
 function SiteFooter({

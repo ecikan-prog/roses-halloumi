@@ -972,6 +972,7 @@ function SiteFooter({
   onNavigate: (page: any) => void;
   session: SessionState | null;
 }) {
+  const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
   const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage }> = [
     { label: 'Shop Halloumi', page: 'shop' },
     { label: 'Recipes', page: 'recipes' },
@@ -1028,15 +1029,14 @@ function SiteFooter({
           {socialLinks.map((item) => (
             <Pressable
               key={item.label}
-              style={styles.footerSocialButton}
+              style={[styles.footerSocialButton, focusedSocialLabel === item.label && styles.footerSocialButtonFocused]}
               onPress={() => void openExternalUrl(item.url)}
+              onFocus={() => setFocusedSocialLabel(item.label)}
+              onBlur={() => setFocusedSocialLabel((current) => (current === item.label ? null : current))}
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >
-              <View style={styles.footerSocialIcon} accessible={false}>
-                <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} />
-              </View>
-              <Text style={styles.footerSocialText}>{item.label}</Text>
+              <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} />
             </Pressable>
           ))}
         </View>
@@ -3733,28 +3733,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   footerSocialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#1f4630',
-  },
-  footerSocialIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footerSocialIconImage: {
-    width: 28,
-    height: 28,
+  footerSocialButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#f2d77e',
   },
-  footerSocialText: {
-    color: '#f0e7d2',
-    fontWeight: '600',
+  footerSocialIconImage: {
+    width: 24,
+    height: 24,
   },
   footerMeta: {
     color: '#d7ddda',

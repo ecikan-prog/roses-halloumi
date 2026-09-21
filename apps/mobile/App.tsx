@@ -934,18 +934,18 @@ function SiteHeader({
   );
 }
 
-function openExternalUrl(url: string) {
-  Linking.canOpenURL(url)
-    .then((supported) => {
-      if (!supported) {
-        throw new Error('Unsupported URL');
-      }
-
-      return Linking.openURL(url);
-    })
-    .catch(() => {
+async function openExternalUrl(url: string) {
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (!supported) {
       Alert.alert('Unable to open link', 'This link is not available right now.');
-    });
+      return;
+    }
+
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('Unable to open link', 'This link is not available right now.');
+  }
 }
 
 function SiteFooter({
@@ -985,7 +985,7 @@ function SiteFooter({
     {
       label: 'Instagram',
       icon: '◉',
-      url: 'https://www.instagram.com/grasslandcheese?stkn=MTdjazczdWh5cDI0bQ%3D%3D&utm_source=qr',
+      url: 'https://www.instagram.com/grasslandcheese',
       iconStyle: styles.footerSocialIconInstagram,
     },
   ] as const;
@@ -1017,7 +1017,7 @@ function SiteFooter({
             <Pressable
               key={item.label}
               style={styles.footerSocialButton}
-              onPress={() => openExternalUrl(item.url)}
+              onPress={() => void openExternalUrl(item.url)}
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >

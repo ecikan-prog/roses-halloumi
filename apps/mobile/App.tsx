@@ -934,6 +934,17 @@ function SiteHeader({
   );
 }
 
+function openExternalUrl(url: string) {
+  if (Platform.OS === 'web') {
+    (globalThis as any).open?.(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
+  Linking.openURL(url).catch(() => {
+    Alert.alert('Unable to open link', 'This link is not available right now.');
+  });
+}
+
 function SiteFooter({
   currentPage,
   onNavigate,
@@ -955,6 +966,20 @@ function SiteFooter({
     { label: 'Cart', page: 'cart' },
     { label: session ? 'Account' : 'Login', page: 'account' },
   ];
+  const socialLinks = [
+    {
+      label: 'Facebook',
+      icon: 'f',
+      url: 'https://www.facebook.com/profile.php?id=61594610902425',
+      iconStyle: styles.footerSocialIconFacebook,
+    },
+    {
+      label: 'TikTok',
+      icon: '♪',
+      url: 'https://www.tiktok.com/@grassland.cheese',
+      iconStyle: styles.footerSocialIconTikTok,
+    },
+  ] as const;
 
   return (
     <View style={styles.footerShell}>
@@ -975,6 +1000,25 @@ function SiteFooter({
             </Pressable>
           );
         })}
+      </View>
+      <View style={styles.footerSocialSection}>
+        <Text style={styles.footerSectionLabel}>Follow us</Text>
+        <View style={styles.footerSocialRow}>
+          {socialLinks.map((item) => (
+            <Pressable
+              key={item.label}
+              style={styles.footerSocialButton}
+              onPress={() => openExternalUrl(item.url)}
+              accessibilityRole="link"
+              accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
+            >
+              <View style={[styles.footerSocialIcon, item.iconStyle]}>
+                <Text style={styles.footerSocialIconText}>{item.icon}</Text>
+              </View>
+              <Text style={styles.footerSocialText}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
       <Text style={styles.footerMeta}>Grassland Cheese halloumi recipes are inspiration only and never sold as products.</Text>
     </View>
@@ -3653,6 +3697,51 @@ const styles = StyleSheet.create({
   },
   footerLinkTextActive: {
     color: '#f2d77e',
+  },
+  footerSocialSection: {
+    gap: 12,
+  },
+  footerSectionLabel: {
+    color: '#fffef8',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footerSocialRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  footerSocialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#1f4630',
+  },
+  footerSocialIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerSocialIconFacebook: {
+    backgroundColor: '#1877f2',
+  },
+  footerSocialIconTikTok: {
+    backgroundColor: '#000000',
+  },
+  footerSocialIconText: {
+    color: '#fffef8',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  footerSocialText: {
+    color: '#f0e7d2',
+    fontWeight: '600',
   },
   footerMeta: {
     color: '#d7ddda',

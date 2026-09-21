@@ -935,21 +935,6 @@ function SiteHeader({
 }
 
 function openExternalUrl(url: string) {
-  if (Platform.OS === 'web') {
-    const open = (globalThis as any).open;
-    if (typeof open === 'function') {
-      try {
-        open(url, '_blank', 'noopener,noreferrer');
-        return;
-      } catch {
-        // Fall through to the shared error alert below.
-      }
-    }
-
-    Alert.alert('Unable to open link', 'This link is not available right now.');
-    return;
-  }
-
   Linking.canOpenURL(url)
     .then((supported) => {
       if (!supported) {

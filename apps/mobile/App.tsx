@@ -1032,7 +1032,6 @@ function SiteFooter({
               onPress={() => void openExternalUrl(item.url)}
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
-              accessibilityHint="Opens an external link"
             >
               <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} importantForAccessibility="no" />
             </Pressable>

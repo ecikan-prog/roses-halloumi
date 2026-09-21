@@ -1028,7 +1028,7 @@ function SiteFooter({
           {socialLinks.map((item) => (
             <Pressable
               key={item.label}
-              style={styles.footerSocialButton}
+              style={({ focused }) => [styles.footerSocialButton, focused && styles.footerSocialButtonFocused]}
               onPress={() => void openExternalUrl(item.url)}
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
@@ -3736,6 +3736,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f4630',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  footerSocialButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#f2d77e',
   },
   footerSocialIconImage: {
     width: 24,

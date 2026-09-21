@@ -1032,7 +1032,7 @@ function SiteFooter({
               onPress={() => void openExternalUrl(item.url)}
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
-              accessibilityHint={`Opens the Grassland Cheese ${item.label} profile in an external app or browser`}
+              accessibilityHint={`Opens the Grassland Cheese ${item.label} profile outside this page`}
             >
               <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} importantForAccessibility="no" />
             </Pressable>

@@ -936,7 +936,12 @@ function SiteHeader({
 
 function openExternalUrl(url: string) {
   if (Platform.OS === 'web') {
-    (globalThis as any).open?.(url, '_blank', 'noopener,noreferrer');
+    const openedWindow = (globalThis as any).open?.(url, '_blank', 'noopener,noreferrer');
+    if (openedWindow) {
+      return;
+    }
+
+    Alert.alert('Unable to open link', 'This link is not available right now.');
     return;
   }
 

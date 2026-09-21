@@ -1033,10 +1033,7 @@ function SiteFooter({
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >
-              <View style={styles.footerSocialIcon} accessible={false}>
-                <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} />
-              </View>
-              <Text style={styles.footerSocialText}>{item.label}</Text>
+              <Image source={item.iconSource} style={styles.footerSocialIconImage} accessible={false} />
             </Pressable>
           ))}
         </View>
@@ -3733,28 +3730,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   footerSocialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#1f4630',
-  },
-  footerSocialIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   footerSocialIconImage: {
-    width: 28,
-    height: 28,
-  },
-  footerSocialText: {
-    color: '#f0e7d2',
-    fontWeight: '600',
+    width: 24,
+    height: 24,
   },
   footerMeta: {
     color: '#d7ddda',

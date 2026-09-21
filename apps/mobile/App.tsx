@@ -982,6 +982,12 @@ function SiteFooter({
       url: 'https://www.tiktok.com/@grassland.cheese',
       iconStyle: styles.footerSocialIconTikTok,
     },
+    {
+      label: 'Instagram',
+      icon: '◉',
+      url: 'https://www.instagram.com/grasslandcheese?stkn=MTdjazczdWh5cDI0bQ%3D%3D&utm_source=qr',
+      iconStyle: styles.footerSocialIconInstagram,
+    },
   ] as const;
 
   return (
@@ -3735,6 +3741,9 @@ const styles = StyleSheet.create({
   },
   footerSocialIconTikTok: {
     backgroundColor: '#000000',
+  },
+  footerSocialIconInstagram: {
+    backgroundColor: '#c13584',
   },
   footerSocialIconText: {
     color: '#fffef8',

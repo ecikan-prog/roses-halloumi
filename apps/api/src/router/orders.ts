@@ -48,13 +48,14 @@ async function claimOrderConfirmationEmail(prisma: Pick<PrismaClient, 'order'>, 
     },
   });
 
-  return result.count > 0;
+  return result.count > 0 ? claimedAt : null;
 }
 
-async function markOrderConfirmationEmailSent(prisma: Pick<PrismaClient, 'order'>, orderId: number) {
+async function markOrderConfirmationEmailSent(prisma: Pick<PrismaClient, 'order'>, orderId: number, claimedAt: Date) {
   await prisma.order.updateMany({
     where: {
       id: orderId,
+      confirmationEmailClaimedAt: claimedAt,
       confirmationEmailSentAt: null,
     },
     data: {
@@ -64,10 +65,11 @@ async function markOrderConfirmationEmailSent(prisma: Pick<PrismaClient, 'order'
   });
 }
 
-async function releaseOrderConfirmationEmailClaim(prisma: Pick<PrismaClient, 'order'>, orderId: number) {
+async function releaseOrderConfirmationEmailClaim(prisma: Pick<PrismaClient, 'order'>, orderId: number, claimedAt: Date) {
   await prisma.order.updateMany({
     where: {
       id: orderId,
+      confirmationEmailClaimedAt: claimedAt,
       confirmationEmailSentAt: null,
     },
     data: {
@@ -388,13 +390,13 @@ export const ordersRouter = router({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Order not found.' });
         }
 
-        const shouldSendConfirmationEmail = await claimOrderConfirmationEmail(tx, order.id);
-        return { order, shouldSendConfirmationEmail };
+        const confirmationEmailClaimedAt = await claimOrderConfirmationEmail(tx, order.id);
+        return { order, confirmationEmailClaimedAt };
       });
 
-      const { order, shouldSendConfirmationEmail } = checkoutCompletion;
+      const { order, confirmationEmailClaimedAt } = checkoutCompletion;
 
-      if (shouldSendConfirmationEmail) {
+      if (confirmationEmailClaimedAt) {
         const confirmationEmail = buildOrderConfirmationEmail({
           name: order.customer.name,
           orderNumber: order.orderNumber ?? buildOrderNumber(order.id),
@@ -416,9 +418,9 @@ export const ordersRouter = router({
         const mailResult = await sendMail({ to: order.customer.email, ...confirmationEmail });
 
         if (mailResult.sent) {
-          await markOrderConfirmationEmailSent(ctx.prisma, order.id);
+          await markOrderConfirmationEmailSent(ctx.prisma, order.id, confirmationEmailClaimedAt);
         } else {
-          await releaseOrderConfirmationEmailClaim(ctx.prisma, order.id);
+          await releaseOrderConfirmationEmailClaim(ctx.prisma, order.id, confirmationEmailClaimedAt);
         }
       }
 
@@ -678,13 +680,15 @@ export const ordersRouter = router({
         paymentTermLabel: 'Pay in 30',
         paymentStatusLabel: 'Deferred / unpaid',
       });
-      if (await claimOrderConfirmationEmail(ctx.prisma, order.id)) {
+      const confirmationEmailClaimedAt = await claimOrderConfirmationEmail(ctx.prisma, order.id);
+
+      if (confirmationEmailClaimedAt) {
         const mailResult = await sendMail({ to: order.customer.email, ...confirmationEmail });
 
         if (mailResult.sent) {
-          await markOrderConfirmationEmailSent(ctx.prisma, order.id);
+          await markOrderConfirmationEmailSent(ctx.prisma, order.id, confirmationEmailClaimedAt);
         } else {
-          await releaseOrderConfirmationEmailClaim(ctx.prisma, order.id);
+          await releaseOrderConfirmationEmailClaim(ctx.prisma, order.id, confirmationEmailClaimedAt);
         }
       }
 

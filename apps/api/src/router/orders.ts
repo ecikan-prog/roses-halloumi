@@ -59,7 +59,7 @@ function getStripeKeys() {
 
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: `Stripe is not configured yet: STRIPE_SECRET_KEY is ${missingReason}.`,
+      message: 'Stripe is not configured yet. Please try again later.',
     });
   }
 

@@ -1,4 +1,4 @@
-import { CustomerType, PaymentMethod, PaymentStatus, PaymentTerm } from '@prisma/client';
+import { CustomerType, PaymentMethod, PaymentStatus, PaymentTerm, type PrismaClient } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import Stripe from 'stripe';
 import { z } from 'zod';
@@ -35,7 +35,7 @@ function getPayNowDiscountedUnitPrice(unitPrice: number) {
   return roundMoney(unitPrice * (1 - PAY_NOW_DISCOUNT_RATE));
 }
 
-async function claimOrderConfirmationEmail(prisma: { order: { updateMany: Function } }, orderId: number) {
+async function claimOrderConfirmationEmail(prisma: Pick<PrismaClient, 'order'>, orderId: number) {
   const sentAt = new Date();
   const result = await prisma.order.updateMany({
     where: {
@@ -332,36 +332,43 @@ export const ordersRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Order not found.' });
       }
 
-      await ctx.prisma.order.updateMany({
-        where: {
-          id: existingOrder.id,
-          paymentStatus: {
-            not: PaymentStatus.PAID,
+      const checkoutCompletion = await ctx.prisma.$transaction(async (tx) => {
+        await tx.order.updateMany({
+          where: {
+            id: existingOrder.id,
+            paymentStatus: {
+              not: PaymentStatus.PAID,
+            },
           },
-        },
-        data: {
-          paymentStatus: PaymentStatus.PAID,
-          status: 'CONFIRMED',
-        },
+          data: {
+            paymentStatus: PaymentStatus.PAID,
+            status: 'CONFIRMED',
+          },
+        });
+
+        const order = await tx.order.findFirst({
+          where: {
+            id: existingOrder.id,
+            customerId: ctx.user.id,
+            paymentTerm: PaymentTerm.PAY_NOW,
+          },
+          include: {
+            customer: true,
+            orderItems: { include: { product: true } },
+          },
+        });
+
+        if (!order) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Order not found.' });
+        }
+
+        const shouldSendConfirmationEmail = await claimOrderConfirmationEmail(tx, order.id);
+        return { order, shouldSendConfirmationEmail };
       });
 
-      const order = await ctx.prisma.order.findFirst({
-        where: {
-          id: existingOrder.id,
-          customerId: ctx.user.id,
-          paymentTerm: PaymentTerm.PAY_NOW,
-        },
-        include: {
-          customer: true,
-          orderItems: { include: { product: true } },
-        },
-      });
+      const { order, shouldSendConfirmationEmail } = checkoutCompletion;
 
-      if (!order) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Order not found.' });
-      }
-
-      if (await claimOrderConfirmationEmail(ctx.prisma, order.id)) {
+      if (shouldSendConfirmationEmail) {
         const confirmationEmail = buildOrderConfirmationEmail({
           name: order.customer.name,
           orderNumber: order.orderNumber ?? buildOrderNumber(order.id),

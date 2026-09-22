@@ -9,6 +9,8 @@ import { getShippingProvider } from '../lib/shippingProvider.js';
 import { getProductWeightKg } from '../lib/productWeights.js';
 import { protectedProcedure, router, staffProcedure } from './trpc.js';
 
+const PAY_NOW_DISCOUNT_RATE = 0.1;
+
 function normalizePaymentStatus(status: PaymentStatus, dueDate: Date | null) {
   if (status === PaymentStatus.OUTSTANDING && dueDate && dueDate.getTime() < Date.now()) {
     return PaymentStatus.OVERDUE;
@@ -23,6 +25,29 @@ function getPrice(customerType: CustomerType, wholesalePrice: { toNumber(): numb
 
 function buildOrderNumber(id: number) {
   return `GC-${String(id).padStart(6, '0')}`;
+}
+
+function roundMoney(amount: number) {
+  return Number(amount.toFixed(2));
+}
+
+function getPayNowDiscountedUnitPrice(unitPrice: number) {
+  return roundMoney(unitPrice * (1 - PAY_NOW_DISCOUNT_RATE));
+}
+
+async function claimOrderConfirmationEmail(prisma: { order: { updateMany: Function } }, orderId: number) {
+  const sentAt = new Date();
+  const result = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      confirmationEmailSentAt: null,
+    },
+    data: {
+      confirmationEmailSentAt: sentAt,
+    },
+  });
+
+  return result.count > 0;
 }
 
 // Minimum fields required to calculate a real shipping charge and to give the
@@ -142,11 +167,13 @@ export const ordersRouter = router({
         }
 
         const unitPrice = getPrice(customer.type, product.wholesalePrice, product.retailPrice);
+        const checkoutUnitPrice = getPayNowDiscountedUnitPrice(unitPrice);
         return {
           productId: product.id,
           qty: item.qty,
           unitPrice,
           lineTotal: unitPrice * item.qty,
+          checkoutUnitPrice,
           weightKg: getProductWeightKg(product) * item.qty,
           productName: product.name,
           productUnit: product.unit,
@@ -155,7 +182,9 @@ export const ordersRouter = router({
 
       const subtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
       const totalProductWeight = orderItems.reduce((sum, item) => sum + item.weightKg, 0);
-      const discountApplied = 0;
+      const discountApplied = roundMoney(
+        orderItems.reduce((sum, item) => sum + (item.unitPrice - item.checkoutUnitPrice) * item.qty, 0),
+      );
       const destination: ShippingDestination = {
         country: input.deliveryAddress.country,
         region: input.deliveryAddress.region,
@@ -164,7 +193,7 @@ export const ordersRouter = router({
       };
       const shipping = await getShippingProvider().getQuote({ origin: DEPOT_ADDRESS, destination, totalWeight: totalProductWeight }, subtotal);
       const deliveryCharge = shipping.amount;
-      const total = Number((subtotal - discountApplied + deliveryCharge).toFixed(2));
+      const total = roundMoney(subtotal - discountApplied + deliveryCharge);
 
       const created = await ctx.prisma.$transaction(async (tx) => {
         const createdOrder = await tx.order.create({
@@ -218,7 +247,7 @@ export const ordersRouter = router({
               quantity: item.qty,
               price_data: {
                 currency: 'nzd',
-                unit_amount: Math.round(item.unitPrice * 100),
+                unit_amount: Math.round(item.checkoutUnitPrice * 100),
                 product_data: {
                   name: `${item.productName} (${item.productUnit})`,
                 },
@@ -295,33 +324,42 @@ export const ordersRouter = router({
           customerId: ctx.user.id,
           paymentTerm: PaymentTerm.PAY_NOW,
         },
-        include: {
-          customer: true,
-          orderItems: { include: { product: true } },
-        },
       });
 
       if (!existingOrder) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Order not found.' });
       }
 
-      const wasAlreadyPaid = existingOrder.paymentStatus === PaymentStatus.PAID;
+      await ctx.prisma.order.updateMany({
+        where: {
+          id: existingOrder.id,
+          paymentStatus: {
+            not: PaymentStatus.PAID,
+          },
+        },
+        data: {
+          paymentStatus: PaymentStatus.PAID,
+          status: 'CONFIRMED',
+        },
+      });
 
-      const order = wasAlreadyPaid
-        ? existingOrder
-        : await ctx.prisma.order.update({
-            where: { id: existingOrder.id },
-            data: {
-              paymentStatus: PaymentStatus.PAID,
-              status: 'CONFIRMED',
-            },
-            include: {
-              customer: true,
-              orderItems: { include: { product: true } },
-            },
-          });
+      const order = await ctx.prisma.order.findFirst({
+        where: {
+          id: existingOrder.id,
+          customerId: ctx.user.id,
+          paymentTerm: PaymentTerm.PAY_NOW,
+        },
+        include: {
+          customer: true,
+          orderItems: { include: { product: true } },
+        },
+      });
 
-      if (!wasAlreadyPaid) {
+      if (!order) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Order not found.' });
+      }
+
+      if (await claimOrderConfirmationEmail(ctx.prisma, order.id)) {
         const confirmationEmail = buildOrderConfirmationEmail({
           name: order.customer.name,
           orderNumber: order.orderNumber ?? buildOrderNumber(order.id),
@@ -599,7 +637,9 @@ export const ordersRouter = router({
         paymentTermLabel: 'Pay in 30',
         paymentStatusLabel: 'Deferred / unpaid',
       });
-      void sendMail({ to: order.customer.email, ...confirmationEmail });
+      if (await claimOrderConfirmationEmail(ctx.prisma, order.id)) {
+        void sendMail({ to: order.customer.email, ...confirmationEmail });
+      }
 
       return {
         id: order.id,

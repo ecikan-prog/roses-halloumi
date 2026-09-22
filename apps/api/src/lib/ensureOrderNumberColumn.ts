@@ -168,6 +168,7 @@ const REQUIRED_ORDER_COLUMNS = [
   'paymentStatus',
   'paymentMethod',
   'createdAt',
+  'confirmationEmailSentAt',
 ] as const;
 
 /**
@@ -268,6 +269,9 @@ export async function ensureOrderSchema(prisma: PrismaClient, log: (message: str
   );
   await runStep('add Order.paymentMethod column', log, () =>
     ensureColumn(prisma, 'Order', 'paymentMethod', "ENUM('IN_APP','EFTPOS') NOT NULL DEFAULT 'IN_APP'", log),
+  );
+  await runStep('add Order.confirmationEmailSentAt column', log, () =>
+    ensureColumn(prisma, 'Order', 'confirmationEmailSentAt', 'DATETIME(3) NULL', log),
   );
   // `paymentTerm` and `total` are also required (NOT NULL, no default) on
   // every `orders.create` insert, and `status` is set implicitly by its

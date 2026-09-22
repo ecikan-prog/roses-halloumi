@@ -122,6 +122,7 @@ model Order {
   paymentStatus    PaymentStatus  @default(OUTSTANDING)
   paymentMethod    PaymentMethod
   createdAt        DateTime       @default(now())
+  confirmationEmailSentAt DateTime?
   customer         Customer       @relation(fields: [customerId], references: [id])
   staff            StaffUser?     @relation(fields: [staffId], references: [id])
   orderItems       OrderItem[]

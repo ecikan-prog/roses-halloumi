@@ -47,6 +47,10 @@ app.use(
 // data — so it is safe to run on every startup.
 async function start() {
   console.log('[startup] Verifying/repairing Order table schema...');
+  const stripeSecret = process.env.STRIPE_SECRET_KEY;
+  const stripeSecretStatus =
+    stripeSecret == null ? 'missing' : stripeSecret.length === 0 ? 'empty' : stripeSecret.trim().length === 0 ? 'whitespace-only' : 'present';
+  console.log(`[startup] STRIPE_SECRET_KEY runtime status: ${stripeSecretStatus}.`);
 
   try {
     await ensureOrderSchema(prisma);

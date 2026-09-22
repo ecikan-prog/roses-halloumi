@@ -48,10 +48,15 @@ let stripeClient: Stripe | null = null;
 let cachedStripeSecret: string | null = null;
 
 function getStripeKeys() {
-  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  const rawSecretKey = process.env.STRIPE_SECRET_KEY;
+  const secretKey = rawSecretKey?.trim();
   const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY?.trim();
 
   if (!secretKey) {
+    const missingReason =
+      rawSecretKey == null ? 'missing from runtime environment' : rawSecretKey.length === 0 ? 'set to an empty string' : 'set but only whitespace';
+    console.error(`[stripe] Checkout blocked: STRIPE_SECRET_KEY ${missingReason}.`);
+
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Stripe is not configured yet. Please try again later.',

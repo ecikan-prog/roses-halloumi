@@ -51,7 +51,7 @@ function getStripeKeys() {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY?.trim();
 
-  if (!secretKey || !publishableKey) {
+  if (!secretKey) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Stripe is not configured yet. Please try again later.',
@@ -242,7 +242,7 @@ export const ordersRouter = router({
 
         return {
           checkoutUrl: session.url,
-          publishableKey,
+          ...(publishableKey ? { publishableKey } : {}),
           orderId: created.createdOrder.id,
           orderNumber: created.numberedOrder.orderNumber ?? buildOrderNumber(created.createdOrder.id),
         };

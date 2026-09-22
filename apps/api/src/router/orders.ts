@@ -150,6 +150,7 @@ export const ordersRouter = router({
           active: true,
         },
       });
+      const paymentTerm = PaymentTerm.PAY_NOW;
 
       if (products.length !== input.items.length) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'One or more products are unavailable.' });
@@ -167,7 +168,7 @@ export const ordersRouter = router({
         }
 
         const unitPrice = getPrice(customer.type, product.wholesalePrice, product.retailPrice);
-        const checkoutUnitPrice = getPayNowDiscountedUnitPrice(unitPrice);
+        const checkoutUnitPrice = paymentTerm === PaymentTerm.PAY_NOW ? getPayNowDiscountedUnitPrice(unitPrice) : unitPrice;
         return {
           productId: product.id,
           qty: item.qty,
@@ -182,9 +183,10 @@ export const ordersRouter = router({
 
       const subtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
       const totalProductWeight = orderItems.reduce((sum, item) => sum + item.weightKg, 0);
-      const discountApplied = roundMoney(
-        orderItems.reduce((sum, item) => sum + (item.unitPrice - item.checkoutUnitPrice) * item.qty, 0),
-      );
+      const discountApplied =
+        paymentTerm === PaymentTerm.PAY_NOW
+          ? roundMoney(orderItems.reduce((sum, item) => sum + (item.unitPrice - item.checkoutUnitPrice) * item.qty, 0))
+          : 0;
       const destination: ShippingDestination = {
         country: input.deliveryAddress.country,
         region: input.deliveryAddress.region,
@@ -201,7 +203,7 @@ export const ordersRouter = router({
             customerId: customer.id,
             staffId: null,
             status: 'CONFIRMED',
-            paymentTerm: PaymentTerm.PAY_NOW,
+            paymentTerm,
             subtotal,
             deliveryCharge,
             deliveryAddress: formatDeliveryAddress(input.deliveryAddress),

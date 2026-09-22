@@ -103,12 +103,36 @@ type ConfirmedOrder = {
   discountApplied: number;
   total: number;
   createdAt: Date | string;
+  paymentTerm: PaymentTerm;
+  paymentStatus: PaymentStatus;
   deliveryAddress?: string | null;
   isTemporaryShippingRate?: boolean;
   shippingZoneLabel?: string | null;
   totalShipmentWeightKg?: number | null;
   items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
 };
+
+const PAY_NOW_DISCOUNT_RATE = 0.1;
+
+function roundMoney(amount: number) {
+  return Number(amount.toFixed(2));
+}
+
+function getPayNowDiscountedUnitPrice(unitPrice: number) {
+  return roundMoney(unitPrice * (1 - PAY_NOW_DISCOUNT_RATE));
+}
+
+function getPaymentStatusLabel(status: PaymentStatus) {
+  switch (status) {
+    case PaymentStatus.PAID:
+      return 'Paid';
+    case PaymentStatus.OVERDUE:
+      return 'Overdue';
+    case PaymentStatus.OUTSTANDING:
+    default:
+      return 'Deferred / unpaid';
+  }
+}
 
 export type SessionState = {
   token: string | null;
@@ -624,10 +648,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
     .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
-  // Pay Now would previously apply a 10% discount, but Pay Now cannot be
-  // completed yet (no payment gateway is connected), so no discount is
-  // currently offered at checkout.
-  const discount = 0;
+  const discount = paymentTerm === PaymentTerm.PAY_NOW
+    ? roundMoney(selectedItems.reduce((sum, item) => sum + (item.effectivePrice - getPayNowDiscountedUnitPrice(item.effectivePrice)) * item.qty, 0))
+    : 0;
   const totalWeightKg = selectedItems.reduce((sum, item) => sum + getProductWeightKg(item) * item.qty, 0);
   const deliveryAddressReady = isDeliveryAddressComplete(deliveryAddress);
   const shippingEstimateQuery = trpc.shipping.estimate.useQuery(
@@ -707,6 +730,8 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
             discountApplied: result.discountApplied,
             total: result.total,
             createdAt: result.createdAt,
+            paymentTerm: result.paymentTerm,
+            paymentStatus: result.paymentStatus,
             deliveryAddress: result.deliveryAddress,
             isTemporaryShippingRate: result.isTemporaryShippingRate,
             shippingZoneLabel: result.shippingZoneLabel,
@@ -819,6 +844,8 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
         discountApplied: result.discountApplied,
         total: result.total,
         createdAt: result.createdAt,
+        paymentTerm: result.paymentTerm,
+        paymentStatus: result.paymentStatus,
         deliveryAddress: result.deliveryAddress,
         isTemporaryShippingRate: result.isTemporaryShippingRate,
         shippingZoneLabel: result.shippingZoneLabel,
@@ -1451,7 +1478,7 @@ function ShopPage({
                 groupLabel="Payment term"
                 value={paymentTerm}
                 options={[
-                  { label: 'Pay now (Stripe Checkout)', value: PaymentTerm.PAY_NOW, disabled: isStaff },
+                  { label: 'Pay now (Stripe Checkout, 10% off)', value: PaymentTerm.PAY_NOW, disabled: isStaff },
                   { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
                 ]}
                 onChange={(value) => setPaymentTerm(value as PaymentTerm)}
@@ -1459,7 +1486,7 @@ function ShopPage({
               <Text style={styles.metaText}>
                 {isStaff
                   ? 'Staff-created orders currently use Pay in 30 only.'
-                  : 'Retail customers can use Stripe Checkout for Pay now, or choose Pay in 30 for deferred payment.'}
+                  : 'Retail customers can pay now with Stripe Checkout for 10% off, or choose Pay in 30 at full price.'}
               </Text>
             </View>
           </View>
@@ -1776,13 +1803,13 @@ function CartPage({
               groupLabel="Checkout payment term"
               value={paymentTerm}
               options={[
-                { label: 'Pay now (Stripe Checkout)', value: PaymentTerm.PAY_NOW },
+                { label: 'Pay now (Stripe Checkout, 10% off)', value: PaymentTerm.PAY_NOW },
                 { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
               ]}
               onChange={(value) => setPaymentTerm(value as PaymentTerm)}
             />
             {isPayNow ? (
-              <Text style={styles.metaText}>Pay now: you&apos;ll be redirected to Stripe Checkout and returned here after payment.</Text>
+              <Text style={styles.metaText}>Pay now: save 10% on products, pay securely in Stripe Checkout, and return here after payment.</Text>
             ) : (
               <Text style={styles.metaText}>Pay in 30: confirm now, no payment gateway required. Due date is set to 30 days from confirmation.</Text>
             )}
@@ -1849,8 +1876,8 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
         ) : null}
         <Text style={styles.summaryTotal}>Total: {formatMoney(order.total)}</Text>
         {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to:{'\n'}{order.deliveryAddress}</Text> : null}
-        <Text style={styles.metaText}>Payment method: Pay in 30</Text>
-        <Text style={styles.metaText}>Payment status: Deferred / unpaid</Text>
+        <Text style={styles.metaText}>Payment method: {order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now (Stripe Checkout)' : 'Pay in 30'}</Text>
+        <Text style={styles.metaText}>Payment status: {getPaymentStatusLabel(order.paymentStatus)}</Text>
         <Text style={styles.metaText}>A confirmation email has been sent to your registered email address.</Text>
         <View style={styles.heroActionRow}>
           <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>

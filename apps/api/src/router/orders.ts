@@ -53,7 +53,7 @@ function getStripeKeys() {
 
   if (!secretKey || !publishableKey) {
     throw new TRPCError({
-      code: 'FAILED_PRECONDITION',
+      code: 'INTERNAL_SERVER_ERROR',
       message: 'Stripe is not configured yet. Please try again later.',
     });
   }
@@ -78,7 +78,7 @@ function getCheckoutBaseUrl(origin?: string) {
 
   if (!baseUrl) {
     throw new TRPCError({
-      code: 'FAILED_PRECONDITION',
+      code: 'INTERNAL_SERVER_ERROR',
       message: 'APP_BASE_URL must be configured for Stripe Checkout redirects.',
     });
   }

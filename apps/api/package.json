@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc --project tsconfig.json",
+    "start": "node dist/src/server.js",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

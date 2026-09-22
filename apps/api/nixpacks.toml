@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["cd ../.. && npm ci"]
+
+[phases.build]
+cmds = ["cd ../.. && npm run build:api"]
+
+[start]
+cmd = "cd ../.. && npm run start:api"

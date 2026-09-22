@@ -49,6 +49,20 @@ All seeded accounts use `password123`.
 - `wholesale@dairysales.local`
 - `retail@dairysales.local`
 
+## Railway deployment (two separate services)
+
+This monorepo deploys as **two independent Railway services**, each with its own root directory and `nixpacks.toml`. Do not point a single Railway service at the repo root — each service's *Root Directory* setting must match the app it is meant to run, and no service should override the committed `nixpacks.toml` [start] command with a custom start command in the Railway dashboard.
+
+- **API service** (Express/tRPC backend, reads `DATABASE_URL`/`JWT_SECRET`/`STRIPE_SECRET_KEY`, etc.):
+  - Root Directory: `apps/api`
+  - Uses `apps/api/nixpacks.toml`, which installs from the repo root, runs `npm run build:api` (Prisma generate + `tsc`), and starts with `npm run start:api` (`node dist/src/server.js`).
+- **Web service** (Expo web build served to customers, e.g. `grasslandcheese.com`):
+  - Root Directory: `apps/mobile`
+  - Uses `apps/mobile/nixpacks.toml`, which installs from the repo root, runs `npm run build:mobile:web` (Expo web export), and starts with `npm run start:mobile:web` (`node ./serve-web.mjs`).
+  - Set `EXPO_PUBLIC_API_URL` on this service to the API service's public `/trpc` URL so the web frontend talks to the backend instead of falling back to a hardcoded default.
+
+If a Railway service's logs show `expo start` / "Metro is running in CI mode" instead of `API listening on http://localhost:<PORT>`, that service's Root Directory or start command is misconfigured to run `apps/mobile`'s dev script rather than either app's production start command above.
+
 ## Notes
 
 - Customer self-registration always creates a retail account; staff can later upgrade it to wholesale.

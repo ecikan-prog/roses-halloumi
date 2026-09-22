@@ -36,18 +36,44 @@ function getPayNowDiscountedUnitPrice(unitPrice: number) {
 }
 
 async function claimOrderConfirmationEmail(prisma: Pick<PrismaClient, 'order'>, orderId: number) {
-  const sentAt = new Date();
+  const claimedAt = new Date();
   const result = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      confirmationEmailClaimedAt: null,
+      confirmationEmailSentAt: null,
+    },
+    data: {
+      confirmationEmailClaimedAt: claimedAt,
+    },
+  });
+
+  return result.count > 0;
+}
+
+async function markOrderConfirmationEmailSent(prisma: Pick<PrismaClient, 'order'>, orderId: number) {
+  await prisma.order.updateMany({
     where: {
       id: orderId,
       confirmationEmailSentAt: null,
     },
     data: {
-      confirmationEmailSentAt: sentAt,
+      confirmationEmailClaimedAt: null,
+      confirmationEmailSentAt: new Date(),
     },
   });
+}
 
-  return result.count > 0;
+async function releaseOrderConfirmationEmailClaim(prisma: Pick<PrismaClient, 'order'>, orderId: number) {
+  await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      confirmationEmailSentAt: null,
+    },
+    data: {
+      confirmationEmailClaimedAt: null,
+    },
+  });
 }
 
 // Minimum fields required to calculate a real shipping charge and to give the
@@ -387,7 +413,13 @@ export const ordersRouter = router({
           paymentTermLabel: 'Pay now (Stripe Checkout)',
           paymentStatusLabel: 'Paid',
         });
-        void sendMail({ to: order.customer.email, ...confirmationEmail });
+        const mailResult = await sendMail({ to: order.customer.email, ...confirmationEmail });
+
+        if (mailResult.sent) {
+          await markOrderConfirmationEmailSent(ctx.prisma, order.id);
+        } else {
+          await releaseOrderConfirmationEmailClaim(ctx.prisma, order.id);
+        }
       }
 
       return {
@@ -647,7 +679,13 @@ export const ordersRouter = router({
         paymentStatusLabel: 'Deferred / unpaid',
       });
       if (await claimOrderConfirmationEmail(ctx.prisma, order.id)) {
-        void sendMail({ to: order.customer.email, ...confirmationEmail });
+        const mailResult = await sendMail({ to: order.customer.email, ...confirmationEmail });
+
+        if (mailResult.sent) {
+          await markOrderConfirmationEmailSent(ctx.prisma, order.id);
+        } else {
+          await releaseOrderConfirmationEmailClaim(ctx.prisma, order.id);
+        }
       }
 
       return {

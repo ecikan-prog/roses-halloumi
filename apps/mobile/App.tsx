@@ -122,6 +122,18 @@ function getPayNowDiscountedUnitPrice(unitPrice: number) {
   return roundMoney(unitPrice * (1 - PAY_NOW_DISCOUNT_RATE));
 }
 
+function getPaymentStatusLabel(status: PaymentStatus) {
+  switch (status) {
+    case PaymentStatus.PAID:
+      return 'Paid';
+    case PaymentStatus.OVERDUE:
+      return 'Overdue';
+    case PaymentStatus.OUTSTANDING:
+    default:
+      return 'Deferred / unpaid';
+  }
+}
+
 export type SessionState = {
   token: string | null;
   user: SessionUser | null;
@@ -1865,7 +1877,7 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
         <Text style={styles.summaryTotal}>Total: {formatMoney(order.total)}</Text>
         {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to:{'\n'}{order.deliveryAddress}</Text> : null}
         <Text style={styles.metaText}>Payment method: {order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now (Stripe Checkout)' : 'Pay in 30'}</Text>
-        <Text style={styles.metaText}>Payment status: {order.paymentStatus === PaymentStatus.PAID ? 'Paid' : 'Deferred / unpaid'}</Text>
+        <Text style={styles.metaText}>Payment status: {getPaymentStatusLabel(order.paymentStatus)}</Text>
         <Text style={styles.metaText}>A confirmation email has been sent to your registered email address.</Text>
         <View style={styles.heroActionRow}>
           <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>

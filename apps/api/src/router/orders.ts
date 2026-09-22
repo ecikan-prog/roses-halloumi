@@ -1,5 +1,6 @@
 import { CustomerType, PaymentMethod, PaymentStatus, PaymentTerm } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
+import Stripe from 'stripe';
 import { z } from 'zod';
 import { buildOrderConfirmationEmail } from '../lib/emailTemplates.js';
 import { sendMail } from '../lib/mailer.js';
@@ -43,7 +44,356 @@ function formatDeliveryAddress(address: DeliveryAddressInput) {
     .join('\n');
 }
 
+let stripeClient: Stripe | null = null;
+let cachedStripeSecret: string | null = null;
+
+function getStripeKeys() {
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY?.trim();
+
+  if (!secretKey || !publishableKey) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Stripe is not configured yet. Please try again later.',
+    });
+  }
+
+  return { secretKey, publishableKey };
+}
+
+function getStripeClient() {
+  const { secretKey } = getStripeKeys();
+
+  if (!stripeClient || cachedStripeSecret !== secretKey) {
+    stripeClient = new Stripe(secretKey);
+    cachedStripeSecret = secretKey;
+  }
+
+  return stripeClient;
+}
+
+function getCheckoutBaseUrl(origin?: string) {
+  const appBaseUrl = process.env.APP_BASE_URL?.trim();
+  const baseUrl = appBaseUrl || origin;
+
+  if (!baseUrl) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'APP_BASE_URL must be configured for Stripe Checkout redirects.',
+    });
+  }
+
+  return baseUrl.replace(/\/+$/, '');
+}
+
 export const ordersRouter = router({
+  createCheckoutSession: protectedProcedure
+    .input(
+      z.object({
+        items: z.array(z.object({ productId: z.number().int().positive(), qty: z.number().positive() })).min(1),
+        deliveryAddress: deliveryAddressSchema,
+        orderNotes: z.string().trim().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.kind !== 'customer') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Stripe Checkout is only available to customers.' });
+      }
+
+      const customer = await ctx.prisma.customer.findUnique({ where: { id: ctx.user.id } });
+
+      if (!customer) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Customer not found.' });
+      }
+
+      if (customer.type !== CustomerType.RETAIL) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Stripe Checkout is only available for retail customers.' });
+      }
+
+      if (!isNewZealandDestination(input.deliveryAddress.country)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'We currently only ship within New Zealand.' });
+      }
+
+      const products = await ctx.prisma.product.findMany({
+        where: {
+          id: { in: input.items.map((item) => item.productId) },
+          active: true,
+        },
+      });
+
+      if (products.length !== input.items.length) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'One or more products are unavailable.' });
+      }
+
+      const orderItems = input.items.map((item) => {
+        const product = products.find((candidate) => candidate.id === item.productId);
+
+        if (!product) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Product lookup failed.' });
+        }
+
+        if (!Number.isInteger(item.qty)) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Stripe Checkout requires whole-number product quantities.' });
+        }
+
+        const unitPrice = getPrice(customer.type, product.wholesalePrice, product.retailPrice);
+        return {
+          productId: product.id,
+          qty: item.qty,
+          unitPrice,
+          lineTotal: unitPrice * item.qty,
+          weightKg: getProductWeightKg(product) * item.qty,
+          productName: product.name,
+          productUnit: product.unit,
+        };
+      });
+
+      const subtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
+      const totalProductWeight = orderItems.reduce((sum, item) => sum + item.weightKg, 0);
+      const discountApplied = 0;
+      const destination: ShippingDestination = {
+        country: input.deliveryAddress.country,
+        region: input.deliveryAddress.region,
+        city: input.deliveryAddress.suburb,
+        postcode: input.deliveryAddress.postcode,
+      };
+      const shipping = await getShippingProvider().getQuote({ origin: DEPOT_ADDRESS, destination, totalWeight: totalProductWeight }, subtotal);
+      const deliveryCharge = shipping.amount;
+      const total = Number((subtotal - discountApplied + deliveryCharge).toFixed(2));
+
+      const created = await ctx.prisma.$transaction(async (tx) => {
+        const createdOrder = await tx.order.create({
+          data: {
+            customerId: customer.id,
+            staffId: null,
+            status: 'CONFIRMED',
+            paymentTerm: PaymentTerm.PAY_NOW,
+            subtotal,
+            deliveryCharge,
+            deliveryAddress: formatDeliveryAddress(input.deliveryAddress),
+            orderNotes: input.orderNotes,
+            discountApplied,
+            total,
+            dueDate: null,
+            paymentStatus: PaymentStatus.OUTSTANDING,
+            paymentMethod: PaymentMethod.IN_APP,
+            orderItems: {
+              create: orderItems.map((item) => ({
+                productId: item.productId,
+                qty: item.qty,
+                unitPrice: item.unitPrice,
+              })),
+            },
+          },
+        });
+
+        const numberedOrder = await tx.order.update({
+          where: { id: createdOrder.id },
+          data: { orderNumber: buildOrderNumber(createdOrder.id) },
+        });
+
+        return { createdOrder, numberedOrder };
+      });
+
+      const baseUrl = getCheckoutBaseUrl(ctx.origin);
+      const { publishableKey } = getStripeKeys();
+
+      try {
+        const stripe = getStripeClient();
+        const session = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          customer_email: customer.email,
+          payment_method_types: ['card'],
+          metadata: {
+            orderId: String(created.createdOrder.id),
+            customerId: String(customer.id),
+          },
+          line_items: [
+            ...orderItems.map((item) => ({
+              quantity: item.qty,
+              price_data: {
+                currency: 'nzd',
+                unit_amount: Math.round(item.unitPrice * 100),
+                product_data: {
+                  name: `${item.productName} (${item.productUnit})`,
+                },
+              },
+            })),
+            ...(deliveryCharge > 0
+              ? [
+                  {
+                    quantity: 1,
+                    price_data: {
+                      currency: 'nzd',
+                      unit_amount: Math.round(deliveryCharge * 100),
+                      product_data: { name: `Shipping (${shipping.zoneLabel})` },
+                    },
+                  },
+                ]
+              : []),
+          ],
+          success_url: `${baseUrl}?checkout=success&session_id={CHECKOUT_SESSION_ID}&order_id=${created.createdOrder.id}`,
+          cancel_url: `${baseUrl}?checkout=cancel&order_id=${created.createdOrder.id}`,
+        });
+
+        if (!session.url) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Stripe Checkout did not return a redirect URL.' });
+        }
+
+        return {
+          checkoutUrl: session.url,
+          publishableKey,
+          orderId: created.createdOrder.id,
+          orderNumber: created.numberedOrder.orderNumber ?? buildOrderNumber(created.createdOrder.id),
+        };
+      } catch (error) {
+        await ctx.prisma.order.update({
+          where: { id: created.createdOrder.id },
+          data: { status: 'CANCELLED' },
+        });
+
+        console.error('[orders.createCheckoutSession] Failed to create Stripe checkout session:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'We could not start Stripe Checkout. Please try again.',
+          cause: error,
+        });
+      }
+    }),
+  completeCheckoutSession: protectedProcedure
+    .input(
+      z.object({
+        orderId: z.number().int().positive(),
+        sessionId: z.string().trim().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.kind !== 'customer') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Stripe Checkout completion is only available to customers.' });
+      }
+
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(input.sessionId);
+      const sessionOrderId = Number(session.metadata?.orderId);
+
+      if (!Number.isFinite(sessionOrderId) || sessionOrderId !== input.orderId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Checkout session does not match this order.' });
+      }
+
+      if (session.payment_status !== 'paid' || session.status !== 'complete') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Payment is not complete yet.' });
+      }
+
+      const existingOrder = await ctx.prisma.order.findFirst({
+        where: {
+          id: input.orderId,
+          customerId: ctx.user.id,
+          paymentTerm: PaymentTerm.PAY_NOW,
+        },
+        include: {
+          customer: true,
+          orderItems: { include: { product: true } },
+        },
+      });
+
+      if (!existingOrder) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Order not found.' });
+      }
+
+      const wasAlreadyPaid = existingOrder.paymentStatus === PaymentStatus.PAID;
+
+      const order = wasAlreadyPaid
+        ? existingOrder
+        : await ctx.prisma.order.update({
+            where: { id: existingOrder.id },
+            data: {
+              paymentStatus: PaymentStatus.PAID,
+              status: 'CONFIRMED',
+            },
+            include: {
+              customer: true,
+              orderItems: { include: { product: true } },
+            },
+          });
+
+      if (!wasAlreadyPaid) {
+        const confirmationEmail = buildOrderConfirmationEmail({
+          name: order.customer.name,
+          orderNumber: order.orderNumber ?? buildOrderNumber(order.id),
+          items: order.orderItems.map((item) => ({
+            qty: item.qty.toNumber(),
+            unitPrice: item.unitPrice.toNumber(),
+            productName: item.product.name,
+            unit: item.product.unit,
+          })),
+          subtotal: order.subtotal?.toNumber() ?? 0,
+          deliveryCharge: order.deliveryCharge.toNumber(),
+          discountApplied: order.discountApplied.toNumber(),
+          total: order.total.toNumber(),
+          deliveryAddress: order.deliveryAddress,
+          orderNotes: order.orderNotes,
+          paymentTermLabel: 'Pay now (Stripe Checkout)',
+          paymentStatusLabel: 'Paid',
+        });
+        void sendMail({ to: order.customer.email, ...confirmationEmail });
+      }
+
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber ?? buildOrderNumber(order.id),
+        status: order.status,
+        paymentTerm: order.paymentTerm,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: normalizePaymentStatus(order.paymentStatus, order.dueDate),
+        subtotal: order.subtotal?.toNumber() ?? 0,
+        deliveryCharge: order.deliveryCharge.toNumber(),
+        isTemporaryShippingRate: false,
+        shippingZoneLabel: null,
+        totalShipmentWeightKg: null,
+        deliveryAddress: order.deliveryAddress,
+        orderNotes: order.orderNotes,
+        total: order.total.toNumber(),
+        discountApplied: order.discountApplied.toNumber(),
+        dueDate: order.dueDate,
+        createdAt: order.createdAt,
+        items: order.orderItems.map((item) => ({
+          id: item.id,
+          qty: item.qty.toNumber(),
+          unitPrice: item.unitPrice.toNumber(),
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            unit: item.product.unit,
+          },
+        })),
+      };
+    }),
+  cancelCheckoutSession: protectedProcedure
+    .input(
+      z.object({
+        orderId: z.number().int().positive(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.kind !== 'customer') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Stripe Checkout cancellation is only available to customers.' });
+      }
+
+      const result = await ctx.prisma.order.updateMany({
+        where: {
+          id: input.orderId,
+          customerId: ctx.user.id,
+          paymentTerm: PaymentTerm.PAY_NOW,
+          paymentStatus: PaymentStatus.OUTSTANDING,
+          status: 'CONFIRMED',
+        },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+
+      return { cancelled: result.count > 0 };
+    }),
   create: protectedProcedure
     .input(
       z.object({

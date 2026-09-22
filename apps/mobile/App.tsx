@@ -561,6 +561,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     { enabled: user.kind === 'customer' || Boolean(effectiveCustomerId) },
   );
   const createOrder = trpc.orders.create.useMutation();
+  const createCheckoutSession = trpc.orders.createCheckoutSession.useMutation();
+  const completeCheckoutSession = trpc.orders.completeCheckoutSession.useMutation();
+  const cancelCheckoutSession = trpc.orders.cancelCheckoutSession.useMutation();
   const utils = trpc.useUtils();
 
   useEffect(() => {
@@ -642,6 +645,89 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
   const deliveryCharge = deliveryAddressReady ? shippingEstimateQuery.data?.amount ?? 0 : 0;
   const total = subtotal - discount + deliveryCharge;
   const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+  const isSubmittingOrder =
+    createOrder.isPending || createCheckoutSession.isPending || completeCheckoutSession.isPending || cancelCheckoutSession.isPending;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || user.kind !== 'customer' || typeof window === 'undefined') {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    const checkout = url.searchParams.get('checkout');
+
+    if (!checkout) {
+      return;
+    }
+
+    const orderId = Number(url.searchParams.get('order_id'));
+
+    const clearCheckoutParams = () => {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('checkout');
+      cleanUrl.searchParams.delete('order_id');
+      cleanUrl.searchParams.delete('session_id');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    };
+
+    if (checkout === 'cancel') {
+      if (Number.isFinite(orderId)) {
+        void cancelCheckoutSession.mutateAsync({ orderId }).catch(() => undefined);
+      }
+
+      setOrderError('Payment was cancelled. Your cart is still ready whenever you want to checkout.');
+      setPage('cart');
+      clearCheckoutParams();
+      return;
+    }
+
+    if (checkout === 'success') {
+      const sessionId = url.searchParams.get('session_id');
+
+      if (!sessionId || !Number.isFinite(orderId)) {
+        setOrderError('We could not verify the Stripe payment session. Please try checkout again.');
+        setPage('cart');
+        clearCheckoutParams();
+        return;
+      }
+
+      void (async () => {
+        try {
+          const result = await completeCheckoutSession.mutateAsync({ orderId, sessionId });
+          await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
+          setQuantities({});
+          await clearStoredCart();
+          setDeliveryAddress(emptyDeliveryAddress);
+          setOrderNotes('');
+          setOrderError(null);
+          setLastOrder({
+            orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
+            subtotal: result.subtotal,
+            deliveryCharge: result.deliveryCharge,
+            discountApplied: result.discountApplied,
+            total: result.total,
+            createdAt: result.createdAt,
+            deliveryAddress: result.deliveryAddress,
+            isTemporaryShippingRate: result.isTemporaryShippingRate,
+            shippingZoneLabel: result.shippingZoneLabel,
+            totalShipmentWeightKg: result.totalShipmentWeightKg,
+            items: result.items,
+          });
+          setPage('order-confirmation');
+        } catch (error) {
+          setOrderError(getErrorMessage(error));
+          setPage('cart');
+        } finally {
+          clearCheckoutParams();
+        }
+      })();
+    }
+  }, [
+    cancelCheckoutSession,
+    completeCheckoutSession,
+    user.kind,
+    utils,
+  ]);
 
   function adjustQuantity(productId: number, nextQuantity: number) {
     setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
@@ -662,12 +748,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       return;
     }
 
-    if (paymentTerm === PaymentTerm.PAY_NOW) {
-      Alert.alert(
-        'Pay now is not available yet',
-        'Online card payment is coming soon. Please select "Pay in 30" to place your order today without paying online.',
-      );
-      setOrderError('Online card payment isn\u2019t available yet. Please select "Pay in 30" to place your order today without paying online.');
+    if (user.kind === 'staff' && paymentTerm === PaymentTerm.PAY_NOW) {
+      Alert.alert('Pay now unavailable for staff orders', 'Staff-created orders currently support Pay in 30 only.');
+      setOrderError('Staff-created orders currently support Pay in 30 only.');
       return;
     }
 
@@ -678,9 +761,8 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
     }
 
     try {
-      const result = await createOrder.mutateAsync({
+      const orderPayload = {
         customerId: user.kind === 'staff' ? effectiveCustomerId : undefined,
-        paymentTerm,
         items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
         ...(deliveryAddressReady
           ? {
@@ -695,6 +777,34 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
             }
           : {}),
         ...(orderNotes.trim() ? { orderNotes: orderNotes.trim() } : {}),
+      };
+
+      if (user.kind === 'customer' && paymentTerm === PaymentTerm.PAY_NOW) {
+        const checkout = await createCheckoutSession.mutateAsync({
+          items: orderPayload.items,
+          deliveryAddress: orderPayload.deliveryAddress ?? {
+            name: deliveryAddress.name.trim(),
+            addressLine: deliveryAddress.addressLine.trim(),
+            suburb: deliveryAddress.suburb.trim(),
+            region: deliveryAddress.region.trim() || undefined,
+            postcode: deliveryAddress.postcode.trim(),
+            country: deliveryAddress.country.trim(),
+          },
+          orderNotes: orderPayload.orderNotes,
+        });
+
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.assign(checkout.checkoutUrl);
+        } else {
+          await Linking.openURL(checkout.checkoutUrl);
+        }
+
+        return;
+      }
+
+      const result = await createOrder.mutateAsync({
+        ...orderPayload,
+        paymentTerm,
       });
       await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
       setQuantities({});
@@ -788,7 +898,7 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
           shippingEstimateQuery={shippingEstimateQuery}
           onNavigate={setPage}
           onSubmitOrder={submitOrder}
-          isSubmitting={createOrder.isPending}
+          isSubmitting={isSubmittingOrder}
           orderError={orderError}
         />
       );
@@ -1341,12 +1451,16 @@ function ShopPage({
                 groupLabel="Payment term"
                 value={paymentTerm}
                 options={[
-                  { label: 'Pay now (coming soon)', value: PaymentTerm.PAY_NOW, disabled: true },
+                  { label: 'Pay now (Stripe Checkout)', value: PaymentTerm.PAY_NOW, disabled: isStaff },
                   { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
                 ]}
                 onChange={(value) => setPaymentTerm(value as PaymentTerm)}
               />
-              <Text style={styles.metaText}>Online card payment (Pay now) is not connected yet, so it can&apos;t be selected. Choose Pay in 30 to confirm your order today — due date will be set to 30 days from confirmation.</Text>
+              <Text style={styles.metaText}>
+                {isStaff
+                  ? 'Staff-created orders currently use Pay in 30 only.'
+                  : 'Retail customers can use Stripe Checkout for Pay now, or choose Pay in 30 for deferred payment.'}
+              </Text>
             </View>
           </View>
           <View style={styles.inlineCardColumn}>
@@ -1662,13 +1776,13 @@ function CartPage({
               groupLabel="Checkout payment term"
               value={paymentTerm}
               options={[
-                { label: 'Pay now (coming soon)', value: PaymentTerm.PAY_NOW, disabled: true },
+                { label: 'Pay now (Stripe Checkout)', value: PaymentTerm.PAY_NOW },
                 { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
               ]}
               onChange={(value) => setPaymentTerm(value as PaymentTerm)}
             />
             {isPayNow ? (
-              <Text style={styles.errorText}>Online card payment isn&apos;t connected yet. Please select "Pay in 30" to confirm your order — no payment is required today.</Text>
+              <Text style={styles.metaText}>Pay now: you&apos;ll be redirected to Stripe Checkout and returned here after payment.</Text>
             ) : (
               <Text style={styles.metaText}>Pay in 30: confirm now, no payment gateway required. Due date is set to 30 days from confirmation.</Text>
             )}
@@ -1689,11 +1803,11 @@ function CartPage({
             <Text style={styles.summaryTotal}>Total: {formatMoney(total)}</Text>
             {orderError ? <Text style={styles.errorText}>{orderError}</Text> : null}
             <Pressable
-              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow}
-              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid || isPayNow) && styles.disabledPrimaryButton]}
+              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid}
+              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid) && styles.disabledPrimaryButton]}
               onPress={() => void onSubmitOrder()}
             >
-              <Text style={styles.primaryButtonLabel}>{isSubmitting ? 'Processing…' : 'Confirm order'}</Text>
+              <Text style={styles.primaryButtonLabel}>{isSubmitting ? 'Processing…' : isPayNow ? 'Continue to Stripe' : 'Confirm order'}</Text>
             </Pressable>
           </View>
         </View>

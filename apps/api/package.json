@@ -30,6 +30,7 @@
     "jsonwebtoken": "9.0.3",
     "mysql2": "3.24.4",
     "nodemailer": "10.0.10",
+    "stripe": "^22.6.2",
     "superjson": "2.2.6",
     "zod": "4.6.2"
   },

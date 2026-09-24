@@ -5,61 +5,13 @@ import {
   buildWholesaleApplicationAdminEmail,
 } from '../lib/emailTemplates.js';
 import { sendMail } from '../lib/mailer.js';
+import { wholesaleApplicationSchema, mapZodErrorsToFieldErrors } from '../lib/wholesaleValidation.js';
 import { adminProcedure, publicProcedure, router } from './trpc.js';
-
-// Sensible maximum lengths to prevent abuse of these unauthenticated endpoints.
-const NAME_MAX_LENGTH = 200;
-const EMAIL_MAX_LENGTH = 254;
-const PHONE_MAX_LENGTH = 40;
-const ADDRESS_MAX_LENGTH = 500;
-const VOLUME_MAX_LENGTH = 100;
-const PRODUCTS_MAX_LENGTH = 500;
-const MESSAGE_MAX_LENGTH = 5000;
-
-function trimmedString(maxLength: number, minLength = 1) {
-  return z
-    .string()
-    .trim()
-    .min(minLength, 'This field is required.')
-    .max(maxLength, `Must be ${maxLength} characters or fewer.`);
-}
-
-const emailField = z.string().trim().toLowerCase().email('Enter a valid email address.').max(EMAIL_MAX_LENGTH);
-
-const optionalPhoneField = z
-  .string()
-  .trim()
-  .max(PHONE_MAX_LENGTH, `Must be ${PHONE_MAX_LENGTH} characters or fewer.`)
-  .optional()
-  .transform((value) => (value ? value : undefined));
-
-const businessTypeEnum = z.enum(['CAFÉ', 'RESTAURANT', 'DELI', 'RETAILER', 'DISTRIBUTOR', 'OTHER']);
-
-const wholesaleApplicationSchema = z.object({
-  businessName: trimmedString(NAME_MAX_LENGTH),
-  businessType: businessTypeEnum,
-  nzbn: trimmedString(20, 0).optional(), // NZBN format is typically up to 13 digits, allow padding
-  contactName: trimmedString(NAME_MAX_LENGTH),
-  email: emailField,
-  phone: optionalPhoneField,
-  deliveryAddress: trimmedString(ADDRESS_MAX_LENGTH),
-  estimatedVolume: trimmedString(VOLUME_MAX_LENGTH, 0).optional(),
-  productsOfInterest: trimmedString(PRODUCTS_MAX_LENGTH, 0).optional(),
-  message: trimmedString(MESSAGE_MAX_LENGTH, 0).optional(),
-  // Honeypot field - should be empty if submitted by legitimate user
-  website: z.string().max(0).optional(),
-});
 
 export const wholesaleRouter = router({
   // Public: no customer login required to submit wholesale application
   submitApplication: publicProcedure.input(wholesaleApplicationSchema).mutation(async ({ ctx, input }) => {
     try {
-      // Check if this email already has an application
-      const existingApplication = await ctx.prisma.wholesaleApplication.findFirst({
-        where: { email: input.email },
-        orderBy: { createdAt: 'desc' },
-      });
-
       // Create the application
       const application = await ctx.prisma.wholesaleApplication.create({
         data: {

@@ -208,6 +208,74 @@ export function buildWholesaleEnquiryAcknowledgementEmail(params: { contactName:
   return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
 }
 
+export function buildWholesaleApplicationAdminEmail(params: {
+  businessName: string;
+  businessType: string;
+  nzbn?: string;
+  contactName: string;
+  email: string;
+  phone?: string | null;
+  deliveryAddress: string;
+  estimatedVolume?: string;
+  productsOfInterest?: string;
+  message?: string;
+}) {
+  const subject = `New Wholesale Application from ${params.businessName}`;
+  const bodyHtml = `
+    <p style="font-size:14px;line-height:22px;"><strong>Submission type:</strong> Wholesale Application</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Business name:</strong> ${escapeHtml(params.businessName)}</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Business type:</strong> ${escapeHtml(params.businessType)}</p>
+    ${params.nzbn ? `<p style="font-size:14px;line-height:22px;"><strong>NZBN:</strong> ${escapeHtml(params.nzbn)}</p>` : ''}
+    <p style="font-size:14px;line-height:22px;"><strong>Contact name:</strong> ${escapeHtml(params.contactName)}</p>
+    <p style="font-size:14px;line-height:22px;"><strong>Email:</strong> ${escapeHtml(params.email)}</p>
+    ${params.phone ? `<p style="font-size:14px;line-height:22px;"><strong>Phone:</strong> ${escapeHtml(params.phone)}</p>` : ''}
+    <p style="font-size:14px;line-height:22px;"><strong>Delivery address:</strong><br/>${escapeHtml(params.deliveryAddress).replace(/\n/g, '<br/>')}</p>
+    ${params.estimatedVolume ? `<p style="font-size:14px;line-height:22px;"><strong>Estimated volume:</strong> ${escapeHtml(params.estimatedVolume)}</p>` : ''}
+    ${params.productsOfInterest ? `<p style="font-size:14px;line-height:22px;"><strong>Products of interest:</strong> ${escapeHtml(params.productsOfInterest)}</p>` : ''}
+    ${params.message ? `<p style="font-size:14px;line-height:22px;"><strong>Message:</strong><br/>${escapeHtml(params.message).replace(/\n/g, '<br/>')}</p>` : ''}
+  `;
+
+  const text = [
+    'Submission type: Wholesale Application',
+    `Business name: ${params.businessName}`,
+    `Business type: ${params.businessType}`,
+    ...(params.nzbn ? [`NZBN: ${params.nzbn}`] : []),
+    `Contact name: ${params.contactName}`,
+    `Email: ${params.email}`,
+    ...(params.phone ? [`Phone: ${params.phone}`] : []),
+    `Delivery address: ${params.deliveryAddress}`,
+    ...(params.estimatedVolume ? [`Estimated volume: ${params.estimatedVolume}`] : []),
+    ...(params.productsOfInterest ? [`Products of interest: ${params.productsOfInterest}`] : []),
+    ...(params.message ? ['', 'Message:', params.message] : []),
+  ].join('\n');
+
+  return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
+}
+
+export function buildWholesaleApplicationAcknowledgementEmail(params: { contactName: string }) {
+  const subject = `Your ${BRAND_NAME} wholesale application has been received`;
+  const bodyHtml = `
+    <p style="font-size:14px;line-height:22px;">Hi ${escapeHtml(params.contactName)},</p>
+    <p style="font-size:14px;line-height:22px;">Thank you for submitting your wholesale application to ${BRAND_NAME}. We've received your application and our team will review it and respond within 1 business day.</p>
+    <p style="font-size:14px;line-height:22px;">If you have any questions in the meantime, feel free to reach out to us at info@grasslandcheese.com.</p>
+    <p style="font-size:14px;line-height:22px;">Thanks,<br/>The ${BRAND_NAME} Team</p>
+  `;
+
+  const text = [
+    `Hi ${params.contactName},`,
+    '',
+    `Thank you for submitting your wholesale application to ${BRAND_NAME}. We've received your application and our team will review it and respond within 1 business day.`,
+    '',
+    'If you have any questions in the meantime, feel free to reach out to us at info@grasslandcheese.com.',
+    '',
+    'Thanks,',
+    `The ${BRAND_NAME} Team`,
+  ].join('\n');
+
+  return { subject, html: wrapEmailHtml(subject, bodyHtml), text };
+}
+
+
 export type OrderConfirmationItem = {
   qty: number;
   unitPrice: number;

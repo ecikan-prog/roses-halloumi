@@ -5,6 +5,7 @@ export type MailMessage = {
   subject: string;
   html: string;
   text: string;
+  replyTo?: string;
 };
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
@@ -30,6 +31,19 @@ export async function sendMail(message: MailMessage) {
   }
 
   try {
+    const body: any = {
+      sender: { name: BRAND_FROM_NAME, email: BRAND_FROM_EMAIL },
+      to: [{ email: message.to }],
+      subject: message.subject,
+      htmlContent: message.html,
+      textContent: message.text,
+    };
+
+    // Add replyTo if provided
+    if (message.replyTo) {
+      body.replyTo = { email: message.replyTo };
+    }
+
     const response = await fetch(BREVO_API_URL, {
       method: 'POST',
       headers: {
@@ -37,13 +51,7 @@ export async function sendMail(message: MailMessage) {
         'Content-Type': 'application/json',
         'api-key': env.BREVO_API_KEY,
       },
-      body: JSON.stringify({
-        sender: { name: BRAND_FROM_NAME, email: BRAND_FROM_EMAIL },
-        to: [{ email: message.to }],
-        subject: message.subject,
-        htmlContent: message.html,
-        textContent: message.text,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

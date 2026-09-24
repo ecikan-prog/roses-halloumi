@@ -39,6 +39,12 @@ enum PaymentMethod {
   EFTPOS
 }
 
+enum WholesaleApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum StaffRole {
   STAFF
   ADMIN
@@ -61,8 +67,12 @@ model Customer {
   /// than being hard-deleted, which would otherwise violate the FK on
   /// `Order.customerId` or destroy order history.
   deletedAt            DateTime?
+  /// Timestamp of when the customer's wholesale application was approved.
+  /// Null means not approved for wholesale yet.
+  wholesaleApprovedAt  DateTime?
   orders               Order[]
   passwordResetTokens  PasswordResetToken[]
+  wholesaleApplication WholesaleApplication?
 }
 
 /**
@@ -154,4 +164,27 @@ model StaffUser {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   orders       Order[]
+}
+
+model WholesaleApplication {
+  id                   Int                       @id @default(autoincrement())
+  businessName         String
+  businessType         String                    // café, restaurant, deli, retailer, distributor, other
+  nzbn                 String?                   // New Zealand Business Number (optional)
+  contactName          String
+  email                String
+  phone                String?
+  deliveryAddress      String                    @db.Text
+  estimatedVolume      String?                   // e.g., "100kg/week" or "400kg/month"
+  productsOfInterest   String?                   // e.g., "Halloumi 500g, Halloumi 200g"
+  message              String?                   @db.Text
+  status               WholesaleApplicationStatus @default(PENDING)
+  customerId           Int?                      // Reference to Customer if account created
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  customer             Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([status])
+  @@index([customerId])
 }

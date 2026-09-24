@@ -93,7 +93,7 @@ type StaffUser = {
 
 type SessionUser = CustomerUser | StaffUser;
 type AuthMode = 'customer-login' | 'admin-login' | 'customer-register' | 'customer-forgot-password' | 'customer-reset-password';
-type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
+type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'wholesale-apply' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
 type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
 
 type ConfirmedOrder = {
@@ -531,6 +531,8 @@ function renderPublicPage(
       return <RecipesPage />;
     case 'wholesale':
       return <WholesalePage onNavigate={onNavigate} />;
+    case 'wholesale-apply':
+      return <WholesaleApplyPage onNavigate={onNavigate} />;
     case 'about':
       return <AboutPage />;
     case 'quality-compliance':
@@ -894,6 +896,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       break;
     case 'wholesale':
       content = <WholesalePage onNavigate={setPage} />;
+      break;
+    case 'wholesale-apply':
+      content = <WholesaleApplyPage onNavigate={setPage} />;
       break;
     case 'about':
       content = <AboutPage />;
@@ -2248,13 +2253,13 @@ function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
   return (
     <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
       <View style={styles.wholesaleCard}>
-        <Text style={styles.wholesaleBody}>Register or sign in to start the customer account path, then talk to us about wholesale access and supply.</Text>
+        <Text style={styles.wholesaleBody}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
         <View style={styles.heroActionRow}>
-          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+          <Pressable style={styles.primaryButton} onPress={() => onNavigate('wholesale-apply')}>
             <Text style={styles.primaryButtonLabel}>Wholesale Enquiries</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('contact')}>
-            <Text style={styles.secondaryButtonLabel}>Contact</Text>
+          <Pressable style={[styles.secondaryButton, styles.wholesaleContactButton]} onPress={() => onNavigate('contact')}>
+            <Text style={[styles.secondaryButtonLabel, styles.wholesaleContactButtonLabel]}>Contact</Text>
           </Pressable>
         </View>
       </View>
@@ -2451,6 +2456,145 @@ function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
         <View style={styles.heroActionRow}>
           <Pressable style={styles.secondaryButton} onPress={() => onNavigate('account')}>
             <Text style={styles.secondaryButtonLabel}>Open Account</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function WholesaleApplicationForm() {
+  const [businessName, setBusinessName] = useState('');
+  const [businessType, setBusinessType] = useState<'CAFÉ' | 'RESTAURANT' | 'DELI' | 'RETAILER' | 'DISTRIBUTOR' | 'OTHER'>('CAFÉ');
+  const [nzbn, setNzbn] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [estimatedVolume, setEstimatedVolume] = useState('');
+  const [productsOfInterest, setProductsOfInterest] = useState('');
+  const [message, setMessage] = useState('');
+  const [website, setWebsite] = useState(''); // Honeypot field
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitApplication = trpc.wholesale.submitApplication.useMutation();
+
+  const businessTypeOptions = [
+    { label: 'Café', value: 'CAFÉ' },
+    { label: 'Restaurant', value: 'RESTAURANT' },
+    { label: 'Deli', value: 'DELI' },
+    { label: 'Retailer', value: 'RETAILER' },
+    { label: 'Distributor', value: 'DISTRIBUTOR' },
+    { label: 'Other', value: 'OTHER' },
+  ];
+
+  function validate(): string | null {
+    if (businessName.trim().length < 1) {
+      return 'Enter your business name.';
+    }
+    if (contactName.trim().length < 1) {
+      return 'Enter a contact name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (deliveryAddress.trim().length < 1) {
+      return 'Enter your delivery address.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      setSubmitted(false);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await submitApplication.mutateAsync({
+        businessName: businessName.trim(),
+        businessType,
+        nzbn: nzbn.trim() || undefined,
+        contactName: contactName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        deliveryAddress: deliveryAddress.trim(),
+        estimatedVolume: estimatedVolume.trim() || undefined,
+        productsOfInterest: productsOfInterest.trim() || undefined,
+        message: message.trim() || undefined,
+        website: website.trim() || undefined,
+      });
+      setSubmitted(true);
+      setBusinessName('');
+      setBusinessType('CAFÉ');
+      setNzbn('');
+      setContactName('');
+      setEmail('');
+      setPhone('');
+      setDeliveryAddress('');
+      setEstimatedVolume('');
+      setProductsOfInterest('');
+      setMessage('');
+      setWebsite('');
+    } catch (error) {
+      setSubmitted(false);
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>Wholesale Application</Text>
+      <Field label="Business name" value={businessName} onChangeText={setBusinessName} />
+      <View style={styles.fieldWrap}>
+        <Text style={styles.fieldLabel}>Business type</Text>
+        <SegmentedControl
+          groupLabel="Business type"
+          value={businessType}
+          options={businessTypeOptions}
+          onChange={(value) => setBusinessType(value as typeof businessType)}
+        />
+      </View>
+      <Field label="NZBN (optional)" value={nzbn} onChangeText={setNzbn} />
+      <Field label="Contact name" value={contactName} onChangeText={setContactName} />
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <Field label="Delivery address" value={deliveryAddress} onChangeText={setDeliveryAddress} multiline />
+      <Field label="Estimated weekly/monthly volume (optional)" value={estimatedVolume} onChangeText={setEstimatedVolume} />
+      <Field label="Products of interest (optional)" value={productsOfInterest} onChangeText={setProductsOfInterest} />
+      <Field label="Additional notes (optional)" value={message} onChangeText={setMessage} multiline />
+      {/* Honeypot field - hidden from user */}
+      <View style={{ display: 'none' }}>
+        <Field label="Website" value={website} onChangeText={setWebsite} />
+      </View>
+      {submitted ? <Text style={styles.successText}>Thanks — your wholesale application has been received. We'll review it and respond within 1 business day.</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable
+        disabled={submitApplication.isPending}
+        style={[styles.primaryButton, submitApplication.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitApplication.isPending ? 'Submitting…' : 'Submit Application'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  return (
+    <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
+      <WholesaleApplicationForm />
+      <View style={styles.noticeCard}>
+        <Text style={styles.noticeTitle}>Questions?</Text>
+        <Text style={styles.noticeText}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
+        <View style={styles.heroActionRow}>
+          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('contact')}>
+            <Text style={styles.secondaryButtonLabel}>Contact Us</Text>
           </Pressable>
         </View>
       </View>
@@ -3606,6 +3750,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 27,
     maxWidth: 620,
+  },
+  wholesaleContactButton: {
+    borderColor: '#f9f5ea',
+  },
+  wholesaleContactButtonLabel: {
+    color: '#f9f5ea',
   },
   authPanel: {
     backgroundColor: '#fffdf8',

@@ -53,59 +53,66 @@ const wholesaleApplicationSchema = z.object({
 export const wholesaleRouter = router({
   // Public: no customer login required to submit wholesale application
   submitApplication: publicProcedure.input(wholesaleApplicationSchema).mutation(async ({ ctx, input }) => {
-    // Check if this email already has an application
-    const existingApplication = await ctx.prisma.wholesaleApplication.findFirst({
-      where: { email: input.email },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Create the application
-    const application = await ctx.prisma.wholesaleApplication.create({
-      data: {
-        businessName: input.businessName,
-        businessType: input.businessType,
-        nzbn: input.nzbn,
-        contactName: input.contactName,
-        email: input.email,
-        phone: input.phone,
-        deliveryAddress: input.deliveryAddress,
-        estimatedVolume: input.estimatedVolume,
-        productsOfInterest: input.productsOfInterest,
-        message: input.message,
-      },
-    });
-
-    // Send admin notification
-    if (ADMIN_EMAIL) {
-      const adminEmail = buildWholesaleApplicationAdminEmail({
-        businessName: input.businessName,
-        businessType: input.businessType,
-        nzbn: input.nzbn,
-        contactName: input.contactName,
-        email: input.email,
-        phone: input.phone,
-        deliveryAddress: input.deliveryAddress,
-        estimatedVolume: input.estimatedVolume,
-        productsOfInterest: input.productsOfInterest,
-        message: input.message,
+    try {
+      // Check if this email already has an application
+      const existingApplication = await ctx.prisma.wholesaleApplication.findFirst({
+        where: { email: input.email },
+        orderBy: { createdAt: 'desc' },
       });
-      const adminResult = await sendMail({ to: ADMIN_EMAIL, ...adminEmail });
-      if (!adminResult.sent) {
-        console.error(
-          `[wholesale] Failed to send admin notification for wholesale application to ${ADMIN_EMAIL}. See mailer logs above for the Brevo error.`,
-        );
+
+      // Create the application
+      const application = await ctx.prisma.wholesaleApplication.create({
+        data: {
+          businessName: input.businessName,
+          businessType: input.businessType,
+          nzbn: input.nzbn,
+          contactName: input.contactName,
+          email: input.email,
+          phone: input.phone,
+          deliveryAddress: input.deliveryAddress,
+          estimatedVolume: input.estimatedVolume,
+          productsOfInterest: input.productsOfInterest,
+          message: input.message,
+        },
+      });
+
+      // Send admin notification
+      if (ADMIN_EMAIL) {
+        const adminEmail = buildWholesaleApplicationAdminEmail({
+          businessName: input.businessName,
+          businessType: input.businessType,
+          nzbn: input.nzbn,
+          contactName: input.contactName,
+          email: input.email,
+          phone: input.phone,
+          deliveryAddress: input.deliveryAddress,
+          estimatedVolume: input.estimatedVolume,
+          productsOfInterest: input.productsOfInterest,
+          message: input.message,
+        });
+        const adminResult = await sendMail({ to: ADMIN_EMAIL, ...adminEmail });
+        if (!adminResult.sent) {
+          console.error(
+            `[wholesale] Failed to send admin notification for wholesale application to ${ADMIN_EMAIL}. See mailer logs above for the Brevo error.`,
+          );
+        }
+      } else {
+        console.error('[wholesale] ADMIN_EMAIL is not configured; skipping admin notification for wholesale application.');
       }
-    } else {
-      console.error('[wholesale] ADMIN_EMAIL is not configured; skipping admin notification for wholesale application.');
+
+      // Send acknowledgement email to applicant
+      const acknowledgementEmail = buildWholesaleApplicationAcknowledgementEmail({
+        contactName: input.contactName,
+      });
+      void sendMail({ to: input.email, ...acknowledgementEmail });
+
+      return { ok: true as const, applicationId: application.id };
+    } catch (error) {
+      console.error('[wholesale] Error submitting wholesale application:', error);
+      throw new Error(
+        'Sorry, something went wrong submitting your application. Please try again or contact us.',
+      );
     }
-
-    // Send acknowledgement email to applicant
-    const acknowledgementEmail = buildWholesaleApplicationAcknowledgementEmail({
-      contactName: input.contactName,
-    });
-    void sendMail({ to: input.email, ...acknowledgementEmail });
-
-    return { ok: true as const, applicationId: application.id };
   }),
 
   // Admin: get all wholesale applications

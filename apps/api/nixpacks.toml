@@ -4,5 +4,8 @@ cmds = ["cd ../.. && npm ci"]
 [phases.build]
 cmds = ["cd ../.. && npm run build:api"]
 
+[phases.deploy]
+cmds = ["cd ../.. && npm --workspace @dairy-sales/api exec prisma migrate deploy"]
+
 [start]
 cmd = "cd ../.. && npm run start:api"

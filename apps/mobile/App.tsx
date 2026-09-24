@@ -23,6 +23,7 @@ import { StatusBar } from 'expo-status-bar';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
+import { SOCIAL_LINKS } from './src/lib/constants';
 import AdminDashboardScreen from './src/admin/AdminDashboard';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
@@ -1119,27 +1120,7 @@ function SiteFooter({
     { label: 'Cart', page: 'cart' },
     { label: session ? 'Account' : 'Login', page: 'account' },
   ];
-  const socialLinks: ReadonlyArray<SocialLink> = [
-    {
-      label: 'Facebook',
-      iconName: 'facebook-f',
-      backgroundColor: '#1877f2',
-      url: 'https://www.facebook.com/profile.php?id=61594610902425',
-    },
-    {
-      label: 'TikTok',
-      iconName: 'tiktok',
-      backgroundColor: '#000000',
-      url: 'https://www.tiktok.com/@grassland.cheese',
-    },
-    {
-      label: 'Instagram',
-      iconName: 'instagram',
-      backgroundColor: '#d62976',
-      webBackgroundImage: 'linear-gradient(135deg, #f9ce34 0%, #ee2a7b 45%, #6228d7 100%)',
-      url: 'https://www.instagram.com/grasslandcheese',
-    },
-  ] as const;
+  const socialLinks: ReadonlyArray<SocialLink> = SOCIAL_LINKS;
 
   return (
     <View style={styles.footerShell}>

@@ -2456,7 +2456,8 @@ function WholesaleApplicationForm() {
   const [productsOfInterest, setProductsOfInterest] = useState('');
   const [message, setMessage] = useState('');
   const [website, setWebsite] = useState(''); // Honeypot field
-  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   const submitApplication = trpc.wholesale.submitApplication.useMutation();
@@ -2469,6 +2470,29 @@ function WholesaleApplicationForm() {
     { label: 'Distributor', value: 'DISTRIBUTOR' },
     { label: 'Other', value: 'OTHER' },
   ];
+
+  function extractFieldErrors(error: unknown): Record<string, string> {
+    if (!error || typeof error !== 'object') {
+      return {};
+    }
+
+    const anyError = error as any;
+
+    // Handle tRPC validation errors with Zod error details
+    if (anyError.data?.zodError?.fieldErrors) {
+      const result: Record<string, string> = {};
+      const zodErrors = anyError.data.zodError.fieldErrors as Record<string, string[]>;
+
+      for (const [field, messages] of Object.entries(zodErrors)) {
+        if (Array.isArray(messages) && messages.length > 0) {
+          result[field] = messages[0]; // Take the first error message
+        }
+      }
+      return result;
+    }
+
+    return {};
+  }
 
   function validate(): string | null {
     if (businessName.trim().length < 1) {
@@ -2489,12 +2513,14 @@ function WholesaleApplicationForm() {
   async function submit() {
     const validationError = validate();
     if (validationError) {
-      setFormError(validationError);
+      setServerError(validationError);
+      setFieldErrors({});
       setSubmitted(false);
       return;
     }
 
-    setFormError(null);
+    setServerError(null);
+    setFieldErrors({});
 
     try {
       await submitApplication.mutateAsync({
@@ -2524,14 +2550,36 @@ function WholesaleApplicationForm() {
       setWebsite('');
     } catch (error) {
       setSubmitted(false);
-      setFormError(getErrorMessage(error));
+      const parsedErrors = extractFieldErrors(error);
+
+      if (Object.keys(parsedErrors).length > 0) {
+        setFieldErrors(parsedErrors);
+        setServerError(null);
+      } else {
+        setFieldErrors({});
+        setServerError(getErrorMessage(error));
+      }
     }
   }
 
   return (
     <View style={styles.inlineCard}>
       <Text style={styles.inlineCardTitle}>Wholesale Application</Text>
-      <Field label="Business name" value={businessName} onChangeText={setBusinessName} />
+
+      {/* Generic server error banner */}
+      {serverError && !Object.keys(fieldErrors).length ? (
+        <View style={[styles.fieldWrap, { backgroundColor: '#fee', borderLeftWidth: 4, borderLeftColor: '#c33', paddingLeft: 12 }]}>
+          <Text style={[styles.errorText, { marginBottom: 0 }]}>{serverError}</Text>
+        </View>
+      ) : null}
+
+      <FieldWithError
+        label="Business name"
+        value={businessName}
+        onChangeText={setBusinessName}
+        error={fieldErrors.businessName}
+      />
+
       <View style={styles.fieldWrap}>
         <Text style={styles.fieldLabel}>Business type</Text>
         <SegmentedControl
@@ -2541,20 +2589,90 @@ function WholesaleApplicationForm() {
           onChange={(value) => setBusinessType(value as typeof businessType)}
         />
       </View>
-      <Field label="NZBN (optional)" value={nzbn} onChangeText={setNzbn} />
-      <Field label="Contact name" value={contactName} onChangeText={setContactName} />
-      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-      <Field label="Delivery address" value={deliveryAddress} onChangeText={setDeliveryAddress} multiline />
-      <Field label="Estimated weekly/monthly volume (optional)" value={estimatedVolume} onChangeText={setEstimatedVolume} />
-      <Field label="Products of interest (optional)" value={productsOfInterest} onChangeText={setProductsOfInterest} />
-      <Field label="Additional notes (optional)" value={message} onChangeText={setMessage} multiline />
+
+      <FieldWithError
+        label="NZBN (13 digits)"
+        placeholder="9429000000000"
+        value={nzbn}
+        onChangeText={setNzbn}
+        inputMode="numeric"
+        maxLength={17}
+        error={fieldErrors.nzbn}
+      />
+
+      <FieldWithError
+        label="Contact name"
+        value={contactName}
+        onChangeText={setContactName}
+        error={fieldErrors.contactName}
+      />
+
+      <FieldWithError
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        error={fieldErrors.email}
+      />
+
+      <FieldWithError
+        label="Phone (optional)"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        error={fieldErrors.phone}
+      />
+
+      <FieldWithError
+        label="Delivery address"
+        value={deliveryAddress}
+        onChangeText={setDeliveryAddress}
+        multiline
+        error={fieldErrors.deliveryAddress}
+      />
+
+      <FieldWithError
+        label="Estimated volume (optional)"
+        placeholder="e.g. 500 kg per month"
+        value={estimatedVolume}
+        onChangeText={setEstimatedVolume}
+        error={fieldErrors.estimatedVolume}
+      />
+
+      <FieldWithError
+        label="Products of interest (optional)"
+        value={productsOfInterest}
+        onChangeText={setProductsOfInterest}
+        error={fieldErrors.productsOfInterest}
+      />
+
+      <View style={styles.fieldWrap}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={styles.fieldLabel}>Additional notes (optional)</Text>
+          <Text style={[styles.metaText, { fontSize: 12, color: '#666' }]}>{message.length}/1000</Text>
+        </View>
+        <TextInput
+          maxLength={1000}
+          multiline
+          style={[styles.input, styles.inputMultiline, fieldErrors.message && { borderColor: '#c33' }]}
+          value={message}
+          onChangeText={setMessage}
+        />
+        {fieldErrors.message ? (
+          <Text style={styles.errorText} accessibilityLiveRegion="polite">
+            {fieldErrors.message}
+          </Text>
+        ) : null}
+      </View>
+
       {/* Honeypot field - hidden from user */}
       <View style={{ display: 'none' }}>
         <Field label="Website" value={website} onChangeText={setWebsite} />
       </View>
+
       {submitted ? <Text style={styles.successText}>Thanks — your wholesale application has been received. We'll review it and respond within 1 business day.</Text> : null}
-      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+
       <Pressable
         disabled={submitApplication.isPending}
         style={[styles.primaryButton, submitApplication.isPending && styles.disabledPrimaryButton]}
@@ -3036,6 +3154,56 @@ function Field(props: {
         value={props.value}
         onChangeText={props.onChangeText}
       />
+    </View>
+  );
+}
+
+function FieldWithError(props: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  error?: string;
+  secureTextEntry?: boolean;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  autoCapitalize?: 'none' | 'sentences';
+  editable?: boolean;
+  multiline?: boolean;
+  placeholder?: string;
+  inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search';
+  maxLength?: number;
+}) {
+  const errorId = props.error ? `${props.label}-error` : undefined;
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{props.label}</Text>
+      <TextInput
+        autoCapitalize={props.autoCapitalize ?? 'sentences'}
+        keyboardType={props.keyboardType ?? 'default'}
+        inputMode={props.inputMode}
+        maxLength={props.maxLength}
+        secureTextEntry={props.secureTextEntry}
+        editable={props.editable ?? true}
+        multiline={props.multiline}
+        placeholder={props.placeholder}
+        style={[
+          styles.input,
+          props.multiline && styles.inputMultiline,
+          props.error && { borderColor: '#c33', borderWidth: 1 },
+        ]}
+        value={props.value}
+        onChangeText={props.onChangeText}
+        accessibilityDescribedBy={errorId}
+      />
+      {props.error ? (
+        <Text
+          style={styles.errorText}
+          nativeID={errorId}
+          accessibilityLiveRegion="polite"
+          role="alert"
+        >
+          {props.error}
+        </Text>
+      ) : null}
     </View>
   );
 }

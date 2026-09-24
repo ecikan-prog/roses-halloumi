@@ -72,7 +72,7 @@ model Customer {
   wholesaleApprovedAt  DateTime?
   orders               Order[]
   passwordResetTokens  PasswordResetToken[]
-  wholesaleApplication WholesaleApplication?
+  wholesaleApplications WholesaleApplication[]
 }
 
 /**

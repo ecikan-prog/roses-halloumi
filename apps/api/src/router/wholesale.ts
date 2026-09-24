@@ -6,7 +6,6 @@ import {
 } from '../lib/emailTemplates.js';
 import { sendMail } from '../lib/mailer.js';
 import { adminProcedure, publicProcedure, router } from './trpc.js';
-import { prisma } from '../prisma.js';
 
 // Sensible maximum lengths to prevent abuse of these unauthenticated endpoints.
 const NAME_MAX_LENGTH = 200;
@@ -53,15 +52,15 @@ const wholesaleApplicationSchema = z.object({
 
 export const wholesaleRouter = router({
   // Public: no customer login required to submit wholesale application
-  submitApplication: publicProcedure.input(wholesaleApplicationSchema).mutation(async ({ input }) => {
+  submitApplication: publicProcedure.input(wholesaleApplicationSchema).mutation(async ({ ctx, input }) => {
     // Check if this email already has an application
-    const existingApplication = await prisma.wholesaleApplication.findFirst({
+    const existingApplication = await ctx.prisma.wholesaleApplication.findFirst({
       where: { email: input.email },
       orderBy: { createdAt: 'desc' },
     });
 
     // Create the application
-    const application = await prisma.wholesaleApplication.create({
+    const application = await ctx.prisma.wholesaleApplication.create({
       data: {
         businessName: input.businessName,
         businessType: input.businessType,
@@ -110,8 +109,8 @@ export const wholesaleRouter = router({
   }),
 
   // Admin: get all wholesale applications
-  getApplications: adminProcedure.query(async () => {
-    const applications = await prisma.wholesaleApplication.findMany({
+  getApplications: adminProcedure.query(async ({ ctx }) => {
+    const applications = await ctx.prisma.wholesaleApplication.findMany({
       orderBy: { createdAt: 'desc' },
       include: { customer: true },
     });
@@ -126,8 +125,8 @@ export const wholesaleRouter = router({
         status: z.enum(['APPROVED', 'REJECTED']),
       }),
     )
-    .mutation(async ({ input }) => {
-      const application = await prisma.wholesaleApplication.findUnique({
+    .mutation(async ({ ctx, input }) => {
+      const application = await ctx.prisma.wholesaleApplication.findUnique({
         where: { id: input.applicationId },
         include: { customer: true },
       });
@@ -137,7 +136,7 @@ export const wholesaleRouter = router({
       }
 
       // Update the application status
-      const updated = await prisma.wholesaleApplication.update({
+      const updated = await ctx.prisma.wholesaleApplication.update({
         where: { id: input.applicationId },
         data: {
           status: input.status,
@@ -149,7 +148,7 @@ export const wholesaleRouter = router({
         let customer = application.customer;
         if (!customer) {
           // Create a placeholder customer account for approved applications without an account yet
-          customer = await prisma.customer.create({
+          customer = await ctx.prisma.customer.create({
             data: {
               name: application.contactName,
               email: application.email,
@@ -161,7 +160,7 @@ export const wholesaleRouter = router({
           });
         } else {
           // Update existing customer to WHOLESALE type and mark as approved
-          customer = await prisma.customer.update({
+          customer = await ctx.prisma.customer.update({
             where: { id: customer.id },
             data: {
               type: 'WHOLESALE',
@@ -171,7 +170,7 @@ export const wholesaleRouter = router({
         }
 
         // Link the customer to the application
-        await prisma.wholesaleApplication.update({
+        await ctx.prisma.wholesaleApplication.update({
           where: { id: input.applicationId },
           data: { customerId: customer.id },
         });

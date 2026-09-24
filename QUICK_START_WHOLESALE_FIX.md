@@ -1,5 +1,7 @@
 # Wholesale Application Fix - Quick Start for Production
 
+> **New in this deployment:** The database migration now runs automatically at container startup. See [PRODUCTION_DEPLOYMENT_STEPS.md](./PRODUCTION_DEPLOYMENT_STEPS.md) for comprehensive guide including production baseline handling if your database was built with `prisma db push`.
+
 ## The Issue (Fixed ✓)
 Wholesale application form submissions showed generic error banner "Sorry, something went wrong..." regardless of actual cause. Real errors were hidden in logs.
 
@@ -32,12 +34,15 @@ ADMIN_EMAIL=admin@grasslandcheese.com
 MAIL_FROM=Grassland Cheese <info@grasslandcheese.com>
 ```
 
-### 3. Run Database Migration (One Time)
-```bash
-cd apps/api
-npx prisma migrate deploy
-```
-This creates the WholesaleApplication table if it doesn't exist.
+### 3. Database Migration (Automatic)
+The migration now runs automatically when the container starts:
+- Deploy phase: `prisma migrate deploy` runs during Railway deployment
+- Start phase: Migrations also run before API server starts (safety backup)
+
+**If your production database was built with `prisma db push`:**
+See [PRODUCTION_DEPLOYMENT_STEPS.md Part 2](./PRODUCTION_DEPLOYMENT_STEPS.md#part-2-handling-production-baseline-if-needed) for safe baseline steps before deployment.
+
+Otherwise, no manual migration steps are needed!
 
 ## Verify It Works (5 Minutes)
 

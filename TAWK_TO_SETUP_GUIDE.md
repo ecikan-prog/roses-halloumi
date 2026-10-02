@@ -75,7 +75,9 @@ These features are included on the Free plan:
 1. The `initializeTawkToChat()` function in `crispChat.ts` dynamically injects the Tawk.to chat script
 2. The App component calls this function only on web platform (`Platform.OS === 'web'`)
 3. The Property ID is read from the `EXPO_PUBLIC_TAWK_TO_PROPERTY_ID` environment variable
-4. Tawk.to chat widget appears at bottom-right of every page automatically
+4. The Widget ID is read from the `EXPO_PUBLIC_TAWK_TO_WIDGET_ID` environment variable (defaults to 'default' if unset)
+5. The script URL is built as: `https://embed.tawk.to/${propertyId}/${widgetId}`
+6. Tawk.to chat widget appears at bottom-right of every page automatically
 
 ### Mobile Compatibility
 - **Mobile (Bottom Right)**: Chat button positioned at bottom-right
@@ -87,12 +89,13 @@ These features are included on the Free plan:
 
 ### For Local Testing
 
-1. **Set Environment Variable:**
+1. **Set Environment Variables:**
    ```bash
    export EXPO_PUBLIC_TAWK_TO_PROPERTY_ID="your_property_id_here"
+   export EXPO_PUBLIC_TAWK_TO_WIDGET_ID="your_widget_id_here"
    ```
-   Replace `your_property_id_here` with your Property ID from Tawk.to dashboard
-   (e.g., "abc123def456")
+   Replace `your_property_id_here` with your Property ID from Tawk.to dashboard (e.g., "abc123def456")
+   Replace `your_widget_id_here` with your Widget ID (or omit this variable to use the default 'default')
 
 2. **Build and Test:**
    ```bash
@@ -110,12 +113,14 @@ These features are included on the Free plan:
 
 ### For Production (Railway/Deployment)
 
-1. **Add Environment Variable to Railway:**
+1. **Add Environment Variables to Railway:**
    - Go to your Railway project (apps/mobile)
    - Navigate to **Variables**
-   - Add new variable:
+   - Add two variables:
      - **Key**: `EXPO_PUBLIC_TAWK_TO_PROPERTY_ID`
-     - **Value**: Your Property ID (just the ID part, e.g., "abc123def456")
+       **Value**: Your Property ID (just the ID part, e.g., "abc123def456")
+     - **Key**: `EXPO_PUBLIC_TAWK_TO_WIDGET_ID`
+       **Value**: Your Widget ID (or omit this variable to use the default 'default')
    - Redeploy the app
 
 2. **Verify Deployment:**
@@ -221,6 +226,7 @@ For Tawk.to support:
 |---------|--------|----------|
 | Tawk.to Account | ✅ To create | info@grasslandcheese.com |
 | Property ID | ✅ Ready | Environment variable: EXPO_PUBLIC_TAWK_TO_PROPERTY_ID |
+| Widget ID | ✅ Ready | Environment variable: EXPO_PUBLIC_TAWK_TO_WIDGET_ID (defaults to 'default') |
 | Code Integration | ✅ Implemented | `/apps/mobile/src/lib/crispChat.ts` + App.tsx |
 | Mobile Compatibility | ✅ Optimized | CSS prevents button overlap |
 | Email Notifications | ✅ Configured | To info@grasslandcheese.com |

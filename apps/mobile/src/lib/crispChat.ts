@@ -3,12 +3,13 @@
  * 
  * This module initializes Tawk.to live chat widget on web platform.
  * Tawk.to property ID should be set in the EXPO_PUBLIC_TAWK_TO_PROPERTY_ID environment variable.
+ * Tawk.to widget ID should be set in the EXPO_PUBLIC_TAWK_TO_WIDGET_ID environment variable (defaults to 'default' if unset).
  * 
  * Account created under: info@grasslandcheese.com
  * https://tawk.to
  */
 
-export function initializeTawkToChat(propertyId: string) {
+export function initializeTawkToChat(propertyId: string, widgetId: string = 'default') {
   // Only inject on web platform
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return;
@@ -27,7 +28,7 @@ export function initializeTawkToChat(propertyId: string) {
   const script = document.createElement('script');
   script.type = 'text/javascript';
   script.async = true;
-  script.src = `https://embed.tawk.to/${propertyId}/default`;
+  script.src = `https://embed.tawk.to/${propertyId}/${widgetId}`;
   script.charset = 'UTF-8';
   script.setAttribute('crossorigin', '');
 
@@ -56,7 +57,7 @@ export function initializeTawkToChat(propertyId: string) {
   document.head.appendChild(style);
   document.body.appendChild(script);
 
-  console.log('[Tawk.to Chat] Initialized with Property ID:', propertyId);
+  console.log('[Tawk.to Chat] Initialized with Property ID:', propertyId, 'Widget ID:', widgetId);
 }
 
 // Declare Tawk.to global types

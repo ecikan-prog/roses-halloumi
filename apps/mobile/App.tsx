@@ -24,6 +24,7 @@ import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
 import { SOCIAL_LINKS } from './src/lib/constants';
+import { initializeCrispChat } from './src/lib/crispChat';
 import AdminDashboardScreen from './src/admin/AdminDashboard';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
@@ -3257,6 +3258,20 @@ export default function App() {
       setSession((current) => ({ ...current, token }));
       setHydrated(true);
     })();
+  }, []);
+
+  // Initialize Crisp Chat on web platform
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    const websiteId = process.env.EXPO_PUBLIC_CRISP_WEBSITE_ID;
+    if (websiteId) {
+      initializeCrispChat(websiteId);
+    } else {
+      console.warn('[Crisp Chat] EXPO_PUBLIC_CRISP_WEBSITE_ID environment variable not set');
+    }
   }, []);
 
   const trpcClient = useMemo(() => createApiClient(() => session.token), [session.token]);

@@ -1039,32 +1039,35 @@ function SiteHeader({
   cartCount: number;
   isCompact: boolean;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const isStaff = session?.user?.kind === 'staff';
-  // Main navigation items for slim header
-  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
-    { label: 'Shop', page: 'shop' },
-    { label: 'Recipes', page: 'recipes' },
-    { label: session ? 'Account' : 'Login', page: 'account' },
-    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
+  
+  // Mobile and desktop navigation items
+  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
+    { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
+    { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
+    { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
+    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart', shortLabel: cartCount > 0 ? `Cart (${cartCount})` : 'Cart' },
   ];
 
   return (
     <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
       <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
-        <Image source={grasslandLogo} style={styles.headerLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
       </Pressable>
-      <View style={[styles.navRow, isCompact && styles.navRowCompact]}>
+      <View style={[styles.navRow, isMobile && styles.navRowMobile]}>
         {mainNavItems.map((item) => {
           const selected = item.page === currentPage;
           return (
-            <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
-              <Text style={[styles.navButtonText, selected && styles.navButtonTextActive]}>{item.label}</Text>
+            <Pressable key={item.page} style={[styles.navButton, isMobile && styles.navButtonMobile, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.navButtonText, isMobile && styles.navButtonTextMobile, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
             </Pressable>
           );
         })}
         {session && onSignOut ? (
-          <Pressable style={styles.signOutButton} onPress={() => void onSignOut()}>
-            <Text style={styles.signOutButtonText}>Sign out</Text>
+          <Pressable style={[styles.signOutButton, isMobile && styles.signOutButtonMobile]} onPress={() => void onSignOut()}>
+            <Text style={[styles.signOutButtonText, isMobile && styles.signOutButtonTextMobile]}>Sign out</Text>
           </Pressable>
         ) : null}
       </View>
@@ -1095,6 +1098,8 @@ function SiteFooter({
   onNavigate: (page: any) => void;
   session: SessionState | null;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
   type SocialLink = {
     label: string;
@@ -1103,48 +1108,50 @@ function SiteFooter({
     webBackgroundImage?: string;
     url: string;
   };
-  const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage }> = [
-    { label: 'Shop Halloumi', page: 'shop' },
-    { label: 'Recipes', page: 'recipes' },
-    { label: 'Wholesale', page: 'wholesale' },
-    { label: 'About', page: 'about' },
-    { label: 'Quality & Compliance', page: 'quality-compliance' },
-    { label: 'Contact', page: 'contact' },
-    { label: 'Privacy', page: 'privacy' },
-    { label: 'Terms', page: 'terms' },
-    { label: 'Cart', page: 'cart' },
-    { label: session ? 'Account' : 'Login', page: 'account' },
+  const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
+    { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
+    { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
+    { label: 'Wholesale', page: 'wholesale', shortLabel: 'Wholesale' },
+    { label: 'About', page: 'about', shortLabel: 'About' },
+    { label: 'Quality', page: 'quality-compliance', shortLabel: 'Quality' },
+    { label: 'Contact', page: 'contact', shortLabel: 'Contact' },
+    { label: 'Privacy', page: 'privacy', shortLabel: 'Privacy' },
+    { label: 'Terms', page: 'terms', shortLabel: 'Terms' },
+    { label: 'Cart', page: 'cart', shortLabel: 'Cart' },
+    { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
   ];
   const socialLinks: ReadonlyArray<SocialLink> = SOCIAL_LINKS;
 
   return (
-    <View style={styles.footerShell}>
-      <View style={styles.footerBrandRow}>
-        <Image source={grasslandLogo} style={styles.footerLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-        <View style={styles.footerBrandCopy}>
-          <Text style={styles.footerBrandName}>{brandName}</Text>
-          <Text style={styles.footerBrandTagline}>Pure Goodness From Our Pastures</Text>
-          <Text style={styles.footerStatement}>{brandStatement}</Text>
+    <View style={[styles.footerShell, isMobile && styles.footerShellMobile]}>
+      <View style={[styles.footerBrandRow, isMobile && styles.footerBrandRowMobile]}>
+        <Image source={grasslandLogo} style={[styles.footerLogo, isMobile && styles.footerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <View style={[styles.footerBrandCopy, isMobile && styles.footerBrandCopyMobile]}>
+          <Text style={[styles.footerBrandName, isMobile && styles.footerBrandNameMobile]}>{brandName}</Text>
+          <Text style={[styles.footerBrandTagline, isMobile && styles.footerBrandTaglineMobile]}>Pure Goodness From Our Pastures</Text>
+          <Text style={[styles.footerStatement, isMobile && styles.footerStatementMobile]}>{brandStatement}</Text>
         </View>
       </View>
-      <View style={styles.footerLinksWrap}>
+      <View style={[styles.footerLinksWrap, isMobile && styles.footerLinksWrapMobile]}>
         {footerLinks.map((item) => {
           const selected = item.page === currentPage;
+          const linkLabel = isMobile ? (item.shortLabel || item.label) : item.label;
           return (
-            <Pressable key={item.page} style={styles.footerLinkButton} onPress={() => onNavigate(item.page)}>
-              <Text style={[styles.footerLinkText, selected && styles.footerLinkTextActive]}>{item.label}</Text>
+            <Pressable key={item.page} style={[styles.footerLinkButton, isMobile && styles.footerLinkButtonMobile]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.footerLinkText, isMobile && styles.footerLinkTextMobile, selected && styles.footerLinkTextActive]} numberOfLines={1}>{linkLabel}</Text>
             </Pressable>
           );
         })}
       </View>
       <View style={styles.footerSocialSection}>
-        <Text style={styles.footerSectionLabel}>Follow us</Text>
+        <Text style={[styles.footerSectionLabel, isMobile && styles.footerSectionLabelMobile]}>Follow us</Text>
         <View style={styles.footerSocialRow}>
           {socialLinks.map((item) => (
             <Pressable
               key={item.label}
               style={[
                 styles.footerSocialButton,
+                isMobile && styles.footerSocialButtonMobile,
                 { backgroundColor: item.backgroundColor },
                 item.webBackgroundImage && Platform.OS === 'web'
                   ? ({ backgroundImage: item.webBackgroundImage } as any)
@@ -1157,12 +1164,12 @@ function SiteFooter({
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >
-              <FontAwesome5 name={item.iconName} size={18} color="#ffffff" />
+              <FontAwesome5 name={item.iconName} size={isMobile ? 16 : 18} color="#ffffff" />
             </Pressable>
           ))}
         </View>
       </View>
-      <Text style={styles.footerMeta}>Grassland Cheese halloumi recipes are inspiration only and never sold as products.</Text>
+      <Text style={[styles.footerMeta, isMobile && styles.footerMetaMobile]}>Grassland Cheese halloumi recipes are inspiration only and never sold as products.</Text>
     </View>
   );
 }
@@ -1213,6 +1220,7 @@ function resolveWebImageUri(source: ImageSourcePropType): string | null {
 
 function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
   const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
@@ -1221,8 +1229,8 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
       <View style={styles.heroBadge}>
         <Text style={styles.heroBadgeText}>{brandStatement}</Text>
       </View>
-      <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
-      <Text style={styles.heroSubtitle}>{heroMessage}</Text>
+      <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>Pure Goodness From Our Pastures</Text>
+      <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>{heroMessage}</Text>
       <View style={styles.heroActionRow}>
         <Pressable style={styles.primaryHeroButton} onPress={onPrimary}>
           <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
@@ -1281,6 +1289,8 @@ function PublicShopSection({
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   // Defensive default: shopProducts should always be an array by the time it reaches this
   // component (it is derived from a fixed list of product specs, never directly from the
   // API response), but a missing/null prop here previously crashed the whole app with
@@ -1299,7 +1309,7 @@ function PublicShopSection({
 
   return (
     <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
-      <View style={styles.productGrid}>
+      <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
         {safeShopProducts.map((product) => {
           const backendProduct = product.product;
           const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
@@ -1340,6 +1350,8 @@ function PublicShopPage({
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
   const safeShopProducts = shopProducts ?? [];
 
@@ -1350,7 +1362,7 @@ function PublicShopPage({
         {!isLoading && safeShopProducts.length === 0 ? (
           <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
         ) : null}
-        <View style={styles.productGrid}>
+        <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
           {safeShopProducts.map((product) => {
             const backendProduct = product.product;
             const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
@@ -1374,9 +1386,9 @@ function PublicShopPage({
             );
           })}
         </View>
-        <View style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>Halloumi only</Text>
-          <Text style={styles.noticeText}>Recipes and food photography remain inspiration only and are never shown as products, prices, cart items, or orderable dishes.</Text>
+        <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+          <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Halloumi only</Text>
+          <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Recipes and food photography remain inspiration only and are never shown as products, prices, cart items, or orderable dishes.</Text>
         </View>
       </SectionShell>
       <WholesaleSection onNavigate={onNavigate} />
@@ -1568,12 +1580,15 @@ function ProductCard({
   disabled: boolean;
   ctaLabel: string;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
-    <View style={styles.productCard}>
-      <View style={styles.productLogoPanel}>
+    <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
+      <View style={[styles.productLogoPanel, isMobile && styles.productLogoPanelMobile]}>
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
-      <Text style={styles.productCardName} numberOfLines={3}>{product.name}</Text>
+      <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
       <Text style={styles.productCardDescription}>{product.description}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
@@ -1615,16 +1630,18 @@ function ProductDetailCard({
   onDecrease: () => void;
   onClose: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const isAvailable = Boolean(product.product);
 
   return (
-    <View style={styles.productDetailCard}>
+    <View style={[styles.productDetailCard, isMobile && styles.productDetailCardMobile]}>
       <View style={styles.productDetailHeader}>
         <View style={styles.productDetailBrandRow}>
-          <Image source={grasslandLogo} style={styles.productDetailLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+          <Image source={grasslandLogo} style={[styles.productDetailLogo, isMobile && styles.productDetailLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
           <View>
             <Text style={styles.sectionEyebrow}>Product details</Text>
-            <Text style={styles.productDetailTitle} numberOfLines={3}>{product.name}</Text>
+            <Text style={[styles.productDetailTitle, isMobile && styles.productDetailTitleMobile]} numberOfLines={3}>{product.name}</Text>
           </View>
         </View>
         <Pressable style={styles.secondaryButton} onPress={onClose}>
@@ -1700,6 +1717,8 @@ function CartPage({
   isSubmitting: boolean;
   orderError: string | null;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const isCustomer = session.user?.kind === 'customer';
   const deliveryAddressValid = !isCustomer || deliveryAddressReady;
   const isPayNow = paymentTerm === PaymentTerm.PAY_NOW;
@@ -1722,10 +1741,10 @@ function CartPage({
 
   return (
     <SectionShell eyebrow="Cart & Checkout" title="Review your Halloumi order" description="Your cart and checkout stay connected to the existing ordering flow.">
-      <View style={styles.inlineTwoColumnRow}>
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Cart</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Cart</Text>
             {selectedItems.length ? (
               selectedItems.map((item) => (
                 <View key={item.id} style={styles.cartLineItem}>
@@ -1758,8 +1777,8 @@ function CartPage({
           </View>
         </View>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Checkout</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Checkout</Text>
             <Text style={styles.metaText}>Ordering as {session.user?.name}</Text>
             <Text style={styles.metaText}>{session.user?.email}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
@@ -1881,12 +1900,14 @@ function PublicCartPage({
   selectedItems: Array<ProductRecord & { qty: number }>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
 
   return (
     <SectionShell eyebrow="Cart" title="Cart and checkout" description="Sign in or create an account to complete checkout with existing server-side pricing.">
-      <View style={styles.inlineCard}>
-        <Text style={styles.inlineCardTitle}>Cart</Text>
+      <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+        <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Cart</Text>
         {selectedItems.length ? (
           selectedItems.map((item) => (
             <View key={item.id} style={styles.cartLineItem}>
@@ -1917,9 +1938,9 @@ function PublicCartPage({
         </Pressable>
       </View>
       {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: {formatMoney(subtotal)}</Text> : null}
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Ready to order?</Text>
-        <Text style={styles.noticeText}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Ready to order?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
         <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
           <Text style={styles.primaryButtonLabel}>Go to Account</Text>
         </Pressable>
@@ -1929,26 +1950,32 @@ function PublicCartPage({
 }
 
 function RecipesPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <>
       <RecipesSection />
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Recipes are inspiration only</Text>
-        <Text style={styles.noticeText}>Prepared dishes never become products, cart items, inventory, checkout lines, or orderable food.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Recipes are inspiration only</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Prepared dishes never become products, cart items, inventory, checkout lines, or orderable food.</Text>
       </View>
     </>
   );
 }
 
 function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {}) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Ideas to inspire your cooking. We sell halloumi cheese — recipes are for inspiration only.">
-      <View style={styles.recipeGrid}>
+      <View style={[styles.recipeGrid, isMobile && styles.recipeGridMobile]}>
         {recipeFeatures.map((recipe) => (
-          <View key={recipe.title} style={styles.recipeCard}>
-            <Image source={recipe.image} style={styles.recipeCardImage} resizeMode="cover" accessibilityLabel={`${recipe.title} inspiration image`} />
-            <Text style={styles.recipeCardTitle}>{recipe.title}</Text>
-            <Text style={styles.recipeCardDescription}>{recipe.description}</Text>
+          <View key={recipe.title} style={[styles.recipeCard, isMobile && styles.recipeCardMobile]}>
+            <Image source={recipe.image} style={[styles.recipeCardImage, isMobile && styles.recipeCardImageMobile]} resizeMode="cover" accessibilityLabel={`${recipe.title} inspiration image`} />
+            <Text style={[styles.recipeCardTitle, isMobile && styles.recipeCardTitleMobile]}>{recipe.title}</Text>
+            <Text style={[styles.recipeCardDescription, isMobile && styles.recipeCardDescriptionMobile]}>{recipe.description}</Text>
           </View>
         ))}
       </View>
@@ -1962,13 +1989,16 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
 }
 
 function WhyGrasslandSection() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Pure halloumi from New Zealand, made for grilling and sharing.">
-      <View style={styles.valueGrid}>
+      <View style={[styles.valueGrid, isMobile && styles.valueGridMobile]}>
         {whyGrasslandItems.map((item) => (
-          <View key={item.title} style={styles.valueCard}>
-            <Text style={styles.valueCardTitle}>{item.title}</Text>
-            <Text style={styles.valueCardDescription}>{item.description}</Text>
+          <View key={item.title} style={[styles.valueCard, isMobile && styles.valueCardMobile]}>
+            <Text style={[styles.valueCardTitle, isMobile && styles.valueCardTitleMobile]}>{item.title}</Text>
+            <Text style={[styles.valueCardDescription, isMobile && styles.valueCardDescriptionMobile]}>{item.description}</Text>
           </View>
         ))}
       </View>
@@ -2012,11 +2042,11 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFamilySection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Family Story</Text>
-        <View style={styles.storyCard}>
-          <Text style={styles.storyParagraph}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             At Rose’s Dairy, cheese-making is more than a craft — it’s a family tradition. Since 2010 we have been producing specialty Halloumi on our boutique dairy farm in Pukekohe, Auckland, using a recipe that has been passed down through generations of our family dynasty.
           </Text>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             We believe good food nourishes both body and spirit. That simple belief guides everything we do. Every batch of our Halloumi begins with fresh, pasteurised whole cow’s milk from the paddock next door. It doesn’t get fresher than that.
           </Text>
         </View>
@@ -2036,7 +2066,7 @@ function OurStoryPageSection() {
                   <Text style={styles.storyJourneyNumberText}>{stage.number}</Text>
                 </View>
                 <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]} numberOfLines={3}>{stage.title}</Text>
-                <Text style={styles.storyJourneyDescription}>{stage.description}</Text>
+                <Text style={[styles.storyJourneyDescription, isSmallMobile && styles.storyJourneyDescriptionMobile]}>{stage.description}</Text>
               </View>
             </View>
           );
@@ -2045,14 +2075,14 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFamilySection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>What Makes Our Halloumi Special</Text>
-        <View style={styles.storyCard}>
-          <Text style={styles.storyParagraph}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Our Halloumi is soft and gently squeaky, with a clean, creamy flavour that is never overly salty. We use just the right amount of rock salt so the natural taste of the milk shines through.
           </Text>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Because it is made the traditional way and finished with modern precision, our cheese holds its shape beautifully when cooked. Chefs love it — it flips easily with tongs, browns evenly, and stays consistent batch after batch.
           </Text>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Whether you fry, grill, bake, or pan-sear it in a little olive oil, Rose’s Halloumi delivers the same wonderful creamy taste every time. It is ready to enjoy straight from the pack and works equally well in savoury or sweet dishes.
           </Text>
         </View>
@@ -2060,14 +2090,14 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFamilySection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>How to Enjoy It</Text>
-        <View style={styles.storyCard}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
           <View style={styles.storyBulletList}>
-            <Text style={styles.storyBulletItem}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
-            <Text style={styles.storyBulletItem}>• Grill or bake for a delicious centrepiece</Text>
-            <Text style={styles.storyBulletItem}>• Pair with honey and pancakes for a sweet treat</Text>
-            <Text style={styles.storyBulletItem}>• Add to a plated toaster or simple skillet meal</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Grill or bake for a delicious centrepiece</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Pair with honey and pancakes for a sweet treat</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Add to a plated toaster or simple skillet meal</Text>
           </View>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Our Halloumi is naturally vegetarian and loved by everyone from age 7 to 70. Once you taste it, you’ll understand why this centuries-old style of cheese has never gone out of favour.
           </Text>
         </View>
@@ -2075,12 +2105,12 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFarmToTableSection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>From Our Farm to Your Table</Text>
-        <View style={styles.storyCard}>
-          <Text style={styles.storyParagraph}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             We operate a small, carefully run facility right on the dairy farm. Modern equipment helps us maintain the highest standards of hygiene and consistency, while the heart of the process remains the time-honoured family methods we have perfected over many years.
           </Text>
         </View>
-        <View style={styles.storyBrandStatementCard}>
+        <View style={[styles.storyBrandStatementCard, isSmallMobile && styles.wholesaleCardMobile]}>
           <Text style={styles.storyBrandStatement}>Fresh milk. Honest ingredients. A recipe rooted in family history.</Text>
           <Text style={styles.storyBrandClosingLine}>That’s the Rose’s Dairy difference.</Text>
           <Text style={styles.storyBrandClosingLine}>Good food. Good life.</Text>
@@ -2129,6 +2159,7 @@ function QualityDocumentCard({
   source,
   viewLabel,
   showDownload,
+  isMobile,
 }: {
   title: string;
   description: string;
@@ -2136,10 +2167,11 @@ function QualityDocumentCard({
   source: ImageSourcePropType;
   viewLabel: string;
   showDownload?: boolean;
+  isMobile?: boolean;
 }) {
   return (
-    <View style={styles.qualityDocCard}>
-      <Text style={styles.qualityDocTitle}>{title}</Text>
+    <View style={[styles.qualityDocCard, isMobile && styles.qualityDocCardMobile]}>
+      <Text style={[styles.qualityDocTitle, isMobile && styles.qualityDocTitleMobile]}>{title}</Text>
       <Text style={styles.qualityDocDescription}>{description}</Text>
       {meta.length > 0 ? (
         <View style={styles.qualityDocMetaList}>
@@ -2166,6 +2198,9 @@ function QualityDocumentCard({
 }
 
 function QualityCompliancePage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell
       eyebrow="Quality & Compliance"
@@ -2174,7 +2209,7 @@ function QualityCompliancePage() {
     >
       <View style={styles.qualitySection}>
         <Text style={styles.qualitySectionHeading}>Official Certifications</Text>
-        <View style={styles.qualityDocGrid}>
+        <View style={[styles.qualityDocGrid, isMobile && styles.qualityDocGridMobile]}>
           <QualityDocumentCard
             title="MPI Animal Products Exporter Registration"
             description="Official MPI Animal Products Exporter registration for AYYILDIZ Limited trading as Roses Dairy (Halloumi Cheese)."
@@ -2185,6 +2220,7 @@ function QualityCompliancePage() {
             source={mpiRegistrationPdf}
             viewLabel="View Certificate"
             showDownload
+            isMobile={isMobile}
           />
           <QualityDocumentCard
             title="Food Safety & Quality Audit Certificate"
@@ -2193,19 +2229,20 @@ function QualityCompliancePage() {
             source={foodSafetyAuditPdf}
             viewLabel="View Certificate"
             showDownload
+            isMobile={isMobile}
           />
         </View>
       </View>
       <View style={styles.qualitySection}>
         <Text style={styles.qualitySectionHeading}>Halloumi Product Information</Text>
-        <View style={styles.qualityDocGrid}>
+        <View style={[styles.qualityDocGrid, isMobile && styles.qualityDocGridMobile]}>
           <QualityDocumentCard
-            title="Rose’s Dairy Halloumi Product Specification"
+            title="Rose's Dairy Halloumi Product Specification"
             description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
             meta={[
-              { label: 'Product', value: 'Rose’s Dairy Halloumi' },
+              { label: 'Product', value: 'Rose's Dairy Halloumi' },
               { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
-              { label: 'Ingredients', value: 'Pasteurised Cow’s Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Ingredients', value: 'Pasteurised Cow's Milk, Vinegar, Salt, Vegetable Rennet.' },
               { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
               { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
               { label: 'Opened', value: 'Consume within 5 days once opened.' },
@@ -2225,10 +2262,13 @@ function WholesalePage({ onNavigate }: { onNavigate: (page: any) => void }) {
 }
 
 function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
-      <View style={styles.wholesaleCard}>
-        <Text style={styles.wholesaleBody}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
+      <View style={[styles.wholesaleCard, isMobile && styles.wholesaleCardMobile]}>
+        <Text style={[styles.wholesaleBody, isMobile && styles.wholesaleBodyMobile]}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
         <View style={styles.heroActionRow}>
           <Pressable style={styles.primaryButton} onPress={() => onNavigate('wholesale-apply')}>
             <Text style={styles.primaryButtonLabel}>Wholesale Enquiries</Text>
@@ -2421,14 +2461,17 @@ function WholesaleContactForm() {
 }
 
 function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
       <GeneralContactForm />
       <WholesaleContactForm />
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Already a customer?</Text>
-        <Text style={styles.noticeText}>Sign in to your customer account to place orders and view order history.</Text>
-        <View style={styles.heroActionRow}>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Already a customer?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in to your customer account to place orders and view order history.</Text>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
           <Pressable style={styles.secondaryButton} onPress={() => onNavigate('account')}>
             <Text style={styles.secondaryButtonLabel}>Open Account</Text>
           </Pressable>
@@ -2679,13 +2722,16 @@ function WholesaleApplicationForm() {
 }
 
 function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
       <WholesaleApplicationForm />
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Questions?</Text>
-        <Text style={styles.noticeText}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
-        <View style={styles.heroActionRow}>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Questions?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
           <Pressable style={styles.secondaryButton} onPress={() => onNavigate('contact')}>
             <Text style={styles.secondaryButtonLabel}>Contact Us</Text>
           </Pressable>
@@ -2696,22 +2742,28 @@ function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void })
 }
 
 function PrivacyPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Privacy" title="Privacy" description="A concise overview for the current ordering experience.">
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeText}>Grassland Cheese uses account and order details to support sign-in, customer account access, ordering, and order history within the current application experience.</Text>
-        <Text style={styles.noticeText}>More detailed privacy content can be published here without changing the existing customer ordering flow.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Grassland Cheese uses account and order details to support sign-in, customer account access, ordering, and order history within the current application experience.</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>More detailed privacy content can be published here without changing the existing customer ordering flow.</Text>
       </View>
     </SectionShell>
   );
 }
 
 function TermsPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Terms" title="Terms" description="A simple placeholder for the current web ordering experience.">
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeText}>Product availability and customer access depend on the live catalog records provided by the existing ordering system.</Text>
-        <Text style={styles.noticeText}>Recipes and food inspiration remain informational content only and are never treated as orderable products.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Product availability and customer access depend on the live catalog records provided by the existing ordering system.</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Recipes and food inspiration remain informational content only and are never treated as orderable products.</Text>
       </View>
     </SectionShell>
   );
@@ -2724,15 +2776,18 @@ function AccountPage({
   onNavigate: (page: PublicPage) => void;
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Customer Account" title="Sign in or create your account" description="Access customer ordering, save your place for future halloumi purchases, and keep wholesale enquiries moving through the existing account flow.">
-      <View style={styles.inlineTwoColumnRow}>
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.brandPanelCard}>
-            <Image source={grasslandLogo} style={styles.accountLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-            <Text style={styles.brandPanelTitle} numberOfLines={3}>{brandName}</Text>
-            <Text style={styles.brandPanelSubtitle}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
-            <Text style={styles.brandPanelMeta}>{brandStatement}</Text>
+          <View style={[styles.brandPanelCard, isMobile && styles.brandPanelCardMobile]}>
+            <Image source={grasslandLogo} style={[styles.accountLogo, isMobile && styles.accountLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+            <Text style={[styles.brandPanelTitle, isMobile && styles.brandPanelTitleMobile]} numberOfLines={3}>{brandName}</Text>
+            <Text style={[styles.brandPanelSubtitle, isMobile && styles.brandPanelSubtitleMobile]}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
+            <Text style={[styles.brandPanelMeta, isMobile && styles.brandPanelMetaMobile]}>{brandStatement}</Text>
             <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Browse Halloumi</Text>
             </Pressable>
@@ -2770,16 +2825,19 @@ function SignedInAccountPage({
     }
   };
 
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Customer Account" title={`Welcome, ${session.user?.name ?? brandName}`} description="Manage your account, review your ordering history, and keep your halloumi shopping connected to the current sales flow.">
-      <View style={styles.inlineTwoColumnRow}>
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Account details</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Account details</Text>
             <Text style={styles.metaText}>{session.user?.email}</Text>
             <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
-            <View style={styles.heroActionRow}>
+            <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
               <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
                 <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
               </Pressable>
@@ -2804,8 +2862,8 @@ function SignedInAccountPage({
           </View>
         </View>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Order history</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Order history</Text>
             {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
             {(ordersQuery.data ?? []).slice(0, 3).map((order) => (
               <View key={order.id} style={styles.accountOrderRow}>
@@ -2878,6 +2936,8 @@ function getResetTokenFromWebLocation(): string | null {
 }
 
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const initialResetToken = useMemo(() => getResetTokenFromWebLocation(), []);
   const [mode, setMode] = useState<AuthMode>(initialResetToken ? 'customer-reset-password' : 'customer-login');
   const [resetToken] = useState<string | null>(initialResetToken);
@@ -3001,8 +3061,8 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   if (mode === 'admin-login') {
     return (
-      <View style={styles.authPanel}>
-        <Text style={styles.authPanelTitle}>Admin Login</Text>
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Admin Login</Text>
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
@@ -3018,9 +3078,9 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   if (mode === 'customer-forgot-password') {
     return (
-      <View style={styles.authPanel}>
-        <Text style={styles.authPanelTitle}>Reset your password</Text>
-        <Text style={styles.authPanelSubtitle}>Enter your account email and we'll send you a link to set a new password.</Text>
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Reset your password</Text>
+        <Text style={[styles.authPanelSubtitle, isMobile && styles.authPanelSubtitleMobile]}>Enter your account email and we'll send you a link to set a new password.</Text>
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
@@ -3036,8 +3096,8 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   if (mode === 'customer-reset-password') {
     return (
-      <View style={styles.authPanel}>
-        <Text style={styles.authPanelTitle}>Set a new password</Text>
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Set a new password</Text>
         {!resetToken ? (
           <Text style={styles.errorText}>This password reset link is invalid or has expired. Request a new one below.</Text>
         ) : (
@@ -3063,9 +3123,9 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
   }
 
   return (
-    <View style={styles.authPanel}>
-      <Text style={styles.authPanelTitle}>Welcome to {brandName}</Text>
-      <Text style={styles.authPanelSubtitle}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
+    <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+      <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Welcome to {brandName}</Text>
+      <Text style={[styles.authPanelSubtitle, isMobile && styles.authPanelSubtitleMobile]}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
       {mode === 'customer-register' ? (
         <>
           <Field label="Full name" value={name} onChangeText={setName} />
@@ -3181,11 +3241,14 @@ function CustomersScreen() {
 }
 
 function SectionShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: ReactNode }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <View style={styles.sectionShell}>
       <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
-      <Text style={styles.sectionTitle} numberOfLines={3}>{title}</Text>
-      <Text style={styles.sectionDescription}>{description}</Text>
+      <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]} numberOfLines={3}>{title}</Text>
+      <Text style={[styles.sectionDescription, isMobile && styles.sectionDescriptionMobile]}>{description}</Text>
       {children}
     </View>
   );
@@ -3394,6 +3457,10 @@ const styles = StyleSheet.create({
     width: 90,
     height: 38,
   },
+  headerLogoMobile: {
+    width: 75,
+    height: 32,
+  },
   brandCopyWrap: {
     flexShrink: 1,
   },
@@ -3417,11 +3484,18 @@ const styles = StyleSheet.create({
   navRowCompact: {
     justifyContent: 'flex-start',
   },
+  navRowMobile: {
+    gap: 6,
+  },
   navButton: {
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: '#f2ead9',
+  },
+  navButtonMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   navButtonActive: {
     backgroundColor: '#1f5c43',
@@ -3429,6 +3503,9 @@ const styles = StyleSheet.create({
   navButtonText: {
     color: '#224232',
     fontWeight: '600',
+  },
+  navButtonTextMobile: {
+    fontSize: 13,
   },
   navButtonTextActive: {
     color: '#fffef8',
@@ -3440,9 +3517,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1f5c43',
   },
+  signOutButtonMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
   signOutButtonText: {
     color: '#1f5c43',
     fontWeight: '700',
+  },
+  signOutButtonTextMobile: {
+    fontSize: 13,
   },
   heroShell: {
     borderRadius: 32,
@@ -3491,16 +3575,27 @@ const styles = StyleSheet.create({
     color: '#fffdf8',
     maxWidth: 560,
   },
+  heroTitleMobile: {
+    fontSize: 24,
+    lineHeight: 32,
+  },
   heroSubtitle: {
     fontSize: 18,
     lineHeight: 28,
     color: '#f5f2ea',
     maxWidth: 520,
   },
+  heroSubtitleMobile: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
   heroActionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  heroActionRowMobile: {
+    gap: 10,
   },
   sectionShell: {
     gap: 16,
@@ -3518,16 +3613,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#123524',
   },
+  sectionTitleMobile: {
+    fontSize: 20,
+    lineHeight: 26,
+  },
   sectionDescription: {
     fontSize: 17,
     lineHeight: 27,
     color: '#4d5c54',
     maxWidth: 760,
   },
+  sectionDescriptionMobile: {
+    fontSize: 15,
+    lineHeight: 24,
+  },
   productGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
+  },
+  productGridMobile: {
+    gap: 12,
   },
   productCard: {
     flexBasis: 280,
@@ -3539,6 +3645,11 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 12,
   },
+  productCardMobile: {
+    flexBasis: 240,
+    padding: 16,
+    borderRadius: 20,
+  },
   productLogoPanel: {
     backgroundColor: '#f5efe0',
     borderRadius: 18,
@@ -3546,6 +3657,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 320,
+  },
+  productLogoPanelMobile: {
+    height: 240,
+    padding: 12,
+    borderRadius: 14,
   },
   productLogo: {
     width: '100%',
@@ -3555,6 +3671,9 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#123524',
+  },
+  productCardNameMobile: {
+    fontSize: 18,
   },
   productCardSize: {
     fontSize: 15,
@@ -3683,6 +3802,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 16,
   },
+  qualityDocGridMobile: {
+    gap: 12,
+  },
   qualityDocCard: {
     flexBasis: 320,
     flexGrow: 1,
@@ -3693,10 +3815,18 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 12,
   },
+  qualityDocCardMobile: {
+    flexBasis: 260,
+    padding: 16,
+    borderRadius: 20,
+  },
   qualityDocTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#123524',
+  },
+  qualityDocTitleMobile: {
+    fontSize: 17,
   },
   qualityDocDescription: {
     fontSize: 15,
@@ -3729,20 +3859,34 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
   },
+  noticeCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   noticeTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#123524',
+  },
+  noticeTitleMobile: {
+    fontSize: 17,
   },
   noticeText: {
     fontSize: 15,
     lineHeight: 24,
     color: '#4d5c54',
   },
+  noticeTextMobile: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
   valueGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
+  },
+  valueGridMobile: {
+    gap: 12,
   },
   valueCard: {
     flexBasis: 240,
@@ -3754,20 +3898,35 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 10,
   },
+  valueCardMobile: {
+    flexBasis: 200,
+    padding: 16,
+    borderRadius: 20,
+  },
   valueCardTitle: {
     fontSize: 19,
     fontWeight: '700',
     color: '#123524',
+  },
+  valueCardTitleMobile: {
+    fontSize: 16,
   },
   valueCardDescription: {
     fontSize: 15,
     lineHeight: 24,
     color: '#4d5c54',
   },
+  valueCardDescriptionMobile: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
   recipeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
+  },
+  recipeGridMobile: {
+    gap: 12,
   },
   recipeCard: {
     flexBasis: 300,
@@ -3778,9 +3937,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e7ddc9',
   },
+  recipeCardMobile: {
+    flexBasis: 260,
+    borderRadius: 20,
+  },
   recipeCardImage: {
     width: '100%',
     height: 220,
+  },
+  recipeCardImageMobile: {
+    height: 180,
   },
   recipeCardTitle: {
     paddingHorizontal: 18,
@@ -3788,6 +3954,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#123524',
+  },
+  recipeCardTitleMobile: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    fontSize: 17,
   },
   recipeCardDescription: {
     paddingHorizontal: 18,
@@ -3797,6 +3968,13 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: '#4d5c54',
   },
+  recipeCardDescriptionMobile: {
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 14,
+    fontSize: 14,
+    lineHeight: 21,
+  },
   storyCard: {
     backgroundColor: '#fffdf8',
     borderRadius: 24,
@@ -3805,10 +3983,18 @@ const styles = StyleSheet.create({
     padding: 22,
     gap: 12,
   },
+  storyCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   storyParagraph: {
     color: '#4d5c54',
     fontSize: 16,
     lineHeight: 27,
+  },
+  storyParagraphMobile: {
+    fontSize: 14,
+    lineHeight: 23,
   },
   ourStoryPage: {
     gap: 32,
@@ -3929,7 +4115,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   storyJourneyTitleMobile: {
-    fontSize: 21,
+    fontSize: 20,
     lineHeight: 26,
   },
   storyJourneyDescription: {
@@ -3937,6 +4123,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 26,
     maxWidth: 520,
+  },
+  storyJourneyDescriptionMobile: {
+    fontSize: 14,
+    lineHeight: 22,
   },
   storyFamilySection: {
     gap: 16,
@@ -3981,11 +4171,19 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+  wholesaleCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   wholesaleBody: {
     color: '#f9f5ea',
     fontSize: 17,
     lineHeight: 27,
     maxWidth: 620,
+  },
+  wholesaleBodyMobile: {
+    fontSize: 15,
+    lineHeight: 24,
   },
   wholesaleContactButton: {
     borderColor: '#f9f5ea',
@@ -4001,15 +4199,26 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 14,
   },
+  authPanelMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   authPanelTitle: {
     fontSize: 26,
     fontWeight: '700',
     color: '#123524',
   },
+  authPanelTitleMobile: {
+    fontSize: 22,
+  },
   authPanelSubtitle: {
     fontSize: 15,
     lineHeight: 23,
     color: '#4d5c54',
+  },
+  authPanelSubtitleMobile: {
+    fontSize: 13,
+    lineHeight: 20,
   },
   adminAccessSection: {
     marginTop: 12,
@@ -4035,6 +4244,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 16,
   },
+  inlineTwoColumnRowMobile: {
+    gap: 12,
+  },
   inlineCardColumn: {
     flexBasis: 320,
     flexGrow: 1,
@@ -4047,10 +4259,17 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 12,
   },
+  inlineCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   inlineCardTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#123524',
+  },
+  inlineCardTitleMobile: {
+    fontSize: 17,
   },
   metaText: {
     fontSize: 14,
@@ -4120,24 +4339,43 @@ const styles = StyleSheet.create({
     minHeight: 320,
     justifyContent: 'center',
   },
+  brandPanelCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    minHeight: 280,
+  },
   accountLogo: {
     width: '100%',
     height: 90,
     alignSelf: 'center',
+  },
+  accountLogoMobile: {
+    height: 70,
   },
   brandPanelTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: '#fffef8',
   },
+  brandPanelTitleMobile: {
+    fontSize: 18,
+  },
   brandPanelSubtitle: {
     fontSize: 16,
     lineHeight: 24,
     color: '#edf5ee',
   },
+  brandPanelSubtitleMobile: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   brandPanelMeta: {
     color: '#f2d77e',
     fontWeight: '700',
+  },
+  brandPanelMetaMobile: {
+    fontSize: 13,
   },
   accountOrderRow: {
     paddingVertical: 4,
@@ -4175,6 +4413,10 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 14,
   },
+  productDetailCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   productDetailHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -4192,11 +4434,19 @@ const styles = StyleSheet.create({
     width: 120,
     height: 56,
   },
+  productDetailLogoMobile: {
+    width: 90,
+    height: 42,
+  },
   productDetailTitle: {
     fontSize: 28,
     lineHeight: 34,
     fontWeight: '800',
     color: '#123524',
+  },
+  productDetailTitleMobile: {
+    fontSize: 22,
+    lineHeight: 28,
   },
   orderItemText: {
     color: '#4d5c54',
@@ -4207,45 +4457,81 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+  footerShellMobile: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
   footerBrandRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
     alignItems: 'center',
   },
+  footerBrandRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
   footerLogo: {
     width: 150,
     height: 64,
     backgroundColor: 'transparent',
   },
+  footerLogoMobile: {
+    width: 110,
+    height: 48,
+  },
   footerBrandCopy: {
     gap: 4,
+  },
+  footerBrandCopyMobile: {
+    gap: 2,
   },
   footerBrandName: {
     fontSize: 24,
     fontWeight: '800',
     color: '#fffef8',
   },
+  footerBrandNameMobile: {
+    fontSize: 18,
+  },
   footerBrandTagline: {
     color: '#f0e7d2',
     fontSize: 14,
   },
+  footerBrandTaglineMobile: {
+    fontSize: 12,
+  },
   footerStatement: {
     color: '#f2d77e',
     fontWeight: '700',
+  },
+  footerStatementMobile: {
+    fontSize: 12,
   },
   footerLinksWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
+  footerLinksWrapMobile: {
+    gap: 8,
+  },
   footerLinkButton: {
     paddingVertical: 4,
     paddingRight: 8,
   },
+  footerLinkButtonMobile: {
+    paddingVertical: 2,
+    paddingRight: 6,
+  },
   footerLinkText: {
     color: '#f0e7d2',
     fontWeight: '600',
+  },
+  footerLinkTextMobile: {
+    fontSize: 13,
   },
   footerLinkTextActive: {
     color: '#f2d77e',
@@ -4257,6 +4543,9 @@ const styles = StyleSheet.create({
     color: '#fffef8',
     fontSize: 16,
     fontWeight: '700',
+  },
+  footerSectionLabelMobile: {
+    fontSize: 14,
   },
   footerSocialRow: {
     flexDirection: 'row',
@@ -4270,6 +4559,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  footerSocialButtonMobile: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
   footerSocialButtonFocused: {
     borderWidth: 2,
     borderColor: '#f2d77e',
@@ -4277,5 +4571,9 @@ const styles = StyleSheet.create({
   footerMeta: {
     color: '#d7ddda',
     lineHeight: 22,
+  },
+  footerMetaMobile: {
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

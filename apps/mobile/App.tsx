@@ -24,6 +24,7 @@ import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
 import { SOCIAL_LINKS } from './src/lib/constants';
+import { initializeTawkToChat } from './src/lib/crispChat';
 import AdminDashboardScreen from './src/admin/AdminDashboard';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
@@ -3257,6 +3258,20 @@ export default function App() {
       setSession((current) => ({ ...current, token }));
       setHydrated(true);
     })();
+  }, []);
+
+  // Initialize Tawk.to Chat on web platform
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    const propertyId = process.env.EXPO_PUBLIC_TAWK_TO_PROPERTY_ID;
+    if (propertyId) {
+      initializeTawkToChat(propertyId);
+    } else {
+      console.warn('[Tawk.to Chat] EXPO_PUBLIC_TAWK_TO_PROPERTY_ID environment variable not set');
+    }
   }, []);
 
   const trpcClient = useMemo(() => createApiClient(() => session.token), [session.token]);

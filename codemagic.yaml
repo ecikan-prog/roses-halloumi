@@ -11,8 +11,11 @@ workflows:
         EXPO_PUBLIC_API_URL: $EXPO_PUBLIC_API_URL
         XCODE_SCHEME: dairy_sales
         XCODE_CONFIGURATION: Release
-      xcode: 15.1
+      xcode: 16.2
       node: 18.17.0
+    ios_signing:
+      distribution_type: app_store
+      bundle_identifier: com.grasslandcheese.app
     scripts:
       - name: Install dependencies using npm workspaces
         script: |
@@ -104,8 +107,11 @@ workflows:
         EXPO_PUBLIC_API_URL: $EXPO_PUBLIC_API_URL_DEV
         XCODE_SCHEME: dairy_sales
         XCODE_CONFIGURATION: Debug
-      xcode: 15.1
+      xcode: 16.2
       node: 18.17.0
+    ios_signing:
+      distribution_type: ad_hoc
+      bundle_identifier: com.grasslandcheese.app
     scripts:
       - name: Install dependencies using npm workspaces
         script: |

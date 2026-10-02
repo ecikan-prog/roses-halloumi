@@ -1,0 +1,106 @@
+workflows:
+  ios-production:
+    name: iOS App Production Build
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      xcode: "26.4"
+      node: "22.13.x"
+      groups:
+        - grassland_cheese_ios
+      variables:
+        XCODE_WORKSPACE: "apps/mobile/ios/dairy_sales.xcworkspace"
+        XCODE_SCHEME: "dairy_sales"
+        BUNDLE_ID: "com.grasslandcheese.app"
+        APP_ID_PREFIX: "$APP_ID_PREFIX"
+        DEVELOPER_TEAM: "$DEVELOPER_TEAM"
+        PROVISIONING_PROFILE: "$PROVISIONING_PROFILE_PRODUCTION"
+        CERTIFICATE_PRIVATE_KEY: "$CERTIFICATE_PRIVATE_KEY"
+        CERTIFICATE_PASSWORD: "$CERTIFICATE_PASSWORD"
+      ios_signing:
+        distribution_type: app_store
+        bundle_id: "com.grasslandcheese.app"
+    trigger:
+      branch:
+        include:
+          - main
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+      - name: Install Expo CLI
+        script: |
+          npm install -g expo-cli
+      - name: Setup Node
+        script: |
+          node --version
+      - name: Build iOS App
+        script: |
+          cd apps/mobile
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --configuration Release \
+            --archive-xcargs "-allowProvisioningUpdates"
+    artifacts:
+      - build/ios/ipa/**/*.ipa
+    publishing:
+      email:
+        enabled: true
+        recipients:
+          - $DEVELOPER_EMAIL
+      slack:
+        enabled: false
+
+  ios-development:
+    name: iOS App Development Build
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      xcode: "26.4"
+      node: "22.13.x"
+      groups:
+        - grassland_cheese_ios
+      variables:
+        XCODE_WORKSPACE: "apps/mobile/ios/dairy_sales.xcworkspace"
+        XCODE_SCHEME: "dairy_sales"
+        BUNDLE_ID: "com.grasslandcheese.app"
+        APP_ID_PREFIX: "$APP_ID_PREFIX"
+        DEVELOPER_TEAM: "$DEVELOPER_TEAM"
+        PROVISIONING_PROFILE: "$PROVISIONING_PROFILE_DEVELOPMENT"
+        CERTIFICATE_PRIVATE_KEY: "$CERTIFICATE_PRIVATE_KEY"
+        CERTIFICATE_PASSWORD: "$CERTIFICATE_PASSWORD"
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_id: "com.grasslandcheese.app"
+    trigger:
+      branch:
+        include:
+          - develop
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+      - name: Install Expo CLI
+        script: |
+          npm install -g expo-cli
+      - name: Setup Node
+        script: |
+          node --version
+      - name: Build iOS App
+        script: |
+          cd apps/mobile
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --configuration Debug \
+            --archive-xcargs "-allowProvisioningUpdates"
+    artifacts:
+      - build/ios/ipa/**/*.ipa
+    publishing:
+      email:
+        enabled: true
+        recipients:
+          - $DEVELOPER_EMAIL

@@ -1,0 +1,101 @@
+workflows:
+  ios-build:
+    name: iOS Build
+    environment:
+      groups:
+        - grassland_cheese_ios
+      xcode: 26.4
+      node: 22.13
+      variables:
+        BUNDLE_ID: com.grasslandcheese.app
+        PROJECT_NAME: dairy-sales
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+      - name: Install Expo CLI
+        script: |
+          npm install -g expo-cli@latest
+      - name: Prebuild iOS
+        script: |
+          cd apps/mobile
+          npx expo prebuild --platform ios --clean
+      - name: Build for Ad Hoc (Development)
+        script: |
+          cd apps/mobile/ios
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace dairy-sales.xcworkspace \
+            --scheme dairy-sales \
+            --configuration Release \
+            --export-method ad-hoc
+        triggerOn:
+          branch:
+            pattern: develop
+            includeTags: false
+      - name: Build for App Store (Production)
+        script: |
+          cd apps/mobile/ios
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace dairy-sales.xcworkspace \
+            --scheme dairy-sales \
+            --configuration Release \
+            --export-method app-store
+        triggerOn:
+          branch:
+            pattern: main
+            includeTags: false
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
+    triggers:
+      - branch:
+          pattern: main
+      - branch:
+          pattern: develop
+
+  ios-build-production:
+    name: iOS Build Production
+    environment:
+      groups:
+        - grassland_cheese_ios
+      xcode: 26.4
+      node: 22.13
+      variables:
+        BUNDLE_ID: com.grasslandcheese.app
+        PROJECT_NAME: dairy-sales
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+      - name: Install Expo CLI
+        script: |
+          npm install -g expo-cli@latest
+      - name: Prebuild iOS
+        script: |
+          cd apps/mobile
+          npx expo prebuild --platform ios --clean
+      - name: Build for App Store
+        script: |
+          cd apps/mobile/ios
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace dairy-sales.xcworkspace \
+            --scheme dairy-sales \
+            --configuration Release \
+            --export-method app-store
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: true
+    triggers:
+      - branch:
+          pattern: main

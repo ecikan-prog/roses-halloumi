@@ -1717,6 +1717,8 @@ function CartPage({
   isSubmitting: boolean;
   orderError: string | null;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const isCustomer = session.user?.kind === 'customer';
   const deliveryAddressValid = !isCustomer || deliveryAddressReady;
   const isPayNow = paymentTerm === PaymentTerm.PAY_NOW;
@@ -1739,10 +1741,10 @@ function CartPage({
 
   return (
     <SectionShell eyebrow="Cart & Checkout" title="Review your Halloumi order" description="Your cart and checkout stay connected to the existing ordering flow.">
-      <View style={styles.inlineTwoColumnRow}>
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Cart</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Cart</Text>
             {selectedItems.length ? (
               selectedItems.map((item) => (
                 <View key={item.id} style={styles.cartLineItem}>
@@ -1775,8 +1777,8 @@ function CartPage({
           </View>
         </View>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Checkout</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Checkout</Text>
             <Text style={styles.metaText}>Ordering as {session.user?.name}</Text>
             <Text style={styles.metaText}>{session.user?.email}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
@@ -1898,12 +1900,14 @@ function PublicCartPage({
   selectedItems: Array<ProductRecord & { qty: number }>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
 
   return (
     <SectionShell eyebrow="Cart" title="Cart and checkout" description="Sign in or create an account to complete checkout with existing server-side pricing.">
-      <View style={styles.inlineCard}>
-        <Text style={styles.inlineCardTitle}>Cart</Text>
+      <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+        <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Cart</Text>
         {selectedItems.length ? (
           selectedItems.map((item) => (
             <View key={item.id} style={styles.cartLineItem}>
@@ -1934,9 +1938,9 @@ function PublicCartPage({
         </Pressable>
       </View>
       {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: {formatMoney(subtotal)}</Text> : null}
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Ready to order?</Text>
-        <Text style={styles.noticeText}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Ready to order?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
         <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
           <Text style={styles.primaryButtonLabel}>Go to Account</Text>
         </Pressable>
@@ -2772,15 +2776,18 @@ function AccountPage({
   onNavigate: (page: PublicPage) => void;
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Customer Account" title="Sign in or create your account" description="Access customer ordering, save your place for future halloumi purchases, and keep wholesale enquiries moving through the existing account flow.">
-      <View style={styles.inlineTwoColumnRow}>
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.brandPanelCard}>
-            <Image source={grasslandLogo} style={styles.accountLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-            <Text style={styles.brandPanelTitle} numberOfLines={3}>{brandName}</Text>
-            <Text style={styles.brandPanelSubtitle}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
-            <Text style={styles.brandPanelMeta}>{brandStatement}</Text>
+          <View style={[styles.brandPanelCard, isMobile && styles.brandPanelCardMobile]}>
+            <Image source={grasslandLogo} style={[styles.accountLogo, isMobile && styles.accountLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+            <Text style={[styles.brandPanelTitle, isMobile && styles.brandPanelTitleMobile]} numberOfLines={3}>{brandName}</Text>
+            <Text style={[styles.brandPanelSubtitle, isMobile && styles.brandPanelSubtitleMobile]}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
+            <Text style={[styles.brandPanelMeta, isMobile && styles.brandPanelMetaMobile]}>{brandStatement}</Text>
             <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Browse Halloumi</Text>
             </Pressable>
@@ -2818,16 +2825,19 @@ function SignedInAccountPage({
     }
   };
 
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Customer Account" title={`Welcome, ${session.user?.name ?? brandName}`} description="Manage your account, review your ordering history, and keep your halloumi shopping connected to the current sales flow.">
-      <View style={styles.inlineTwoColumnRow}>
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Account details</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Account details</Text>
             <Text style={styles.metaText}>{session.user?.email}</Text>
             <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
-            <View style={styles.heroActionRow}>
+            <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
               <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
                 <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
               </Pressable>
@@ -2852,8 +2862,8 @@ function SignedInAccountPage({
           </View>
         </View>
         <View style={styles.inlineCardColumn}>
-          <View style={styles.inlineCard}>
-            <Text style={styles.inlineCardTitle}>Order history</Text>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Order history</Text>
             {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
             {(ordersQuery.data ?? []).slice(0, 3).map((order) => (
               <View key={order.id} style={styles.accountOrderRow}>
@@ -2926,6 +2936,8 @@ function getResetTokenFromWebLocation(): string | null {
 }
 
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const initialResetToken = useMemo(() => getResetTokenFromWebLocation(), []);
   const [mode, setMode] = useState<AuthMode>(initialResetToken ? 'customer-reset-password' : 'customer-login');
   const [resetToken] = useState<string | null>(initialResetToken);
@@ -3049,8 +3061,8 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   if (mode === 'admin-login') {
     return (
-      <View style={styles.authPanel}>
-        <Text style={styles.authPanelTitle}>Admin Login</Text>
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Admin Login</Text>
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
@@ -3066,9 +3078,9 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   if (mode === 'customer-forgot-password') {
     return (
-      <View style={styles.authPanel}>
-        <Text style={styles.authPanelTitle}>Reset your password</Text>
-        <Text style={styles.authPanelSubtitle}>Enter your account email and we'll send you a link to set a new password.</Text>
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Reset your password</Text>
+        <Text style={[styles.authPanelSubtitle, isMobile && styles.authPanelSubtitleMobile]}>Enter your account email and we'll send you a link to set a new password.</Text>
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
@@ -3084,8 +3096,8 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
 
   if (mode === 'customer-reset-password') {
     return (
-      <View style={styles.authPanel}>
-        <Text style={styles.authPanelTitle}>Set a new password</Text>
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Set a new password</Text>
         {!resetToken ? (
           <Text style={styles.errorText}>This password reset link is invalid or has expired. Request a new one below.</Text>
         ) : (
@@ -3111,9 +3123,9 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
   }
 
   return (
-    <View style={styles.authPanel}>
-      <Text style={styles.authPanelTitle}>Welcome to {brandName}</Text>
-      <Text style={styles.authPanelSubtitle}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
+    <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+      <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Welcome to {brandName}</Text>
+      <Text style={[styles.authPanelSubtitle, isMobile && styles.authPanelSubtitleMobile]}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
       {mode === 'customer-register' ? (
         <>
           <Field label="Full name" value={name} onChangeText={setName} />
@@ -4327,24 +4339,43 @@ const styles = StyleSheet.create({
     minHeight: 320,
     justifyContent: 'center',
   },
+  brandPanelCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    minHeight: 280,
+  },
   accountLogo: {
     width: '100%',
     height: 90,
     alignSelf: 'center',
+  },
+  accountLogoMobile: {
+    height: 70,
   },
   brandPanelTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: '#fffef8',
   },
+  brandPanelTitleMobile: {
+    fontSize: 18,
+  },
   brandPanelSubtitle: {
     fontSize: 16,
     lineHeight: 24,
     color: '#edf5ee',
   },
+  brandPanelSubtitleMobile: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   brandPanelMeta: {
     color: '#f2d77e',
     fontWeight: '700',
+  },
+  brandPanelMetaMobile: {
+    fontSize: 13,
   },
   accountOrderRow: {
     paddingVertical: 4,

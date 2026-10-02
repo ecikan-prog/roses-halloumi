@@ -1626,16 +1626,18 @@ function ProductDetailCard({
   onDecrease: () => void;
   onClose: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const isAvailable = Boolean(product.product);
 
   return (
-    <View style={styles.productDetailCard}>
+    <View style={[styles.productDetailCard, isMobile && styles.productDetailCardMobile]}>
       <View style={styles.productDetailHeader}>
         <View style={styles.productDetailBrandRow}>
-          <Image source={grasslandLogo} style={styles.productDetailLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+          <Image source={grasslandLogo} style={[styles.productDetailLogo, isMobile && styles.productDetailLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
           <View>
             <Text style={styles.sectionEyebrow}>Product details</Text>
-            <Text style={styles.productDetailTitle} numberOfLines={3}>{product.name}</Text>
+            <Text style={[styles.productDetailTitle, isMobile && styles.productDetailTitleMobile]} numberOfLines={3}>{product.name}</Text>
           </View>
         </View>
         <Pressable style={styles.secondaryButton} onPress={onClose}>
@@ -2029,11 +2031,11 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFamilySection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Family Story</Text>
-        <View style={styles.storyCard}>
-          <Text style={styles.storyParagraph}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             At Rose’s Dairy, cheese-making is more than a craft — it’s a family tradition. Since 2010 we have been producing specialty Halloumi on our boutique dairy farm in Pukekohe, Auckland, using a recipe that has been passed down through generations of our family dynasty.
           </Text>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             We believe good food nourishes both body and spirit. That simple belief guides everything we do. Every batch of our Halloumi begins with fresh, pasteurised whole cow’s milk from the paddock next door. It doesn’t get fresher than that.
           </Text>
         </View>
@@ -2053,7 +2055,7 @@ function OurStoryPageSection() {
                   <Text style={styles.storyJourneyNumberText}>{stage.number}</Text>
                 </View>
                 <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]} numberOfLines={3}>{stage.title}</Text>
-                <Text style={styles.storyJourneyDescription}>{stage.description}</Text>
+                <Text style={[styles.storyJourneyDescription, isSmallMobile && styles.storyJourneyDescriptionMobile]}>{stage.description}</Text>
               </View>
             </View>
           );
@@ -2062,14 +2064,14 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFamilySection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>What Makes Our Halloumi Special</Text>
-        <View style={styles.storyCard}>
-          <Text style={styles.storyParagraph}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Our Halloumi is soft and gently squeaky, with a clean, creamy flavour that is never overly salty. We use just the right amount of rock salt so the natural taste of the milk shines through.
           </Text>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Because it is made the traditional way and finished with modern precision, our cheese holds its shape beautifully when cooked. Chefs love it — it flips easily with tongs, browns evenly, and stays consistent batch after batch.
           </Text>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Whether you fry, grill, bake, or pan-sear it in a little olive oil, Rose’s Halloumi delivers the same wonderful creamy taste every time. It is ready to enjoy straight from the pack and works equally well in savoury or sweet dishes.
           </Text>
         </View>
@@ -2077,14 +2079,14 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFamilySection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>How to Enjoy It</Text>
-        <View style={styles.storyCard}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
           <View style={styles.storyBulletList}>
-            <Text style={styles.storyBulletItem}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
-            <Text style={styles.storyBulletItem}>• Grill or bake for a delicious centrepiece</Text>
-            <Text style={styles.storyBulletItem}>• Pair with honey and pancakes for a sweet treat</Text>
-            <Text style={styles.storyBulletItem}>• Add to a plated toaster or simple skillet meal</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Grill or bake for a delicious centrepiece</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Pair with honey and pancakes for a sweet treat</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Add to a plated toaster or simple skillet meal</Text>
           </View>
-          <Text style={styles.storyParagraph}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             Our Halloumi is naturally vegetarian and loved by everyone from age 7 to 70. Once you taste it, you’ll understand why this centuries-old style of cheese has never gone out of favour.
           </Text>
         </View>
@@ -2092,12 +2094,12 @@ function OurStoryPageSection() {
 
       <View style={styles.storyFarmToTableSection}>
         <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>From Our Farm to Your Table</Text>
-        <View style={styles.storyCard}>
-          <Text style={styles.storyParagraph}>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
             We operate a small, carefully run facility right on the dairy farm. Modern equipment helps us maintain the highest standards of hygiene and consistency, while the heart of the process remains the time-honoured family methods we have perfected over many years.
           </Text>
         </View>
-        <View style={styles.storyBrandStatementCard}>
+        <View style={[styles.storyBrandStatementCard, isSmallMobile && styles.wholesaleCardMobile]}>
           <Text style={styles.storyBrandStatement}>Fresh milk. Honest ingredients. A recipe rooted in family history.</Text>
           <Text style={styles.storyBrandClosingLine}>That’s the Rose’s Dairy difference.</Text>
           <Text style={styles.storyBrandClosingLine}>Good food. Good life.</Text>
@@ -2249,10 +2251,13 @@ function WholesalePage({ onNavigate }: { onNavigate: (page: any) => void }) {
 }
 
 function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
-      <View style={styles.wholesaleCard}>
-        <Text style={styles.wholesaleBody}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
+      <View style={[styles.wholesaleCard, isMobile && styles.wholesaleCardMobile]}>
+        <Text style={[styles.wholesaleBody, isMobile && styles.wholesaleBodyMobile]}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
         <View style={styles.heroActionRow}>
           <Pressable style={styles.primaryButton} onPress={() => onNavigate('wholesale-apply')}>
             <Text style={styles.primaryButtonLabel}>Wholesale Enquiries</Text>
@@ -3820,15 +3825,26 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
   },
+  noticeCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   noticeTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#123524',
   },
+  noticeTitleMobile: {
+    fontSize: 17,
+  },
   noticeText: {
     fontSize: 15,
     lineHeight: 24,
     color: '#4d5c54',
+  },
+  noticeTextMobile: {
+    fontSize: 13,
+    lineHeight: 20,
   },
   valueGrid: {
     flexDirection: 'row',
@@ -3933,10 +3949,18 @@ const styles = StyleSheet.create({
     padding: 22,
     gap: 12,
   },
+  storyCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   storyParagraph: {
     color: '#4d5c54',
     fontSize: 16,
     lineHeight: 27,
+  },
+  storyParagraphMobile: {
+    fontSize: 14,
+    lineHeight: 23,
   },
   ourStoryPage: {
     gap: 32,
@@ -4113,11 +4137,19 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+  wholesaleCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   wholesaleBody: {
     color: '#f9f5ea',
     fontSize: 17,
     lineHeight: 27,
     maxWidth: 620,
+  },
+  wholesaleBodyMobile: {
+    fontSize: 15,
+    lineHeight: 24,
   },
   wholesaleContactButton: {
     borderColor: '#f9f5ea',
@@ -4133,15 +4165,26 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 14,
   },
+  authPanelMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   authPanelTitle: {
     fontSize: 26,
     fontWeight: '700',
     color: '#123524',
   },
+  authPanelTitleMobile: {
+    fontSize: 22,
+  },
   authPanelSubtitle: {
     fontSize: 15,
     lineHeight: 23,
     color: '#4d5c54',
+  },
+  authPanelSubtitleMobile: {
+    fontSize: 13,
+    lineHeight: 20,
   },
   adminAccessSection: {
     marginTop: 12,
@@ -4167,6 +4210,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 16,
   },
+  inlineTwoColumnRowMobile: {
+    gap: 12,
+  },
   inlineCardColumn: {
     flexBasis: 320,
     flexGrow: 1,
@@ -4179,10 +4225,17 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 12,
   },
+  inlineCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   inlineCardTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#123524',
+  },
+  inlineCardTitleMobile: {
+    fontSize: 17,
   },
   metaText: {
     fontSize: 14,
@@ -4307,6 +4360,10 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 14,
   },
+  productDetailCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
   productDetailHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -4324,11 +4381,19 @@ const styles = StyleSheet.create({
     width: 120,
     height: 56,
   },
+  productDetailLogoMobile: {
+    width: 90,
+    height: 42,
+  },
   productDetailTitle: {
     fontSize: 28,
     lineHeight: 34,
     fontWeight: '800',
     color: '#123524',
+  },
+  productDetailTitleMobile: {
+    fontSize: 22,
+    lineHeight: 28,
   },
   orderItemText: {
     color: '#4d5c54',

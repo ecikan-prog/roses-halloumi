@@ -1040,29 +1040,21 @@ function SiteHeader({
   isCompact: boolean;
 }) {
   const isStaff = session?.user?.kind === 'staff';
-  const navItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
-    { label: 'Home', page: 'home' },
-    { label: 'Shop Halloumi', page: 'shop' },
+  // Main navigation items for slim header
+  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
+    { label: 'Shop', page: 'shop' },
     { label: 'Recipes', page: 'recipes' },
-    { label: 'Wholesale', page: 'wholesale' },
-    { label: 'Our Story', page: 'about' },
+    { label: session ? 'Account' : 'Login', page: 'account' },
     { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
-    { label: session ? 'Customer Account' : 'Login', page: 'account' },
-    ...(session && !isStaff ? [{ label: 'My Orders', page: 'orders' as const }] : []),
-    ...(isStaff ? [{ label: 'Orders', page: 'orders' as const }, { label: 'Customers', page: 'customers' as const }] : []),
   ];
 
   return (
     <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
       <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
         <Image source={grasslandLogo} style={styles.headerLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-        <View style={styles.brandCopyWrap}>
-          <Text style={styles.brandName}>{brandName}</Text>
-          <Text style={styles.brandTagline}>{brandTagline}</Text>
-        </View>
       </Pressable>
       <View style={[styles.navRow, isCompact && styles.navRowCompact]}>
-        {navItems.map((item) => {
+        {mainNavItems.map((item) => {
           const selected = item.page === currentPage;
           return (
             <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
@@ -3384,14 +3376,14 @@ const styles = StyleSheet.create({
   headerShell: {
     backgroundColor: '#fffdf8',
     borderRadius: 28,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#e7ddc9',
-    gap: 16,
+    gap: 12,
   },
   headerShellCompact: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   brandLockup: {
     flexDirection: 'row',
@@ -3399,8 +3391,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   headerLogo: {
-    width: 150,
-    height: 64,
+    width: 90,
+    height: 38,
   },
   brandCopyWrap: {
     flexShrink: 1,

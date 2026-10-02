@@ -15,9 +15,6 @@ workflows:
       - name: Install dependencies
         script: |
           npm install
-      - name: Install Expo CLI
-        script: |
-          npm install -g expo-cli@latest
       - name: Prebuild iOS
         script: |
           cd apps/mobile
@@ -45,7 +42,7 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        submit_to_testflight: false
         submit_to_app_store: false
 
   ios-build-production:
@@ -59,9 +56,6 @@ workflows:
       - name: Install dependencies
         script: |
           npm install
-      - name: Install Expo CLI
-        script: |
-          npm install -g expo-cli@latest
       - name: Prebuild iOS
         script: |
           cd apps/mobile

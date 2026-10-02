@@ -8,7 +8,7 @@ workflows:
         bundle_identifier: com.grasslandcheese.app
       groups:
         - grassland_cheese_ios
-      xcode: 26.4
+      xcode: latest
       node: 22.13
 
     scripts:
@@ -34,14 +34,22 @@ workflows:
       - name: Build IPA
         script: |
           cd apps/mobile/ios
+          WS=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WS%.xcworkspace}"
           xcode-project build-ipa \
-            --workspace Grassland.xcworkspace \
-            --scheme Grassland \
-            --config Release \
-            --export-method app-store
+            --workspace "$WS" \
+            --scheme "$SCHEME"
 
     artifacts:
       - apps/mobile/ios/build/ios/ipa/*.ipa
+
+    integrations:
+      app_store_connect: grassland_cheese_ios
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
 
   android-build-production:
     name: Grassland Cheese Android Production

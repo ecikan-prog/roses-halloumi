@@ -2,13 +2,13 @@ ios-build-production:
   name: Grassland Cheese iOS Production
 
   environment:
+    ios_signing:
+      distribution_type: app_store
+      bundle_identifier: com.grasslandcheese.app
     groups:
       - grassland_cheese_ios
     xcode: 26.4
     node: 22.13
-
-  integrations:
-    app_store_connect: Codemagic CI
 
   scripts:
     - name: Install dependencies
@@ -20,7 +20,7 @@ ios-build-production:
         cd apps/mobile
         npx expo prebuild --platform ios --clean
 
-    - name: Configure signing
+    - name: Set up code signing
       script: |
         cd apps/mobile/ios
         xcode-project use-profiles
@@ -36,9 +36,3 @@ ios-build-production:
 
   artifacts:
     - apps/mobile/ios/build/ios/ipa/*.ipa
-
-  publishing:
-    app_store_connect:
-      auth: integration
-      submit_to_testflight: false
-      submit_to_app_store: false

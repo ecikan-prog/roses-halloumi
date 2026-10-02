@@ -2773,7 +2773,7 @@ function SignedInAccountPage({
       await onSignOut();
       alert('Your account has been successfully deleted.');
     } catch (error) {
-      alert(`Error deleting account: ${error instanceof Error ? error.message : String(error)}`);
+      alert(`Error deleting account: ${getErrorMessage(error)}`);
     }
   };
 

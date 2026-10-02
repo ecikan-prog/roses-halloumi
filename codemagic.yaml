@@ -1,0 +1,174 @@
+workflows:
+  ios-production:
+    name: Grassland Cheese iOS Production Build
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      groups:
+        - ios_code_signing
+      vars:
+        APP_STORE_BUNDLE_ID: com.grasslandcheese.app
+        EXPO_PUBLIC_API_URL: $EXPO_PUBLIC_API_URL
+        XCODE_SCHEME: dairy_sales
+        XCODE_CONFIGURATION: Release
+      xcode: 15.1
+      node: 18.17.0
+    scripts:
+      - name: Install dependencies using npm workspaces
+        script: |
+          cd $CM_BUILD_DIR
+          npm ci --workspaces
+      - name: Install Expo CLI globally
+        script: |
+          npm install -g @expo/cli
+      - name: Prebuild Expo app for iOS native development
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          npx expo prebuild --platform ios --clean --no-install
+      - name: Install native iOS dependencies via CocoaPods
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile/ios
+          pod install
+      - name: Update build version from CI build number
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          BUILD_NUMBER=$CI_BUILD_NUMBER
+          xcrun agvtool new-version -all "$BUILD_NUMBER"
+      - name: Create ExportOptions.plist for App Store
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile/ios
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>teamID</key>
+              <string>$TEAM_ID</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>thinning</key>
+              <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+      - name: Build iOS app archive for App Store
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          xcodebuild \
+            -workspace ios/dairy_sales.xcworkspace \
+            -scheme "$XCODE_SCHEME" \
+            -configuration "$XCODE_CONFIGURATION" \
+            -derivedDataPath build \
+            -archivePath build/dairy_sales.xcarchive \
+            -allowProvisioningUpdates \
+            clean archive
+      - name: Export .ipa for App Store distribution
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/dairy_sales.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build/ipa \
+            -allowProvisioningUpdates
+      - name: Verify .ipa artifact
+        script: |
+          ls -lh $CM_BUILD_DIR/apps/mobile/build/ipa/*.ipa
+    artifacts:
+      - $CM_BUILD_DIR/apps/mobile/build/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
+      email:
+        recipients:
+          - $DEVELOPER_EMAIL
+        notify:
+          success: true
+          failure: true
+
+  ios-development:
+    name: Grassland Cheese iOS Development Build
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      groups:
+        - ios_code_signing
+      vars:
+        APP_STORE_BUNDLE_ID: com.grasslandcheese.app
+        EXPO_PUBLIC_API_URL: $EXPO_PUBLIC_API_URL_DEV
+        XCODE_SCHEME: dairy_sales
+        XCODE_CONFIGURATION: Debug
+      xcode: 15.1
+      node: 18.17.0
+    scripts:
+      - name: Install dependencies using npm workspaces
+        script: |
+          cd $CM_BUILD_DIR
+          npm ci --workspaces
+      - name: Install Expo CLI globally
+        script: |
+          npm install -g @expo/cli
+      - name: Prebuild Expo app for iOS native development
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          npx expo prebuild --platform ios --clean --no-install
+      - name: Install native iOS dependencies via CocoaPods
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile/ios
+          pod install
+      - name: Create ExportOptions.plist for Ad Hoc distribution
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile/ios
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>teamID</key>
+              <string>$TEAM_ID</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>thinning</key>
+              <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+      - name: Build iOS app archive for development
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          xcodebuild \
+            -workspace ios/dairy_sales.xcworkspace \
+            -scheme "$XCODE_SCHEME" \
+            -configuration "$XCODE_CONFIGURATION" \
+            -derivedDataPath build-dev \
+            -archivePath build-dev/dairy_sales-dev.xcarchive \
+            -allowProvisioningUpdates \
+            clean archive
+      - name: Export .ipa for development distribution
+        script: |
+          cd $CM_BUILD_DIR/apps/mobile
+          xcodebuild \
+            -exportArchive \
+            -archivePath build-dev/dairy_sales-dev.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build-dev/ipa \
+            -allowProvisioningUpdates
+    artifacts:
+      - $CM_BUILD_DIR/apps/mobile/build-dev/ipa/*.ipa
+    publishing:
+      email:
+        recipients:
+          - $DEVELOPER_EMAIL
+        notify:
+          success: true
+          failure: true

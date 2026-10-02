@@ -3267,8 +3267,9 @@ export default function App() {
     }
 
     const propertyId = process.env.EXPO_PUBLIC_TAWK_TO_PROPERTY_ID;
+    const widgetId = process.env.EXPO_PUBLIC_TAWK_TO_WIDGET_ID || 'default';
     if (propertyId) {
-      initializeTawkToChat(propertyId);
+      initializeTawkToChat(propertyId, widgetId);
     } else {
       console.warn('[Tawk.to Chat] EXPO_PUBLIC_TAWK_TO_PROPERTY_ID environment variable not set');
     }

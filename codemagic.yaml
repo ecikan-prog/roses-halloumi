@@ -9,6 +9,8 @@ workflows:
         - grassland_cheese_ios
       xcode: 26.4
       node: 22.13
+    integrations:
+      app_store_connect: Codemagic CI
     scripts:
       - name: Install dependencies
         script: |

@@ -21,6 +21,11 @@ workflows:
           cd apps/mobile
           npx expo prebuild --platform ios --clean
 
+      - name: Install CocoaPods
+        script: |
+          cd apps/mobile/ios
+          pod install --repo-update
+
       - name: Set up code signing
         script: |
           cd apps/mobile/ios
@@ -30,10 +35,37 @@ workflows:
         script: |
           cd apps/mobile/ios
           xcode-project build-ipa \
-            --workspace dairy-sales.xcworkspace \
-            --scheme dairy-sales \
-            --configuration Release \
+            --workspace Grassland.xcworkspace \
+            --scheme Grassland \
+            --config Release \
             --export-method app-store
 
     artifacts:
       - apps/mobile/ios/build/ios/ipa/*.ipa
+
+  android-build-production:
+    name: Grassland Cheese Android Production
+
+    environment:
+      groups:
+        - grassland_cheese_android
+      node: 22.13
+      java: 17
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+
+      - name: Prebuild Android
+        script: |
+          cd apps/mobile
+          npx expo prebuild --platform android --clean
+
+      - name: Build AAB
+        script: |
+          cd apps/mobile/android
+          ./gradlew bundleRelease
+
+    artifacts:
+      - apps/mobile/android/app/build/outputs/bundle/release/*.aab

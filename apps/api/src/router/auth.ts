@@ -184,5 +184,23 @@ export const authRouter = router({
 
       return { ok: true as const };
     }),
+  deleteAccount: protectedProcedure
+    .input(z.object({ confirmEmail: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.kind !== 'customer') {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Only customers can delete their account.' });
+      }
+
+      if (input.confirmEmail !== ctx.user.email) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Email confirmation does not match.' });
+      }
+
+      await ctx.prisma.customer.update({
+        where: { id: ctx.user.id },
+        data: { deletedAt: new Date() },
+      });
+
+      return { ok: true as const };
+    }),
   me: protectedProcedure.query(async ({ ctx }) => ctx.user),
 });

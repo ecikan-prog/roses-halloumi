@@ -270,11 +270,13 @@ const whyGrasslandItems = [
 ] as const;
 
 const recipeFeatures: RecipeFeature[] = [
-  {
-    title: 'Grilled Halloumi',
-    description: 'Golden, charred halloumi inspiration for simple meals and warm platters.',
-    image: grilledHalloumiImage,
-  },
+  // NOTE: 'Grilled Halloumi' recipe card is hidden due to image containing typo "BURGGER".
+  // Will be restored once corrected image is supplied.
+  // {
+  //   title: 'Grilled Halloumi',
+  //   description: 'Golden, charred halloumi inspiration for simple meals and warm platters.',
+  //   image: grilledHalloumiImage,
+  // },
   {
     title: 'Halloumi Burger',
     description: 'A burger-style serving idea that stays firmly in the recipe and inspiration category.',
@@ -1580,7 +1582,6 @@ function ProductCard({
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
       <Text style={styles.productCardName}>{product.name}</Text>
-      <Text style={styles.productCardSize}>{product.size}</Text>
       <Text style={styles.productCardDescription}>{product.description}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
@@ -1600,7 +1601,7 @@ function ProductCard({
           </Pressable>
         </View>
       </View>
-      <Pressable disabled={disabled} style={[styles.primaryButton, disabled && styles.disabledPrimaryButton]} onPress={onAdd}>
+      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
         <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
       </Pressable>
     </View>

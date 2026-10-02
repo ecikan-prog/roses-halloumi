@@ -1039,32 +1039,35 @@ function SiteHeader({
   cartCount: number;
   isCompact: boolean;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const isStaff = session?.user?.kind === 'staff';
-  // Main navigation items for slim header
-  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
-    { label: 'Shop', page: 'shop' },
-    { label: 'Recipes', page: 'recipes' },
-    { label: session ? 'Account' : 'Login', page: 'account' },
-    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
+  
+  // Mobile and desktop navigation items
+  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
+    { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
+    { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
+    { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
+    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart', shortLabel: cartCount > 0 ? `Cart (${cartCount})` : 'Cart' },
   ];
 
   return (
     <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
       <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
-        <Image source={grasslandLogo} style={styles.headerLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
       </Pressable>
-      <View style={[styles.navRow, isCompact && styles.navRowCompact]}>
+      <View style={[styles.navRow, isMobile && styles.navRowMobile]}>
         {mainNavItems.map((item) => {
           const selected = item.page === currentPage;
           return (
-            <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
-              <Text style={[styles.navButtonText, selected && styles.navButtonTextActive]}>{item.label}</Text>
+            <Pressable key={item.page} style={[styles.navButton, isMobile && styles.navButtonMobile, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.navButtonText, isMobile && styles.navButtonTextMobile, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
             </Pressable>
           );
         })}
         {session && onSignOut ? (
-          <Pressable style={styles.signOutButton} onPress={() => void onSignOut()}>
-            <Text style={styles.signOutButtonText}>Sign out</Text>
+          <Pressable style={[styles.signOutButton, isMobile && styles.signOutButtonMobile]} onPress={() => void onSignOut()}>
+            <Text style={[styles.signOutButtonText, isMobile && styles.signOutButtonTextMobile]}>Sign out</Text>
           </Pressable>
         ) : null}
       </View>
@@ -1095,6 +1098,8 @@ function SiteFooter({
   onNavigate: (page: any) => void;
   session: SessionState | null;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
   type SocialLink = {
     label: string;
@@ -1103,48 +1108,50 @@ function SiteFooter({
     webBackgroundImage?: string;
     url: string;
   };
-  const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage }> = [
-    { label: 'Shop Halloumi', page: 'shop' },
-    { label: 'Recipes', page: 'recipes' },
-    { label: 'Wholesale', page: 'wholesale' },
-    { label: 'About', page: 'about' },
-    { label: 'Quality & Compliance', page: 'quality-compliance' },
-    { label: 'Contact', page: 'contact' },
-    { label: 'Privacy', page: 'privacy' },
-    { label: 'Terms', page: 'terms' },
-    { label: 'Cart', page: 'cart' },
-    { label: session ? 'Account' : 'Login', page: 'account' },
+  const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
+    { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
+    { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
+    { label: 'Wholesale', page: 'wholesale', shortLabel: 'Wholesale' },
+    { label: 'About', page: 'about', shortLabel: 'About' },
+    { label: 'Quality', page: 'quality-compliance', shortLabel: 'Quality' },
+    { label: 'Contact', page: 'contact', shortLabel: 'Contact' },
+    { label: 'Privacy', page: 'privacy', shortLabel: 'Privacy' },
+    { label: 'Terms', page: 'terms', shortLabel: 'Terms' },
+    { label: 'Cart', page: 'cart', shortLabel: 'Cart' },
+    { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
   ];
   const socialLinks: ReadonlyArray<SocialLink> = SOCIAL_LINKS;
 
   return (
-    <View style={styles.footerShell}>
-      <View style={styles.footerBrandRow}>
-        <Image source={grasslandLogo} style={styles.footerLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-        <View style={styles.footerBrandCopy}>
-          <Text style={styles.footerBrandName}>{brandName}</Text>
-          <Text style={styles.footerBrandTagline}>Pure Goodness From Our Pastures</Text>
-          <Text style={styles.footerStatement}>{brandStatement}</Text>
+    <View style={[styles.footerShell, isMobile && styles.footerShellMobile]}>
+      <View style={[styles.footerBrandRow, isMobile && styles.footerBrandRowMobile]}>
+        <Image source={grasslandLogo} style={[styles.footerLogo, isMobile && styles.footerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <View style={[styles.footerBrandCopy, isMobile && styles.footerBrandCopyMobile]}>
+          <Text style={[styles.footerBrandName, isMobile && styles.footerBrandNameMobile]}>{brandName}</Text>
+          <Text style={[styles.footerBrandTagline, isMobile && styles.footerBrandTaglineMobile]}>Pure Goodness From Our Pastures</Text>
+          <Text style={[styles.footerStatement, isMobile && styles.footerStatementMobile]}>{brandStatement}</Text>
         </View>
       </View>
-      <View style={styles.footerLinksWrap}>
+      <View style={[styles.footerLinksWrap, isMobile && styles.footerLinksWrapMobile]}>
         {footerLinks.map((item) => {
           const selected = item.page === currentPage;
+          const linkLabel = isMobile ? (item.shortLabel || item.label) : item.label;
           return (
-            <Pressable key={item.page} style={styles.footerLinkButton} onPress={() => onNavigate(item.page)}>
-              <Text style={[styles.footerLinkText, selected && styles.footerLinkTextActive]}>{item.label}</Text>
+            <Pressable key={item.page} style={[styles.footerLinkButton, isMobile && styles.footerLinkButtonMobile]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.footerLinkText, isMobile && styles.footerLinkTextMobile, selected && styles.footerLinkTextActive]} numberOfLines={1}>{linkLabel}</Text>
             </Pressable>
           );
         })}
       </View>
       <View style={styles.footerSocialSection}>
-        <Text style={styles.footerSectionLabel}>Follow us</Text>
+        <Text style={[styles.footerSectionLabel, isMobile && styles.footerSectionLabelMobile]}>Follow us</Text>
         <View style={styles.footerSocialRow}>
           {socialLinks.map((item) => (
             <Pressable
               key={item.label}
               style={[
                 styles.footerSocialButton,
+                isMobile && styles.footerSocialButtonMobile,
                 { backgroundColor: item.backgroundColor },
                 item.webBackgroundImage && Platform.OS === 'web'
                   ? ({ backgroundImage: item.webBackgroundImage } as any)
@@ -1157,12 +1164,12 @@ function SiteFooter({
               accessibilityRole="link"
               accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
             >
-              <FontAwesome5 name={item.iconName} size={18} color="#ffffff" />
+              <FontAwesome5 name={item.iconName} size={isMobile ? 16 : 18} color="#ffffff" />
             </Pressable>
           ))}
         </View>
       </View>
-      <Text style={styles.footerMeta}>Grassland Cheese halloumi recipes are inspiration only and never sold as products.</Text>
+      <Text style={[styles.footerMeta, isMobile && styles.footerMetaMobile]}>Grassland Cheese halloumi recipes are inspiration only and never sold as products.</Text>
     </View>
   );
 }
@@ -1213,6 +1220,7 @@ function resolveWebImageUri(source: ImageSourcePropType): string | null {
 
 function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
   const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
@@ -1221,8 +1229,8 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
       <View style={styles.heroBadge}>
         <Text style={styles.heroBadgeText}>{brandStatement}</Text>
       </View>
-      <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
-      <Text style={styles.heroSubtitle}>{heroMessage}</Text>
+      <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>Pure Goodness From Our Pastures</Text>
+      <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>{heroMessage}</Text>
       <View style={styles.heroActionRow}>
         <Pressable style={styles.primaryHeroButton} onPress={onPrimary}>
           <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
@@ -1568,12 +1576,15 @@ function ProductCard({
   disabled: boolean;
   ctaLabel: string;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
-    <View style={styles.productCard}>
-      <View style={styles.productLogoPanel}>
+    <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
+      <View style={[styles.productLogoPanel, isMobile && styles.productLogoPanelMobile]}>
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
-      <Text style={styles.productCardName} numberOfLines={3}>{product.name}</Text>
+      <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
       <Text style={styles.productCardDescription}>{product.description}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
@@ -1941,14 +1952,17 @@ function RecipesPage() {
 }
 
 function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {}) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Ideas to inspire your cooking. We sell halloumi cheese — recipes are for inspiration only.">
-      <View style={styles.recipeGrid}>
+      <View style={[styles.recipeGrid, isMobile && styles.recipeGridMobile]}>
         {recipeFeatures.map((recipe) => (
-          <View key={recipe.title} style={styles.recipeCard}>
-            <Image source={recipe.image} style={styles.recipeCardImage} resizeMode="cover" accessibilityLabel={`${recipe.title} inspiration image`} />
-            <Text style={styles.recipeCardTitle}>{recipe.title}</Text>
-            <Text style={styles.recipeCardDescription}>{recipe.description}</Text>
+          <View key={recipe.title} style={[styles.recipeCard, isMobile && styles.recipeCardMobile]}>
+            <Image source={recipe.image} style={[styles.recipeCardImage, isMobile && styles.recipeCardImageMobile]} resizeMode="cover" accessibilityLabel={`${recipe.title} inspiration image`} />
+            <Text style={[styles.recipeCardTitle, isMobile && styles.recipeCardTitleMobile]}>{recipe.title}</Text>
+            <Text style={[styles.recipeCardDescription, isMobile && styles.recipeCardDescriptionMobile]}>{recipe.description}</Text>
           </View>
         ))}
       </View>
@@ -1962,13 +1976,16 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
 }
 
 function WhyGrasslandSection() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Pure halloumi from New Zealand, made for grilling and sharing.">
-      <View style={styles.valueGrid}>
+      <View style={[styles.valueGrid, isMobile && styles.valueGridMobile]}>
         {whyGrasslandItems.map((item) => (
-          <View key={item.title} style={styles.valueCard}>
-            <Text style={styles.valueCardTitle}>{item.title}</Text>
-            <Text style={styles.valueCardDescription}>{item.description}</Text>
+          <View key={item.title} style={[styles.valueCard, isMobile && styles.valueCardMobile]}>
+            <Text style={[styles.valueCardTitle, isMobile && styles.valueCardTitleMobile]}>{item.title}</Text>
+            <Text style={[styles.valueCardDescription, isMobile && styles.valueCardDescriptionMobile]}>{item.description}</Text>
           </View>
         ))}
       </View>
@@ -2129,6 +2146,7 @@ function QualityDocumentCard({
   source,
   viewLabel,
   showDownload,
+  isMobile,
 }: {
   title: string;
   description: string;
@@ -2136,10 +2154,11 @@ function QualityDocumentCard({
   source: ImageSourcePropType;
   viewLabel: string;
   showDownload?: boolean;
+  isMobile?: boolean;
 }) {
   return (
-    <View style={styles.qualityDocCard}>
-      <Text style={styles.qualityDocTitle}>{title}</Text>
+    <View style={[styles.qualityDocCard, isMobile && styles.qualityDocCardMobile]}>
+      <Text style={[styles.qualityDocTitle, isMobile && styles.qualityDocTitleMobile]}>{title}</Text>
       <Text style={styles.qualityDocDescription}>{description}</Text>
       {meta.length > 0 ? (
         <View style={styles.qualityDocMetaList}>
@@ -2166,6 +2185,9 @@ function QualityDocumentCard({
 }
 
 function QualityCompliancePage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <SectionShell
       eyebrow="Quality & Compliance"
@@ -2174,7 +2196,7 @@ function QualityCompliancePage() {
     >
       <View style={styles.qualitySection}>
         <Text style={styles.qualitySectionHeading}>Official Certifications</Text>
-        <View style={styles.qualityDocGrid}>
+        <View style={[styles.qualityDocGrid, isMobile && styles.qualityDocGridMobile]}>
           <QualityDocumentCard
             title="MPI Animal Products Exporter Registration"
             description="Official MPI Animal Products Exporter registration for AYYILDIZ Limited trading as Roses Dairy (Halloumi Cheese)."
@@ -2185,6 +2207,7 @@ function QualityCompliancePage() {
             source={mpiRegistrationPdf}
             viewLabel="View Certificate"
             showDownload
+            isMobile={isMobile}
           />
           <QualityDocumentCard
             title="Food Safety & Quality Audit Certificate"
@@ -2193,19 +2216,20 @@ function QualityCompliancePage() {
             source={foodSafetyAuditPdf}
             viewLabel="View Certificate"
             showDownload
+            isMobile={isMobile}
           />
         </View>
       </View>
       <View style={styles.qualitySection}>
         <Text style={styles.qualitySectionHeading}>Halloumi Product Information</Text>
-        <View style={styles.qualityDocGrid}>
+        <View style={[styles.qualityDocGrid, isMobile && styles.qualityDocGridMobile]}>
           <QualityDocumentCard
-            title="Rose’s Dairy Halloumi Product Specification"
+            title="Rose's Dairy Halloumi Product Specification"
             description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
             meta={[
-              { label: 'Product', value: 'Rose’s Dairy Halloumi' },
+              { label: 'Product', value: 'Rose's Dairy Halloumi' },
               { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
-              { label: 'Ingredients', value: 'Pasteurised Cow’s Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Ingredients', value: 'Pasteurised Cow's Milk, Vinegar, Salt, Vegetable Rennet.' },
               { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
               { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
               { label: 'Opened', value: 'Consume within 5 days once opened.' },
@@ -3181,11 +3205,14 @@ function CustomersScreen() {
 }
 
 function SectionShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: ReactNode }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  
   return (
     <View style={styles.sectionShell}>
       <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
-      <Text style={styles.sectionTitle} numberOfLines={3}>{title}</Text>
-      <Text style={styles.sectionDescription}>{description}</Text>
+      <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]} numberOfLines={3}>{title}</Text>
+      <Text style={[styles.sectionDescription, isMobile && styles.sectionDescriptionMobile]}>{description}</Text>
       {children}
     </View>
   );
@@ -3394,6 +3421,10 @@ const styles = StyleSheet.create({
     width: 90,
     height: 38,
   },
+  headerLogoMobile: {
+    width: 75,
+    height: 32,
+  },
   brandCopyWrap: {
     flexShrink: 1,
   },
@@ -3417,11 +3448,18 @@ const styles = StyleSheet.create({
   navRowCompact: {
     justifyContent: 'flex-start',
   },
+  navRowMobile: {
+    gap: 6,
+  },
   navButton: {
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: '#f2ead9',
+  },
+  navButtonMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   navButtonActive: {
     backgroundColor: '#1f5c43',
@@ -3429,6 +3467,9 @@ const styles = StyleSheet.create({
   navButtonText: {
     color: '#224232',
     fontWeight: '600',
+  },
+  navButtonTextMobile: {
+    fontSize: 13,
   },
   navButtonTextActive: {
     color: '#fffef8',
@@ -3440,9 +3481,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1f5c43',
   },
+  signOutButtonMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
   signOutButtonText: {
     color: '#1f5c43',
     fontWeight: '700',
+  },
+  signOutButtonTextMobile: {
+    fontSize: 13,
   },
   heroShell: {
     borderRadius: 32,
@@ -3491,11 +3539,19 @@ const styles = StyleSheet.create({
     color: '#fffdf8',
     maxWidth: 560,
   },
+  heroTitleMobile: {
+    fontSize: 24,
+    lineHeight: 32,
+  },
   heroSubtitle: {
     fontSize: 18,
     lineHeight: 28,
     color: '#f5f2ea',
     maxWidth: 520,
+  },
+  heroSubtitleMobile: {
+    fontSize: 16,
+    lineHeight: 24,
   },
   heroActionRow: {
     flexDirection: 'row',
@@ -3518,16 +3574,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#123524',
   },
+  sectionTitleMobile: {
+    fontSize: 20,
+    lineHeight: 26,
+  },
   sectionDescription: {
     fontSize: 17,
     lineHeight: 27,
     color: '#4d5c54',
     maxWidth: 760,
   },
+  sectionDescriptionMobile: {
+    fontSize: 15,
+    lineHeight: 24,
+  },
   productGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
+  },
+  productGridMobile: {
+    gap: 12,
   },
   productCard: {
     flexBasis: 280,
@@ -3539,6 +3606,11 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 12,
   },
+  productCardMobile: {
+    flexBasis: 240,
+    padding: 16,
+    borderRadius: 20,
+  },
   productLogoPanel: {
     backgroundColor: '#f5efe0',
     borderRadius: 18,
@@ -3546,6 +3618,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 320,
+  },
+  productLogoPanelMobile: {
+    height: 240,
+    padding: 12,
+    borderRadius: 14,
   },
   productLogo: {
     width: '100%',
@@ -3555,6 +3632,9 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#123524',
+  },
+  productCardNameMobile: {
+    fontSize: 18,
   },
   productCardSize: {
     fontSize: 15,
@@ -3683,6 +3763,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 16,
   },
+  qualityDocGridMobile: {
+    gap: 12,
+  },
   qualityDocCard: {
     flexBasis: 320,
     flexGrow: 1,
@@ -3693,10 +3776,18 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 12,
   },
+  qualityDocCardMobile: {
+    flexBasis: 260,
+    padding: 16,
+    borderRadius: 20,
+  },
   qualityDocTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#123524',
+  },
+  qualityDocTitleMobile: {
+    fontSize: 17,
   },
   qualityDocDescription: {
     fontSize: 15,
@@ -3744,6 +3835,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 16,
   },
+  valueGridMobile: {
+    gap: 12,
+  },
   valueCard: {
     flexBasis: 240,
     flexGrow: 1,
@@ -3754,20 +3848,35 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
     gap: 10,
   },
+  valueCardMobile: {
+    flexBasis: 200,
+    padding: 16,
+    borderRadius: 20,
+  },
   valueCardTitle: {
     fontSize: 19,
     fontWeight: '700',
     color: '#123524',
+  },
+  valueCardTitleMobile: {
+    fontSize: 16,
   },
   valueCardDescription: {
     fontSize: 15,
     lineHeight: 24,
     color: '#4d5c54',
   },
+  valueCardDescriptionMobile: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
   recipeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
+  },
+  recipeGridMobile: {
+    gap: 12,
   },
   recipeCard: {
     flexBasis: 300,
@@ -3778,9 +3887,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e7ddc9',
   },
+  recipeCardMobile: {
+    flexBasis: 260,
+    borderRadius: 20,
+  },
   recipeCardImage: {
     width: '100%',
     height: 220,
+  },
+  recipeCardImageMobile: {
+    height: 180,
   },
   recipeCardTitle: {
     paddingHorizontal: 18,
@@ -3789,6 +3905,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#123524',
   },
+  recipeCardTitleMobile: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    fontSize: 17,
+  },
   recipeCardDescription: {
     paddingHorizontal: 18,
     paddingTop: 8,
@@ -3796,6 +3917,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     color: '#4d5c54',
+  },
+  recipeCardDescriptionMobile: {
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 14,
+    fontSize: 14,
+    lineHeight: 21,
   },
   storyCard: {
     backgroundColor: '#fffdf8',
@@ -3929,7 +4057,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   storyJourneyTitleMobile: {
-    fontSize: 21,
+    fontSize: 20,
     lineHeight: 26,
   },
   storyJourneyDescription: {
@@ -3937,6 +4065,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 26,
     maxWidth: 520,
+  },
+  storyJourneyDescriptionMobile: {
+    fontSize: 14,
+    lineHeight: 22,
   },
   storyFamilySection: {
     gap: 16,
@@ -4207,45 +4339,81 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+  footerShellMobile: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
   footerBrandRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
     alignItems: 'center',
   },
+  footerBrandRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
   footerLogo: {
     width: 150,
     height: 64,
     backgroundColor: 'transparent',
   },
+  footerLogoMobile: {
+    width: 110,
+    height: 48,
+  },
   footerBrandCopy: {
     gap: 4,
+  },
+  footerBrandCopyMobile: {
+    gap: 2,
   },
   footerBrandName: {
     fontSize: 24,
     fontWeight: '800',
     color: '#fffef8',
   },
+  footerBrandNameMobile: {
+    fontSize: 18,
+  },
   footerBrandTagline: {
     color: '#f0e7d2',
     fontSize: 14,
   },
+  footerBrandTaglineMobile: {
+    fontSize: 12,
+  },
   footerStatement: {
     color: '#f2d77e',
     fontWeight: '700',
+  },
+  footerStatementMobile: {
+    fontSize: 12,
   },
   footerLinksWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
+  footerLinksWrapMobile: {
+    gap: 8,
+  },
   footerLinkButton: {
     paddingVertical: 4,
     paddingRight: 8,
   },
+  footerLinkButtonMobile: {
+    paddingVertical: 2,
+    paddingRight: 6,
+  },
   footerLinkText: {
     color: '#f0e7d2',
     fontWeight: '600',
+  },
+  footerLinkTextMobile: {
+    fontSize: 13,
   },
   footerLinkTextActive: {
     color: '#f2d77e',
@@ -4257,6 +4425,9 @@ const styles = StyleSheet.create({
     color: '#fffef8',
     fontSize: 16,
     fontWeight: '700',
+  },
+  footerSectionLabelMobile: {
+    fontSize: 14,
   },
   footerSocialRow: {
     flexDirection: 'row',
@@ -4270,6 +4441,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  footerSocialButtonMobile: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
   footerSocialButtonFocused: {
     borderWidth: 2,
     borderColor: '#f2d77e',
@@ -4277,5 +4453,9 @@ const styles = StyleSheet.create({
   footerMeta: {
     color: '#d7ddda',
     lineHeight: 22,
+  },
+  footerMetaMobile: {
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

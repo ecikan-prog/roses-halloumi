@@ -1,38 +1,39 @@
-ios-build-production:
-  name: Grassland Cheese iOS Production
+workflows:
+  ios-build-production:
+    name: Grassland Cheese iOS Production
 
-  environment:
-    ios_signing:
-      distribution_type: app_store
-      bundle_identifier: com.grasslandcheese.app
-    groups:
-      - grassland_cheese_ios
-    xcode: 26.4
-    node: 22.13
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.grasslandcheese.app
+      groups:
+        - grassland_cheese_ios
+      xcode: 26.4
+      node: 22.13
 
-  scripts:
-    - name: Install dependencies
-      script: |
-        npm install
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
 
-    - name: Prebuild iOS
-      script: |
-        cd apps/mobile
-        npx expo prebuild --platform ios --clean
+      - name: Prebuild iOS
+        script: |
+          cd apps/mobile
+          npx expo prebuild --platform ios --clean
 
-    - name: Set up code signing
-      script: |
-        cd apps/mobile/ios
-        xcode-project use-profiles
+      - name: Set up code signing
+        script: |
+          cd apps/mobile/ios
+          xcode-project use-profiles
 
-    - name: Build IPA
-      script: |
-        cd apps/mobile/ios
-        xcode-project build-ipa \
-          --workspace dairy-sales.xcworkspace \
-          --scheme dairy-sales \
-          --configuration Release \
-          --export-method app-store
+      - name: Build IPA
+        script: |
+          cd apps/mobile/ios
+          xcode-project build-ipa \
+            --workspace dairy-sales.xcworkspace \
+            --scheme dairy-sales \
+            --configuration Release \
+            --export-method app-store
 
-  artifacts:
-    - apps/mobile/ios/build/ios/ipa/*.ipa
+    artifacts:
+      - apps/mobile/ios/build/ios/ipa/*.ipa

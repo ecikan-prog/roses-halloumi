@@ -1,52 +1,54 @@
 /**
- * Crisp Chat Integration
+ * Tawk.to Live Chat Integration
  * 
- * This module initializes Crisp live chat widget on web platform.
- * Crisp website ID should be set in the EXPO_PUBLIC_CRISP_WEBSITE_ID environment variable.
+ * This module initializes Tawk.to live chat widget on web platform.
+ * Tawk.to property ID should be set in the EXPO_PUBLIC_TAWK_TO_PROPERTY_ID environment variable.
  * 
  * Account created under: info@grasslandcheese.com
- * https://crisp.chat
+ * https://tawk.to
  */
 
-export function initializeCrispChat(websiteId: string) {
+export function initializeTawkToChat(propertyId: string) {
   // Only inject on web platform
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return;
   }
 
-  // Check if Crisp is already loaded
-  if (window.$crisp) {
+  // Check if Tawk.to is already loaded
+  if (window.Tawk_API) {
     return;
   }
 
-  // Initialize Crisp
-  window.$crisp = [];
-  window.CRISP_WEBSITE_ID = websiteId;
+  // Initialize Tawk.to global variables
+  window.Tawk_API = window.Tawk_API || {};
+  window.Tawk_LoadStart = new Date();
 
-  // Create and inject Crisp script
+  // Create and inject Tawk.to script
   const script = document.createElement('script');
   script.type = 'text/javascript';
   script.async = true;
-  script.src = 'https://client.crisp.chat/l.js';
+  script.src = `https://embed.tawk.to/${propertyId}/1`;
+  script.charset = 'UTF-8';
+  script.setAttribute('crossorigin', '*');
 
   // Add CSS to prevent chat widget from covering cart/checkout buttons on mobile
   const style = document.createElement('style');
   style.textContent = `
-    /* Crisp chat widget positioning adjustments for mobile */
+    /* Tawk.to chat widget positioning adjustments for mobile */
     @media (max-width: 768px) {
       /* Ensure chat button doesn't cover bottom elements */
-      .crisp-client {
+      .tawk {
         z-index: 999;
       }
       
       /* Adjust chat widget margins on small screens */
-      .crisp-client iframe {
+      .tawk iframe {
         margin-bottom: 0;
       }
     }
     
-    /* General Crisp styling */
-    .crisp-client {
+    /* General Tawk.to styling */
+    .tawk {
       z-index: 9999 !important;
     }
   `;
@@ -54,13 +56,13 @@ export function initializeCrispChat(websiteId: string) {
   document.head.appendChild(style);
   document.body.appendChild(script);
 
-  console.log('[Crisp Chat] Initialized with Website ID:', websiteId);
+  console.log('[Tawk.to Chat] Initialized with Property ID:', propertyId);
 }
 
-// Declare Crisp global types
+// Declare Tawk.to global types
 declare global {
   interface Window {
-    $crisp?: unknown[];
-    CRISP_WEBSITE_ID?: string;
+    Tawk_API?: unknown;
+    Tawk_LoadStart?: Date;
   }
 }

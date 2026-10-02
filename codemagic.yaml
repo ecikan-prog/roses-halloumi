@@ -5,12 +5,7 @@ workflows:
     max_build_duration: 90
     environment:
       groups:
-        - ios_code_signing
-      vars:
-        APP_STORE_BUNDLE_ID: com.grasslandcheese.app
-        EXPO_PUBLIC_API_URL: $EXPO_PUBLIC_API_URL
-        XCODE_SCHEME: dairy_sales
-        XCODE_CONFIGURATION: Release
+        - grassland_cheese_ios
       xcode: 16.2
       node: 18.17.0
     ios_signing:
@@ -37,52 +32,19 @@ workflows:
           cd $CM_BUILD_DIR/apps/mobile
           BUILD_NUMBER=$CI_BUILD_NUMBER
           xcrun agvtool new-version -all "$BUILD_NUMBER"
-      - name: Create ExportOptions.plist for App Store
-        script: |
-          cd $CM_BUILD_DIR/apps/mobile/ios
-          cat > ExportOptions.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>signingStyle</key>
-              <string>automatic</string>
-              <key>teamID</key>
-              <string>$TEAM_ID</string>
-              <key>stripSwiftSymbols</key>
-              <true/>
-              <key>thinning</key>
-              <string>&lt;none&gt;</string>
-          </dict>
-          </plist>
-          EOF
-      - name: Build iOS app archive for App Store
+      - name: Set up iOS code signing with Codemagic
         script: |
           cd $CM_BUILD_DIR/apps/mobile
-          xcodebuild \
-            -workspace ios/dairy_sales.xcworkspace \
-            -scheme "$XCODE_SCHEME" \
-            -configuration "$XCODE_CONFIGURATION" \
-            -derivedDataPath build \
-            -archivePath build/dairy_sales.xcarchive \
-            -allowProvisioningUpdates \
-            clean archive
-      - name: Export .ipa for App Store distribution
+          xcode-project use-profiles
+      - name: Build iOS app as .ipa for App Store
         script: |
           cd $CM_BUILD_DIR/apps/mobile
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/dairy_sales.xcarchive \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -exportPath build/ipa \
-            -allowProvisioningUpdates
-      - name: Verify .ipa artifact
-        script: |
-          ls -lh $CM_BUILD_DIR/apps/mobile/build/ipa/*.ipa
+          xcode-project build-ipa \
+            --workspace ios/dairy_sales.xcworkspace \
+            --scheme dairy_sales \
+            --configuration Release
     artifacts:
-      - $CM_BUILD_DIR/apps/mobile/build/ipa/*.ipa
+      - $CM_BUILD_DIR/apps/mobile/build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
         auth: integration
@@ -101,12 +63,7 @@ workflows:
     max_build_duration: 90
     environment:
       groups:
-        - ios_code_signing
-      vars:
-        APP_STORE_BUNDLE_ID: com.grasslandcheese.app
-        EXPO_PUBLIC_API_URL: $EXPO_PUBLIC_API_URL_DEV
-        XCODE_SCHEME: dairy_sales
-        XCODE_CONFIGURATION: Debug
+        - grassland_cheese_ios
       xcode: 16.2
       node: 18.17.0
     ios_signing:
@@ -128,49 +85,19 @@ workflows:
         script: |
           cd $CM_BUILD_DIR/apps/mobile/ios
           pod install
-      - name: Create ExportOptions.plist for Ad Hoc distribution
-        script: |
-          cd $CM_BUILD_DIR/apps/mobile/ios
-          cat > ExportOptions.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>ad-hoc</string>
-              <key>signingStyle</key>
-              <string>automatic</string>
-              <key>teamID</key>
-              <string>$TEAM_ID</string>
-              <key>stripSwiftSymbols</key>
-              <true/>
-              <key>thinning</key>
-              <string>&lt;none&gt;</string>
-          </dict>
-          </plist>
-          EOF
-      - name: Build iOS app archive for development
+      - name: Set up iOS code signing with Codemagic
         script: |
           cd $CM_BUILD_DIR/apps/mobile
-          xcodebuild \
-            -workspace ios/dairy_sales.xcworkspace \
-            -scheme "$XCODE_SCHEME" \
-            -configuration "$XCODE_CONFIGURATION" \
-            -derivedDataPath build-dev \
-            -archivePath build-dev/dairy_sales-dev.xcarchive \
-            -allowProvisioningUpdates \
-            clean archive
-      - name: Export .ipa for development distribution
+          xcode-project use-profiles
+      - name: Build iOS app as .ipa for Ad Hoc distribution
         script: |
           cd $CM_BUILD_DIR/apps/mobile
-          xcodebuild \
-            -exportArchive \
-            -archivePath build-dev/dairy_sales-dev.xcarchive \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -exportPath build-dev/ipa \
-            -allowProvisioningUpdates
+          xcode-project build-ipa \
+            --workspace ios/dairy_sales.xcworkspace \
+            --scheme dairy_sales \
+            --configuration Debug
     artifacts:
-      - $CM_BUILD_DIR/apps/mobile/build-dev/ipa/*.ipa
+      - $CM_BUILD_DIR/apps/mobile/build/ios/ipa/*.ipa
     publishing:
       email:
         recipients:

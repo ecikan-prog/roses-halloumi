@@ -27,9 +27,9 @@ export function initializeTawkToChat(propertyId: string) {
   const script = document.createElement('script');
   script.type = 'text/javascript';
   script.async = true;
-  script.src = `https://embed.tawk.to/${propertyId}/1`;
+  script.src = `https://embed.tawk.to/${propertyId}/default`;
   script.charset = 'UTF-8';
-  script.setAttribute('crossorigin', '*');
+  script.setAttribute('crossorigin', '');
 
   // Add CSS to prevent chat widget from covering cart/checkout buttons on mobile
   const style = document.createElement('style');

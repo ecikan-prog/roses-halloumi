@@ -44,7 +44,7 @@ workflows:
       - apps/mobile/ios/build/ios/ipa/*.ipa
 
     integrations:
-      app_store_connect: grassland_cheese_ios
+      app_store_connect: DriveLegal
 
     publishing:
       app_store_connect:

@@ -1,3 +1,6 @@
+integrations:
+  app_store_connect: Codemagic CI
+
 workflows:
   ios-build:
     name: iOS Build
@@ -6,9 +9,6 @@ workflows:
         - grassland_cheese_ios
       xcode: 26.4
       node: 22.13
-      variables:
-        BUNDLE_ID: com.grasslandcheese.app
-        PROJECT_NAME: dairy-sales
     scripts:
       - name: Install dependencies
         script: |
@@ -29,10 +29,6 @@ workflows:
             --scheme dairy-sales \
             --configuration Release \
             --export-method ad-hoc
-        triggerOn:
-          branch:
-            pattern: develop
-            includeTags: false
       - name: Build for App Store (Production)
         script: |
           cd apps/mobile/ios
@@ -42,10 +38,6 @@ workflows:
             --scheme dairy-sales \
             --configuration Release \
             --export-method app-store
-        triggerOn:
-          branch:
-            pattern: main
-            includeTags: false
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
@@ -53,11 +45,6 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
-    triggers:
-      - branch:
-          pattern: main
-      - branch:
-          pattern: develop
 
   ios-build-production:
     name: iOS Build Production
@@ -66,9 +53,6 @@ workflows:
         - grassland_cheese_ios
       xcode: 26.4
       node: 22.13
-      variables:
-        BUNDLE_ID: com.grasslandcheese.app
-        PROJECT_NAME: dairy-sales
     scripts:
       - name: Install dependencies
         script: |
@@ -96,6 +80,3 @@ workflows:
         auth: integration
         submit_to_testflight: false
         submit_to_app_store: true
-    triggers:
-      - branch:
-          pattern: main

@@ -1232,8 +1232,8 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
       <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
       <Text style={styles.heroSubtitle}>{heroMessage}</Text>
       <View style={styles.heroActionRow}>
-        <Pressable style={styles.primaryButton} onPress={onPrimary}>
-          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+        <Pressable style={styles.primaryHeroButton} onPress={onPrimary}>
+          <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
         </Pressable>
         <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
           <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
@@ -1581,7 +1581,7 @@ function ProductCard({
       <View style={styles.productLogoPanel}>
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
-      <Text style={styles.productCardName}>{product.name}</Text>
+      <Text style={styles.productCardName} numberOfLines={3}>{product.name}</Text>
       <Text style={styles.productCardDescription}>{product.description}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
@@ -1632,7 +1632,7 @@ function ProductDetailCard({
           <Image source={grasslandLogo} style={styles.productDetailLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
           <View>
             <Text style={styles.sectionEyebrow}>Product details</Text>
-            <Text style={styles.productDetailTitle}>{product.name}</Text>
+            <Text style={styles.productDetailTitle} numberOfLines={3}>{product.name}</Text>
           </View>
         </View>
         <Pressable style={styles.secondaryButton} onPress={onClose}>
@@ -2043,7 +2043,7 @@ function OurStoryPageSection() {
                 <View style={styles.storyJourneyNumberCircle}>
                   <Text style={styles.storyJourneyNumberText}>{stage.number}</Text>
                 </View>
-                <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>{stage.title}</Text>
+                <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]} numberOfLines={3}>{stage.title}</Text>
                 <Text style={styles.storyJourneyDescription}>{stage.description}</Text>
               </View>
             </View>
@@ -2738,7 +2738,7 @@ function AccountPage({
         <View style={styles.inlineCardColumn}>
           <View style={styles.brandPanelCard}>
             <Image source={grasslandLogo} style={styles.accountLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-            <Text style={styles.brandPanelTitle}>{brandName}</Text>
+            <Text style={styles.brandPanelTitle} numberOfLines={3}>{brandName}</Text>
             <Text style={styles.brandPanelSubtitle}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
             <Text style={styles.brandPanelMeta}>{brandStatement}</Text>
             <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
@@ -3192,7 +3192,7 @@ function SectionShell({ eyebrow, title, description, children }: { eyebrow: stri
   return (
     <View style={styles.sectionShell}>
       <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={styles.sectionTitle} numberOfLines={3}>{title}</Text>
       <Text style={styles.sectionDescription}>{description}</Text>
       {children}
     </View>
@@ -3493,8 +3493,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroTitle: {
-    fontSize: 42,
-    lineHeight: 48,
+    fontSize: 31,
+    lineHeight: 38,
     fontWeight: '800',
     color: '#fffdf8',
     maxWidth: 560,
@@ -3521,8 +3521,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sectionTitle: {
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 25,
+    lineHeight: 30,
     fontWeight: '800',
     color: '#123524',
   },
@@ -3663,6 +3663,18 @@ const styles = StyleSheet.create({
   },
   secondaryHeroButtonLabel: {
     color: '#fffef8',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  primaryHeroButton: {
+    backgroundColor: '#D4AF37',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  primaryHeroButtonLabel: {
+    color: '#1f5c43',
     fontWeight: '700',
     fontSize: 16,
   },
@@ -3840,15 +3852,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   storyHeroTitle: {
-    fontSize: 46,
-    lineHeight: 52,
+    fontSize: 34,
+    lineHeight: 40,
     fontWeight: '800',
     color: '#fffdf8',
     maxWidth: 700,
   },
   storyHeroTitleMobile: {
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 25,
+    lineHeight: 30,
   },
   storyHeroSubtitle: {
     fontSize: 18,
@@ -3921,12 +3933,12 @@ const styles = StyleSheet.create({
   storyJourneyTitle: {
     color: '#123524',
     fontWeight: '800',
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 24,
+    lineHeight: 30,
   },
   storyJourneyTitleMobile: {
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 21,
+    lineHeight: 26,
   },
   storyJourneyDescription: {
     color: '#4d5c54',
@@ -4122,7 +4134,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   brandPanelTitle: {
-    fontSize: 30,
+    fontSize: 22,
     fontWeight: '800',
     color: '#fffef8',
   },
@@ -4212,6 +4224,7 @@ const styles = StyleSheet.create({
   footerLogo: {
     width: 150,
     height: 64,
+    backgroundColor: 'transparent',
   },
   footerBrandCopy: {
     gap: 4,

@@ -1289,6 +1289,8 @@ function PublicShopSection({
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   // Defensive default: shopProducts should always be an array by the time it reaches this
   // component (it is derived from a fixed list of product specs, never directly from the
   // API response), but a missing/null prop here previously crashed the whole app with
@@ -1307,7 +1309,7 @@ function PublicShopSection({
 
   return (
     <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
-      <View style={styles.productGrid}>
+      <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
         {safeShopProducts.map((product) => {
           const backendProduct = product.product;
           const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
@@ -1348,6 +1350,8 @@ function PublicShopPage({
   quantities: Record<number, number>;
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
   // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
   const safeShopProducts = shopProducts ?? [];
 
@@ -1358,7 +1362,7 @@ function PublicShopPage({
         {!isLoading && safeShopProducts.length === 0 ? (
           <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
         ) : null}
-        <View style={styles.productGrid}>
+        <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
           {safeShopProducts.map((product) => {
             const backendProduct = product.product;
             const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
@@ -1382,9 +1386,9 @@ function PublicShopPage({
             );
           })}
         </View>
-        <View style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>Halloumi only</Text>
-          <Text style={styles.noticeText}>Recipes and food photography remain inspiration only and are never shown as products, prices, cart items, or orderable dishes.</Text>
+        <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+          <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Halloumi only</Text>
+          <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Recipes and food photography remain inspiration only and are never shown as products, prices, cart items, or orderable dishes.</Text>
         </View>
       </SectionShell>
       <WholesaleSection onNavigate={onNavigate} />
@@ -1942,12 +1946,15 @@ function PublicCartPage({
 }
 
 function RecipesPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <>
       <RecipesSection />
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Recipes are inspiration only</Text>
-        <Text style={styles.noticeText}>Prepared dishes never become products, cart items, inventory, checkout lines, or orderable food.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Recipes are inspiration only</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Prepared dishes never become products, cart items, inventory, checkout lines, or orderable food.</Text>
       </View>
     </>
   );
@@ -2450,14 +2457,17 @@ function WholesaleContactForm() {
 }
 
 function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
       <GeneralContactForm />
       <WholesaleContactForm />
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Already a customer?</Text>
-        <Text style={styles.noticeText}>Sign in to your customer account to place orders and view order history.</Text>
-        <View style={styles.heroActionRow}>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Already a customer?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in to your customer account to place orders and view order history.</Text>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
           <Pressable style={styles.secondaryButton} onPress={() => onNavigate('account')}>
             <Text style={styles.secondaryButtonLabel}>Open Account</Text>
           </Pressable>
@@ -2708,13 +2718,16 @@ function WholesaleApplicationForm() {
 }
 
 function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
       <WholesaleApplicationForm />
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeTitle}>Questions?</Text>
-        <Text style={styles.noticeText}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
-        <View style={styles.heroActionRow}>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Questions?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
           <Pressable style={styles.secondaryButton} onPress={() => onNavigate('contact')}>
             <Text style={styles.secondaryButtonLabel}>Contact Us</Text>
           </Pressable>
@@ -2725,22 +2738,28 @@ function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void })
 }
 
 function PrivacyPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Privacy" title="Privacy" description="A concise overview for the current ordering experience.">
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeText}>Grassland Cheese uses account and order details to support sign-in, customer account access, ordering, and order history within the current application experience.</Text>
-        <Text style={styles.noticeText}>More detailed privacy content can be published here without changing the existing customer ordering flow.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Grassland Cheese uses account and order details to support sign-in, customer account access, ordering, and order history within the current application experience.</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>More detailed privacy content can be published here without changing the existing customer ordering flow.</Text>
       </View>
     </SectionShell>
   );
 }
 
 function TermsPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <SectionShell eyebrow="Terms" title="Terms" description="A simple placeholder for the current web ordering experience.">
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeText}>Product availability and customer access depend on the live catalog records provided by the existing ordering system.</Text>
-        <Text style={styles.noticeText}>Recipes and food inspiration remain informational content only and are never treated as orderable products.</Text>
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Product availability and customer access depend on the live catalog records provided by the existing ordering system.</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Recipes and food inspiration remain informational content only and are never treated as orderable products.</Text>
       </View>
     </SectionShell>
   );
@@ -3562,6 +3581,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  heroActionRowMobile: {
+    gap: 10,
   },
   sectionShell: {
     gap: 16,

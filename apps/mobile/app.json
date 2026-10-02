@@ -8,7 +8,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.grasslandcheese.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "icon": "./assets/grassland-cheese-app-icon.png",
       "splash": {
         "image": "./assets/grassland-cheese-logo.png",
@@ -17,12 +17,13 @@
       },
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "This app does not require local network access.",
-        "NSBonjourServices": []
+        "NSBonjourServices": [],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.grasslandcheese.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -34,7 +35,8 @@
         "image": "./assets/grassland-cheese-logo.png",
         "resizeMode": "contain",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "blockedPermissions": ["SYSTEM_ALERT_WINDOW", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
     },
     "web": {
       "favicon": "./assets/grassland-cheese-logo.png"

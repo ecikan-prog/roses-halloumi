@@ -253,15 +253,15 @@ const shopProductSpecs: ShopProductSpec[] = [
 const whyGrasslandItems = [
   {
     title: 'New Zealand Product',
-    description: 'A clean, confident brand story anchored in New Zealand product positioning.',
+    description: 'Premium halloumi made from New Zealand milk, grilled to perfection.',
   },
   {
     title: 'Quality Halloumi',
-    description: 'A focused range built entirely around halloumi, with no distractions from prepared dishes.',
+    description: 'Pure, simple halloumi with nothing else — no extras, just quality cheese.',
   },
   {
     title: 'Made for Grilling',
-    description: 'Created for cooking moments that suit grilling, pan-frying, and easy sharing at the table.',
+    description: 'Slice, grill, and share — a high-melting cheese that holds its shape on the plate.',
   },
   {
     title: 'Everyday to Entertaining',
@@ -270,11 +270,13 @@ const whyGrasslandItems = [
 ] as const;
 
 const recipeFeatures: RecipeFeature[] = [
-  {
-    title: 'Grilled Halloumi',
-    description: 'Golden, charred halloumi inspiration for simple meals and warm platters.',
-    image: grilledHalloumiImage,
-  },
+  // NOTE: 'Grilled Halloumi' recipe card is hidden due to image containing typo "BURGGER".
+  // Will be restored once corrected image is supplied.
+  // {
+  //   title: 'Grilled Halloumi',
+  //   description: 'Golden, charred halloumi inspiration for simple meals and warm platters.',
+  //   image: grilledHalloumiImage,
+  // },
   {
     title: 'Halloumi Burger',
     description: 'A burger-style serving idea that stays firmly in the recipe and inspiration category.',
@@ -1038,29 +1040,21 @@ function SiteHeader({
   isCompact: boolean;
 }) {
   const isStaff = session?.user?.kind === 'staff';
-  const navItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
-    { label: 'Home', page: 'home' },
-    { label: 'Shop Halloumi', page: 'shop' },
+  // Main navigation items for slim header
+  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
+    { label: 'Shop', page: 'shop' },
     { label: 'Recipes', page: 'recipes' },
-    { label: 'Wholesale', page: 'wholesale' },
-    { label: 'Our Story', page: 'about' },
+    { label: session ? 'Account' : 'Login', page: 'account' },
     { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
-    { label: session ? 'Customer Account' : 'Login', page: 'account' },
-    ...(session && !isStaff ? [{ label: 'My Orders', page: 'orders' as const }] : []),
-    ...(isStaff ? [{ label: 'Orders', page: 'orders' as const }, { label: 'Customers', page: 'customers' as const }] : []),
   ];
 
   return (
     <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
       <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
         <Image source={grasslandLogo} style={styles.headerLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-        <View style={styles.brandCopyWrap}>
-          <Text style={styles.brandName}>{brandName}</Text>
-          <Text style={styles.brandTagline}>{brandTagline}</Text>
-        </View>
       </Pressable>
       <View style={[styles.navRow, isCompact && styles.navRowCompact]}>
-        {navItems.map((item) => {
+        {mainNavItems.map((item) => {
           const selected = item.page === currentPage;
           return (
             <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
@@ -1230,8 +1224,8 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
       <Text style={styles.heroTitle}>Pure Goodness From Our Pastures</Text>
       <Text style={styles.heroSubtitle}>{heroMessage}</Text>
       <View style={styles.heroActionRow}>
-        <Pressable style={styles.primaryButton} onPress={onPrimary}>
-          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+        <Pressable style={styles.primaryHeroButton} onPress={onPrimary}>
+          <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
         </Pressable>
         <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
           <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
@@ -1579,8 +1573,7 @@ function ProductCard({
       <View style={styles.productLogoPanel}>
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
-      <Text style={styles.productCardName}>{product.name}</Text>
-      <Text style={styles.productCardSize}>{product.size}</Text>
+      <Text style={styles.productCardName} numberOfLines={3}>{product.name}</Text>
       <Text style={styles.productCardDescription}>{product.description}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
@@ -1600,7 +1593,7 @@ function ProductCard({
           </Pressable>
         </View>
       </View>
-      <Pressable disabled={disabled} style={[styles.primaryButton, disabled && styles.disabledPrimaryButton]} onPress={onAdd}>
+      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
         <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
       </Pressable>
     </View>
@@ -1631,7 +1624,7 @@ function ProductDetailCard({
           <Image source={grasslandLogo} style={styles.productDetailLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
           <View>
             <Text style={styles.sectionEyebrow}>Product details</Text>
-            <Text style={styles.productDetailTitle}>{product.name}</Text>
+            <Text style={styles.productDetailTitle} numberOfLines={3}>{product.name}</Text>
           </View>
         </View>
         <Pressable style={styles.secondaryButton} onPress={onClose}>
@@ -1949,7 +1942,7 @@ function RecipesPage() {
 
 function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {}) {
   return (
-    <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Use the food photography for inspiration only. The shop continues to sell halloumi cheese only.">
+    <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Ideas to inspire your cooking. We sell halloumi cheese — recipes are for inspiration only.">
       <View style={styles.recipeGrid}>
         {recipeFeatures.map((recipe) => (
           <View key={recipe.title} style={styles.recipeCard}>
@@ -1970,7 +1963,7 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
 
 function WhyGrasslandSection() {
   return (
-    <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Built around a clean New Zealand identity, premium presentation, and versatile halloumi moments.">
+    <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Pure halloumi from New Zealand, made for grilling and sharing.">
       <View style={styles.valueGrid}>
         {whyGrasslandItems.map((item) => (
           <View key={item.title} style={styles.valueCard}>
@@ -1985,11 +1978,11 @@ function WhyGrasslandSection() {
 
 function StorySection() {
   return (
-    <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Grassland Cheese brings a warm, premium brand identity to a halloumi range designed for modern home cooking and sharing.">
+    <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Quality halloumi made for simple grilling, pan-frying, and sharing.">
       <View style={styles.storyCard}>
-        <Text style={styles.storyParagraph}>Grassland Cheese is built around a simple promise: premium halloumi presented with warmth, confidence, and an easy sense of occasion.</Text>
-        <Text style={styles.storyParagraph}>The brand brings together a clean New Zealand product identity, a focused halloumi offering, and food inspiration that helps customers imagine how to cook, serve, and share it.</Text>
-        <Text style={styles.storyParagraph}>From everyday dinners to entertaining platters, Grassland Cheese keeps the range clear, premium, and centered on halloumi.</Text>
+        <Text style={styles.storyParagraph}>Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.</Text>
+        <Text style={styles.storyParagraph}>We focus on one thing: producing the best halloumi for your table. Slice it, grill it, share it.</Text>
+        <Text style={styles.storyParagraph}>From weeknight dinners to special occasions, Grassland Cheese is halloumi the way it should be.</Text>
       </View>
     </SectionShell>
   );
@@ -2042,7 +2035,7 @@ function OurStoryPageSection() {
                 <View style={styles.storyJourneyNumberCircle}>
                   <Text style={styles.storyJourneyNumberText}>{stage.number}</Text>
                 </View>
-                <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>{stage.title}</Text>
+                <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]} numberOfLines={3}>{stage.title}</Text>
                 <Text style={styles.storyJourneyDescription}>{stage.description}</Text>
               </View>
             </View>
@@ -2737,7 +2730,7 @@ function AccountPage({
         <View style={styles.inlineCardColumn}>
           <View style={styles.brandPanelCard}>
             <Image source={grasslandLogo} style={styles.accountLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-            <Text style={styles.brandPanelTitle}>{brandName}</Text>
+            <Text style={styles.brandPanelTitle} numberOfLines={3}>{brandName}</Text>
             <Text style={styles.brandPanelSubtitle}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
             <Text style={styles.brandPanelMeta}>{brandStatement}</Text>
             <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
@@ -2773,7 +2766,7 @@ function SignedInAccountPage({
       await onSignOut();
       alert('Your account has been successfully deleted.');
     } catch (error) {
-      alert(`Error deleting account: ${error instanceof Error ? error.message : String(error)}`);
+      alert(`Error deleting account: ${getErrorMessage(error)}`);
     }
   };
 
@@ -3191,7 +3184,7 @@ function SectionShell({ eyebrow, title, description, children }: { eyebrow: stri
   return (
     <View style={styles.sectionShell}>
       <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={styles.sectionTitle} numberOfLines={3}>{title}</Text>
       <Text style={styles.sectionDescription}>{description}</Text>
       {children}
     </View>
@@ -3383,14 +3376,14 @@ const styles = StyleSheet.create({
   headerShell: {
     backgroundColor: '#fffdf8',
     borderRadius: 28,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#e7ddc9',
-    gap: 16,
+    gap: 12,
   },
   headerShellCompact: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   brandLockup: {
     flexDirection: 'row',
@@ -3398,8 +3391,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   headerLogo: {
-    width: 150,
-    height: 64,
+    width: 90,
+    height: 38,
   },
   brandCopyWrap: {
     flexShrink: 1,
@@ -3492,8 +3485,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroTitle: {
-    fontSize: 42,
-    lineHeight: 48,
+    fontSize: 31,
+    lineHeight: 38,
     fontWeight: '800',
     color: '#fffdf8',
     maxWidth: 560,
@@ -3520,8 +3513,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sectionTitle: {
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 25,
+    lineHeight: 30,
     fontWeight: '800',
     color: '#123524',
   },
@@ -3662,6 +3655,18 @@ const styles = StyleSheet.create({
   },
   secondaryHeroButtonLabel: {
     color: '#fffef8',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  primaryHeroButton: {
+    backgroundColor: '#D4AF37',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  primaryHeroButtonLabel: {
+    color: '#1f5c43',
     fontWeight: '700',
     fontSize: 16,
   },
@@ -3839,15 +3844,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   storyHeroTitle: {
-    fontSize: 46,
-    lineHeight: 52,
+    fontSize: 34,
+    lineHeight: 40,
     fontWeight: '800',
     color: '#fffdf8',
     maxWidth: 700,
   },
   storyHeroTitleMobile: {
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 25,
+    lineHeight: 30,
   },
   storyHeroSubtitle: {
     fontSize: 18,
@@ -3920,12 +3925,12 @@ const styles = StyleSheet.create({
   storyJourneyTitle: {
     color: '#123524',
     fontWeight: '800',
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 24,
+    lineHeight: 30,
   },
   storyJourneyTitleMobile: {
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 21,
+    lineHeight: 26,
   },
   storyJourneyDescription: {
     color: '#4d5c54',
@@ -4121,7 +4126,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   brandPanelTitle: {
-    fontSize: 30,
+    fontSize: 22,
     fontWeight: '800',
     color: '#fffef8',
   },
@@ -4211,6 +4216,7 @@ const styles = StyleSheet.create({
   footerLogo: {
     width: 150,
     height: 64,
+    backgroundColor: 'transparent',
   },
   footerBrandCopy: {
     gap: 4,

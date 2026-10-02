@@ -253,15 +253,15 @@ const shopProductSpecs: ShopProductSpec[] = [
 const whyGrasslandItems = [
   {
     title: 'New Zealand Product',
-    description: 'A clean, confident brand story anchored in New Zealand product positioning.',
+    description: 'Premium halloumi made from New Zealand milk, grilled to perfection.',
   },
   {
     title: 'Quality Halloumi',
-    description: 'A focused range built entirely around halloumi, with no distractions from prepared dishes.',
+    description: 'Pure, simple halloumi with nothing else — no extras, just quality cheese.',
   },
   {
     title: 'Made for Grilling',
-    description: 'Created for cooking moments that suit grilling, pan-frying, and easy sharing at the table.',
+    description: 'Slice, grill, and share — a high-melting cheese that holds its shape on the plate.',
   },
   {
     title: 'Everyday to Entertaining',
@@ -1950,7 +1950,7 @@ function RecipesPage() {
 
 function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {}) {
   return (
-    <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Use the food photography for inspiration only. The shop continues to sell halloumi cheese only.">
+    <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Ideas to inspire your cooking. We sell halloumi cheese — recipes are for inspiration only.">
       <View style={styles.recipeGrid}>
         {recipeFeatures.map((recipe) => (
           <View key={recipe.title} style={styles.recipeCard}>
@@ -1971,7 +1971,7 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
 
 function WhyGrasslandSection() {
   return (
-    <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Built around a clean New Zealand identity, premium presentation, and versatile halloumi moments.">
+    <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Pure halloumi from New Zealand, made for grilling and sharing.">
       <View style={styles.valueGrid}>
         {whyGrasslandItems.map((item) => (
           <View key={item.title} style={styles.valueCard}>
@@ -1986,11 +1986,11 @@ function WhyGrasslandSection() {
 
 function StorySection() {
   return (
-    <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Grassland Cheese brings a warm, premium brand identity to a halloumi range designed for modern home cooking and sharing.">
+    <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Quality halloumi made for simple grilling, pan-frying, and sharing.">
       <View style={styles.storyCard}>
-        <Text style={styles.storyParagraph}>Grassland Cheese is built around a simple promise: premium halloumi presented with warmth, confidence, and an easy sense of occasion.</Text>
-        <Text style={styles.storyParagraph}>The brand brings together a clean New Zealand product identity, a focused halloumi offering, and food inspiration that helps customers imagine how to cook, serve, and share it.</Text>
-        <Text style={styles.storyParagraph}>From everyday dinners to entertaining platters, Grassland Cheese keeps the range clear, premium, and centered on halloumi.</Text>
+        <Text style={styles.storyParagraph}>Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.</Text>
+        <Text style={styles.storyParagraph}>We focus on one thing: producing the best halloumi for your table. Slice it, grill it, share it.</Text>
+        <Text style={styles.storyParagraph}>From weeknight dinners to special occasions, Grassland Cheese is halloumi the way it should be.</Text>
       </View>
     </SectionShell>
   );

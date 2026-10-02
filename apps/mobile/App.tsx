@@ -2763,6 +2763,19 @@ function SignedInAccountPage({
   onSignOut: () => Promise<void>;
 }) {
   const ordersQuery = trpc.orders.list.useQuery();
+  const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = React.useState('');
+
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteAccountMutation.mutateAsync({ confirmEmail: deleteConfirmEmail });
+      await onSignOut();
+      alert('Your account has been successfully deleted.');
+    } catch (error) {
+      alert(`Error deleting account: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
 
   return (
     <SectionShell eyebrow="Customer Account" title={`Welcome, ${session.user?.name ?? brandName}`} description="Manage your account, review your ordering history, and keep your halloumi shopping connected to the current sales flow.">
@@ -2781,6 +2794,20 @@ function SignedInAccountPage({
                 <Text style={styles.secondaryButtonLabel}>Sign out</Text>
               </Pressable>
             </View>
+            {session.user?.kind === 'customer' && (
+              <>
+                <Text style={[styles.metaText, { marginTop: 16, marginBottom: 8, fontWeight: '600', color: '#999' }]}>Danger zone</Text>
+                <Pressable
+                  style={[styles.secondaryButton, { borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)' }]}
+                  onPress={() => setShowDeleteConfirm(true)}
+                  disabled={deleteAccountMutation.isPending}
+                >
+                  <Text style={[styles.secondaryButtonLabel, { color: '#dc3545' }]}>
+                    {deleteAccountMutation.isPending ? 'Deleting...' : 'Delete Account'}
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
         <View style={styles.inlineCardColumn}>
@@ -2802,6 +2829,45 @@ function SignedInAccountPage({
           </View>
         </View>
       </View>
+      {showDeleteConfirm && (
+        <View style={[styles.inlineCard, { marginTop: 24, borderColor: '#dc3545', borderWidth: 2, backgroundColor: 'rgba(220, 53, 69, 0.05)' }]}>
+          <Text style={[styles.inlineCardTitle, { color: '#dc3545' }]}>Confirm Account Deletion</Text>
+          <Text style={[styles.metaText, { marginBottom: 12 }]}>
+            This action cannot be undone. All your orders and account data will be permanently deleted.
+          </Text>
+          <Text style={[styles.metaText, { marginBottom: 8, fontWeight: '600' }]}>
+            Please type your email address to confirm:
+          </Text>
+          <TextInput
+            style={[styles.input, { marginBottom: 12 }]}
+            placeholder="Enter your email to confirm"
+            value={deleteConfirmEmail}
+            onChangeText={setDeleteConfirmEmail}
+            editable={!deleteAccountMutation.isPending}
+          />
+          <View style={styles.heroActionRow}>
+            <Pressable
+              style={[styles.primaryButton, { backgroundColor: '#dc3545' }]}
+              onPress={() => void handleDeleteAccount()}
+              disabled={deleteConfirmEmail !== session.user?.email || deleteAccountMutation.isPending}
+            >
+              <Text style={styles.primaryButtonLabel}>
+                {deleteAccountMutation.isPending ? 'Deleting...' : 'Permanently Delete'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => {
+                setShowDeleteConfirm(false);
+                setDeleteConfirmEmail('');
+              }}
+              disabled={deleteAccountMutation.isPending}
+            >
+              <Text style={styles.secondaryButtonLabel}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </SectionShell>
   );
 }

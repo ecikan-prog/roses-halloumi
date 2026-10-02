@@ -1,22 +1,40 @@
 {
   "expo": {
-    "name": "Grassland Cheese",
+    "name": "Grassland",
     "slug": "dairy-sales",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/grassland-cheese-app-icon.png"
+      "bundleIdentifier": "com.grasslandcheese.app",
+      "buildNumber": "1",
+      "icon": "./assets/grassland-cheese-app-icon.png",
+      "splash": {
+        "image": "./assets/grassland-cheese-logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
+      },
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "This app does not require local network access.",
+        "NSBonjourServices": []
+      }
     },
     "android": {
+      "package": "com.grasslandcheese.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "splash": {
+        "image": "./assets/grassland-cheese-logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "web": {
       "favicon": "./assets/grassland-cheese-logo.png"

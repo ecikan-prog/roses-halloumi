@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/grassland-cheese-app-icon.png"
     },
     "android": {
       "adaptiveIcon": {

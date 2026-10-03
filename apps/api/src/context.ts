@@ -4,6 +4,7 @@ import { verifyToken, type SessionUser } from './lib/auth.js';
 
 export async function createContext({ req }: CreateExpressContextOptions) {
   const authorization = req.headers.authorization;
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
   let user: SessionUser | null = null;
 
   if (authorization?.startsWith('Bearer ')) {
@@ -32,7 +33,7 @@ export async function createContext({ req }: CreateExpressContextOptions) {
     }
   }
 
-  return { prisma, user };
+  return { prisma, user, origin };
 }
 
 export type Context = Awaited<ReturnType<typeof createContext>>;

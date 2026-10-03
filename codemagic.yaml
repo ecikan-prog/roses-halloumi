@@ -1,0 +1,97 @@
+workflows:
+  ios-build-production:
+    name: Grassland Cheese iOS Production
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.grasslandcheese.app
+      groups:
+        - grassland_cheese_ios
+      xcode: latest
+      node: 22.13
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+
+      - name: Prebuild iOS
+        script: |
+          cd apps/mobile
+          npx expo prebuild --platform ios --clean
+
+      - name: Fix CocoaPods configuration
+        script: |
+          cd apps/mobile/ios
+          # Fix C++ standard library linkage
+          bash ../../../scripts/fix-ios-cpp-linkage.sh
+
+      - name: Clean CocoaPods state
+        script: |
+          cd apps/mobile/ios
+          # Deintegrate to ensure clean state
+          pod deintegrate || true
+
+      - name: Install CocoaPods
+        script: |
+          cd apps/mobile/ios
+          pod install --repo-update
+
+      - name: Fix Xcode build phases
+        script: |
+          cd apps/mobile/ios
+          # Configure build script phases to run based on dependency analysis
+          bash ../../../scripts/fix-ios-build-phases.sh "$(ls -d *.xcodeproj | head -1)"
+
+      - name: Set up code signing
+        script: |
+          cd apps/mobile/ios
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          cd apps/mobile/ios
+          WS=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WS%.xcworkspace}"
+          xcode-project build-ipa \
+            --workspace "$WS" \
+            --scheme "$SCHEME"
+
+    artifacts:
+      - apps/mobile/ios/build/ios/ipa/*.ipa
+
+    integrations:
+      app_store_connect: DriveLegal
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  android-build-production:
+    name: Grassland Cheese Android Production
+
+    environment:
+      groups:
+        - grassland_cheese_android
+      node: 22.13
+      java: 17
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+
+      - name: Prebuild Android
+        script: |
+          cd apps/mobile
+          npx expo prebuild --platform android --clean
+
+      - name: Build AAB
+        script: |
+          cd apps/mobile/android
+          ./gradlew bundleRelease
+
+    artifacts:
+      - apps/mobile/android/app/build/outputs/bundle/release/*.aab

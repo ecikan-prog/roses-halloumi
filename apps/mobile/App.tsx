@@ -2523,14 +2523,23 @@ END:VCARD`;
 
   // Download vCard
   const downloadVCard = () => {
+    if (Platform.OS !== 'web') {
+      Alert.alert('Download vCard', 'To save the contact, use the contact information displayed on this page.');
+      return;
+    }
+     
     const vcard = generateVCard();
-    const element = document.createElement('a');
-    const file = new Blob([vcard], { type: 'text/vcard' });
-    element.href = URL.createObjectURL(file);
-    element.download = 'grassland-cheese-contact.vcf';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    try {
+      const element = document.createElement('a');
+      const file = new Blob([vcard], { type: 'text/vcard' });
+      element.href = URL.createObjectURL(file);
+      element.download = 'grassland-cheese-contact.vcf';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to download vCard. Please copy the contact information manually.');
+    }
   };
 
   return (

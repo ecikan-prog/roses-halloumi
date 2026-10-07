@@ -20,7 +20,7 @@ import { Asset } from 'expo-asset';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
@@ -2246,9 +2246,9 @@ function QualityCompliancePage() {
             title="Rose's Dairy Halloumi Product Specification"
             description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
             meta={[
-              { label: 'Product', value: 'Rose's Dairy Halloumi' },
+              { label: 'Product', value: 'Rose\'s Dairy Halloumi' },
               { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
-              { label: 'Ingredients', value: 'Pasteurised Cow's Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Ingredients', value: 'Pasteurised Cow\'s Milk, Vinegar, Salt, Vegetable Rennet.' },
               { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
               { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
               { label: 'Opened', value: 'Consume within 5 days once opened.' },
@@ -2535,7 +2535,7 @@ END:VCARD`;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <ScrollView style={styles.siteScroll} contentContainerStyle={styles.siteContent}>
         {/* Header */}
         <View style={[styles.businessCardHeader, isMobile && styles.businessCardHeaderMobile]}>
           <Text style={[styles.businessCardTitle, isMobile && styles.businessCardTitleMobile]}>
@@ -2645,7 +2645,7 @@ END:VCARD`;
             </Text>
             <View style={[styles.businessCardQRCodeWrapper, isMobile && styles.businessCardQRCodeWrapperMobile]}>
               {Platform.OS === 'web' ? (
-                <QRCode value={businessCardUrl} size={200} level="H" includeMargin={true} />
+                <QRCodeSVG value={businessCardUrl} size={200} level="H" includeMargin={true} />
               ) : (
                 <Text style={styles.qrCodePlaceholder}>{businessCardUrl}</Text>
               )}

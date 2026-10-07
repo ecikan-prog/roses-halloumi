@@ -20,6 +20,7 @@ import { Asset } from 'expo-asset';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import { QRCodeSVG } from 'qrcode.react';
 import { trpc, createApiClient } from './src/lib/trpc';
 import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
 import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
@@ -95,7 +96,7 @@ type StaffUser = {
 
 type SessionUser = CustomerUser | StaffUser;
 type AuthMode = 'customer-login' | 'admin-login' | 'customer-register' | 'customer-forgot-password' | 'customer-reset-password';
-type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'wholesale-apply' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms';
+type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'wholesale-apply' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms' | 'business-card';
 type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
 
 type ConfirmedOrder = {
@@ -553,6 +554,8 @@ function renderPublicPage(
       return <AccountPage onNavigate={onNavigate} onAuthenticated={onAuthenticated} />;
     case 'contact':
       return <ContactPage onNavigate={onNavigate} />;
+    case 'business-card':
+      return <BusinessCardPage />;
     case 'privacy':
       return <PrivacyPage />;
     case 'terms':
@@ -958,6 +961,9 @@ function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: (
       break;
     case 'contact':
       content = <ContactPage onNavigate={setPage} />;
+      break;
+    case 'business-card':
+      content = <BusinessCardPage />;
       break;
     case 'privacy':
       content = <PrivacyPage />;
@@ -2240,9 +2246,9 @@ function QualityCompliancePage() {
             title="Rose's Dairy Halloumi Product Specification"
             description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
             meta={[
-              { label: 'Product', value: 'Rose's Dairy Halloumi' },
+              { label: 'Product', value: 'Rose\'s Dairy Halloumi' },
               { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
-              { label: 'Ingredients', value: 'Pasteurised Cow's Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Ingredients', value: 'Pasteurised Cow\'s Milk, Vinegar, Salt, Vegetable Rennet.' },
               { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
               { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
               { label: 'Opened', value: 'Consume within 5 days once opened.' },
@@ -2478,6 +2484,196 @@ function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
         </View>
       </View>
     </SectionShell>
+  );
+}
+
+function BusinessCardPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  const businessCardUrl = 'https://grasslandcheese.com/business-card';
+
+  // Contact details for Grassland Cheese
+  const contactDetails = {
+    name: 'Grassland Cheese',
+    phone: '0800422175',
+    phoneDisplay: '0800 422 175',
+    whatsapp: '+6427756599',
+    whatsappDisplay: '+64 27 756 599',
+    email: 'info@grasslandcheese.com',
+    website: 'grasslandcheese.com',
+    websiteUrl: 'https://grasslandcheese.com',
+    linkedin: 'https://www.linkedin.com/in/teyfik-ayyildiz-1ba379439',
+    facebook: 'https://www.facebook.com/share/1BBDwkHH91/?mibextid=wwXIfr',
+    tiktok: 'https://www.tiktok.com/@grassland.cheese',
+  };
+
+  // Generate vCard
+  const generateVCard = () => {
+    const vcard = `BEGIN:VCARD
+VERSION:3.0
+FN:${contactDetails.name}
+ORG:${contactDetails.name}
+TEL;TYPE=WORK,VOICE:${contactDetails.phone}
+TEL;TYPE=WORK,CELL:${contactDetails.whatsapp}
+EMAIL;TYPE=INTERNET:${contactDetails.email}
+URL:${contactDetails.websiteUrl}
+END:VCARD`;
+    return vcard;
+  };
+
+  // Download vCard
+  const downloadVCard = () => {
+    if (Platform.OS !== 'web') {
+      Alert.alert('Download vCard', 'To save the contact, use the contact information displayed on this page.');
+      return;
+    }
+     
+    const vcard = generateVCard();
+    try {
+      const element = document.createElement('a');
+      const file = new Blob([vcard], { type: 'text/vcard' });
+      element.href = URL.createObjectURL(file);
+      element.download = 'grassland-cheese-contact.vcf';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to download vCard. Please copy the contact information manually.');
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.siteScroll} contentContainerStyle={styles.siteContent}>
+        {/* Header */}
+        <View style={[styles.businessCardHeader, isMobile && styles.businessCardHeaderMobile]}>
+          <Text style={[styles.businessCardTitle, isMobile && styles.businessCardTitleMobile]}>
+            Grassland Cheese
+          </Text>
+          <Text style={[styles.businessCardSubtitle, isMobile && styles.businessCardSubtitleMobile]}>
+            Digital Business Card
+          </Text>
+        </View>
+
+        {/* Business Card Container */}
+        <View style={[styles.businessCardContainer, isMobile && styles.businessCardContainerMobile]}>
+          {/* Logo */}
+          <Image
+            source={grasslandLogo}
+            style={[styles.businessCardLogo, isMobile && styles.businessCardLogoMobile]}
+            resizeMode="contain"
+          />
+
+          {/* Contact Information */}
+          <View style={[styles.businessCardSection, isMobile && styles.businessCardSectionMobile]}>
+            <Text style={[styles.businessCardSectionTitle, isMobile && styles.businessCardSectionTitleMobile]}>
+              Contact
+            </Text>
+
+            {/* Phone */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(`tel:${contactDetails.phone}`)}
+            >
+              <FontAwesome5 name="phone" size={16} color="#8B7355" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                {contactDetails.phoneDisplay}
+              </Text>
+            </Pressable>
+
+            {/* WhatsApp */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(`whatsapp://send?phone=${contactDetails.whatsapp.replace(/[^0-9]/g, '')}`)}
+            >
+              <FontAwesome5 name="whatsapp" size={16} color="#25D366" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                WhatsApp {contactDetails.whatsappDisplay}
+              </Text>
+            </Pressable>
+
+            {/* Email */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(`mailto:${contactDetails.email}`)}
+            >
+              <FontAwesome5 name="envelope" size={16} color="#EA4C89" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                {contactDetails.email}
+              </Text>
+            </Pressable>
+
+            {/* Website */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(contactDetails.websiteUrl)}
+            >
+              <FontAwesome5 name="globe" size={16} color="#1F2937" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                {contactDetails.website}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Social Links */}
+          <View style={[styles.businessCardSection, isMobile && styles.businessCardSectionMobile]}>
+            <Text style={[styles.businessCardSectionTitle, isMobile && styles.businessCardSectionTitleMobile]}>
+              Follow Us
+            </Text>
+            <View style={[styles.businessCardSocialRow, isMobile && styles.businessCardSocialRowMobile]}>
+              {/* LinkedIn */}
+              <Pressable
+                style={[styles.businessCardSocialIcon, isMobile && styles.businessCardSocialIconMobile]}
+                onPress={() => Linking.openURL(contactDetails.linkedin)}
+              >
+                <FontAwesome5 name="linkedin" size={24} color="#0A66C2" />
+              </Pressable>
+
+              {/* Facebook */}
+              <Pressable
+                style={[styles.businessCardSocialIcon, isMobile && styles.businessCardSocialIconMobile]}
+                onPress={() => Linking.openURL(contactDetails.facebook)}
+              >
+                <FontAwesome5 name="facebook-f" size={24} color="#1877f2" />
+              </Pressable>
+
+              {/* TikTok */}
+              <Pressable
+                style={[styles.businessCardSocialIcon, isMobile && styles.businessCardSocialIconMobile]}
+                onPress={() => Linking.openURL(contactDetails.tiktok)}
+              >
+                <FontAwesome5 name="tiktok" size={24} color="#000000" />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* QR Code */}
+          <View style={[styles.businessCardQRContainer, isMobile && styles.businessCardQRContainerMobile]}>
+            <Text style={[styles.businessCardQRLabel, isMobile && styles.businessCardQRLabelMobile]}>
+              Scan to visit
+            </Text>
+            <View style={[styles.businessCardQRCodeWrapper, isMobile && styles.businessCardQRCodeWrapperMobile]}>
+              {Platform.OS === 'web' ? (
+                <QRCodeSVG value={businessCardUrl} size={200} level="H" includeMargin={true} />
+              ) : (
+                <Text style={styles.qrCodePlaceholder}>{businessCardUrl}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Save Contact Button */}
+          <Pressable
+            style={[styles.businessCardButton, isMobile && styles.businessCardButtonMobile]}
+            onPress={downloadVCard}
+          >
+            <FontAwesome5 name="download" size={16} color="white" style={styles.businessCardButtonIcon} />
+            <Text style={[styles.businessCardButtonText, isMobile && styles.businessCardButtonTextMobile]}>
+              Save Contact
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -4575,5 +4771,188 @@ const styles = StyleSheet.create({
   footerMetaMobile: {
     fontSize: 12,
     lineHeight: 18,
+  },
+  // Business Card Styles
+  businessCardHeader: {
+   paddingVertical: 24,
+   paddingHorizontal: 32,
+   alignItems: 'center',
+   backgroundColor: '#f9f7f4',
+   borderBottomWidth: 1,
+   borderBottomColor: '#e5ddd2',
+  },
+  businessCardHeaderMobile: {
+   paddingVertical: 16,
+   paddingHorizontal: 16,
+  },
+  businessCardTitle: {
+   fontSize: 32,
+   fontWeight: '700',
+   color: '#1F2937',
+   marginBottom: 8,
+  },
+  businessCardTitleMobile: {
+   fontSize: 24,
+  },
+  businessCardSubtitle: {
+   fontSize: 14,
+   color: '#6B7280',
+   fontWeight: '500',
+  },
+  businessCardSubtitleMobile: {
+   fontSize: 12,
+  },
+  businessCardContainer: {
+   marginHorizontal: 'auto' as any,
+   marginVertical: 32,
+   paddingHorizontal: 32,
+   paddingVertical: 40,
+   maxWidth: 600,
+   backgroundColor: 'white',
+   borderRadius: 12,
+   shadowColor: '#000000',
+   shadowOffset: { width: 0, height: 4 },
+   shadowOpacity: 0.08,
+   shadowRadius: 12,
+   elevation: 3,
+  },
+  businessCardContainerMobile: {
+   marginHorizontal: 16,
+   paddingHorizontal: 20,
+   paddingVertical: 24,
+  },
+  businessCardLogo: {
+   width: '100%',
+   height: 80,
+   marginBottom: 32,
+  },
+  businessCardLogoMobile: {
+   height: 60,
+   marginBottom: 24,
+  },
+  businessCardSection: {
+   marginBottom: 28,
+   paddingBottom: 28,
+   borderBottomWidth: 1,
+   borderBottomColor: '#e5ddd2',
+  },
+  businessCardSectionMobile: {
+   marginBottom: 20,
+   paddingBottom: 20,
+  },
+  businessCardSectionTitle: {
+   fontSize: 14,
+   fontWeight: '700',
+   color: '#8B7355',
+   textTransform: 'uppercase' as any,
+   letterSpacing: 0.5,
+   marginBottom: 16,
+  },
+  businessCardSectionTitleMobile: {
+   fontSize: 12,
+   marginBottom: 12,
+  },
+  businessCardContactRow: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   marginBottom: 12,
+   paddingVertical: 8,
+  },
+  businessCardContactRowMobile: {
+   marginBottom: 10,
+   paddingVertical: 6,
+  },
+  businessCardIcon: {
+   marginRight: 12,
+  },
+  businessCardContactLink: {
+   fontSize: 14,
+   color: '#1F2937',
+   fontWeight: '500',
+   textDecorationLine: 'underline' as any,
+  },
+  businessCardContactLinkMobile: {
+   fontSize: 13,
+  },
+  businessCardSocialRow: {
+   flexDirection: 'row',
+   justifyContent: 'flex-start',
+   gap: 16,
+  },
+  businessCardSocialRowMobile: {
+   gap: 12,
+  },
+  businessCardSocialIcon: {
+   width: 48,
+   height: 48,
+   borderRadius: 24,
+   backgroundColor: '#f3f0ed',
+   alignItems: 'center',
+   justifyContent: 'center',
+  },
+  businessCardSocialIconMobile: {
+   width: 40,
+   height: 40,
+   borderRadius: 20,
+  },
+  businessCardQRContainer: {
+   alignItems: 'center',
+   marginBottom: 28,
+   paddingBottom: 28,
+   borderBottomWidth: 1,
+   borderBottomColor: '#e5ddd2',
+  },
+  businessCardQRContainerMobile: {
+   marginBottom: 20,
+   paddingBottom: 20,
+  },
+  businessCardQRLabel: {
+   fontSize: 14,
+   fontWeight: '700',
+   color: '#8B7355',
+   textTransform: 'uppercase' as any,
+   letterSpacing: 0.5,
+   marginBottom: 16,
+  },
+  businessCardQRLabelMobile: {
+   fontSize: 12,
+   marginBottom: 12,
+  },
+  businessCardQRCodeWrapper: {
+   padding: 12,
+   backgroundColor: '#f9f7f4',
+   borderRadius: 8,
+  },
+  businessCardQRCodeWrapperMobile: {
+   padding: 8,
+  },
+  qrCodePlaceholder: {
+   fontSize: 12,
+   color: '#6B7280',
+  },
+  businessCardButton: {
+   flexDirection: 'row',
+   paddingVertical: 14,
+   paddingHorizontal: 24,
+   backgroundColor: '#8B7355',
+   borderRadius: 8,
+   alignItems: 'center',
+   justifyContent: 'center',
+   gap: 8,
+  },
+  businessCardButtonMobile: {
+   paddingVertical: 12,
+   paddingHorizontal: 20,
+  },
+  businessCardButtonIcon: {
+   marginRight: 4,
+  },
+  businessCardButtonText: {
+   fontSize: 14,
+   fontWeight: '700',
+   color: 'white',
+  },
+  businessCardButtonTextMobile: {
+   fontSize: 13,
   },
 });

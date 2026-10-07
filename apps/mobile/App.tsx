@@ -4097,6 +4097,7 @@ const styles = StyleSheet.create({
   },
   sectionShell: {
     gap: 16,
+    marginVertical: 24,
   },
   sectionEyebrow: {
     color: '#8a6b2f',
@@ -4128,10 +4129,10 @@ const styles = StyleSheet.create({
   productGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 24,
   },
   productGridMobile: {
-    gap: 12,
+    gap: 16,
   },
   productCard: {
     flexBasis: 280,
@@ -4154,10 +4155,10 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 320,
+    height: 360,
   },
   productLogoPanelMobile: {
-    height: 240,
+    height: 280,
     padding: 12,
     borderRadius: 14,
   },

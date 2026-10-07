@@ -1588,6 +1588,8 @@ function ProductCard({
 }) {
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
+  const price = formatPrice(product.product);
+  const isInCart = quantity > 0;
   
   return (
     <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
@@ -1596,26 +1598,30 @@ function ProductCard({
       </View>
       <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
       <Text style={styles.productCardDescription}>{product.description}</Text>
-      <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
+      <Text style={styles.productCardPrice}>{price}</Text>
       <View style={styles.productActionsRow}>
         <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
           <Text style={styles.detailsButtonLabel}>Product details</Text>
         </Pressable>
       </View>
-      <View style={styles.quantityPanel}>
-        <Text style={styles.quantityPanelLabel}>Quantity</Text>
-        <View style={styles.quantityRow}>
-          <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onDecrease}>
-            <Text style={styles.quantityLabel}>-</Text>
-          </Pressable>
-          <Text style={styles.quantityValue}>{quantity}</Text>
-          <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onIncrease}>
-            <Text style={styles.quantityLabel}>+</Text>
-          </Pressable>
-        </View>
-      </View>
-      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
-        <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
+      
+      {isInCart ? (
+        <>
+          <Text style={styles.quantityPanelLabel}>Quantity</Text>
+          <View style={styles.quantityRow}>
+            <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onDecrease}>
+              <Text style={styles.quantityLabel}>-</Text>
+            </Pressable>
+            <Text style={styles.quantityValue}>{quantity}</Text>
+            <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onIncrease}>
+              <Text style={styles.quantityLabel}>+</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+      
+      <Pressable disabled={disabled} style={[styles.primaryButton, disabled && styles.disabledPrimaryButton]} onPress={onAdd}>
+        <Text style={styles.primaryButtonLabel}>{isInCart ? ctaLabel : `${ctaLabel} — ${price}`}</Text>
       </Pressable>
     </View>
   );
@@ -1999,7 +2005,7 @@ function WhyGrasslandSection() {
   const isMobile = width < 640;
   
   return (
-    <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Pure halloumi from New Zealand, made for grilling and sharing.">
+    <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Premium quality halloumi, crafted to perfection.">
       <View style={[styles.valueGrid, isMobile && styles.valueGridMobile]}>
         {whyGrasslandItems.map((item) => (
           <View key={item.title} style={[styles.valueCard, isMobile && styles.valueCardMobile]}>
@@ -2014,7 +2020,7 @@ function WhyGrasslandSection() {
 
 function StorySection() {
   return (
-    <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Quality halloumi made for simple grilling, pan-frying, and sharing.">
+    <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.">
       <View style={styles.storyCard}>
         <Text style={styles.storyParagraph}>Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.</Text>
         <Text style={styles.storyParagraph}>We focus on one thing: producing the best halloumi for your table. Slice it, grill it, share it.</Text>

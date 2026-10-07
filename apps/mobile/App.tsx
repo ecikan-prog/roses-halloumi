@@ -1360,6 +1360,10 @@ function PublicShopPage({
   const isMobile = width < 640;
   // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
   const safeShopProducts = shopProducts ?? [];
+  
+  // Separate halloumi products from others
+  const halloumiProducts = safeShopProducts.filter(p => p.slug && ['200g', '500g', '1kg'].includes(p.slug));
+  const otherProducts = safeShopProducts.filter(p => !p.slug || !['200g', '500g', '1kg'].includes(p.slug));
 
   return (
     <>
@@ -1369,7 +1373,23 @@ function PublicShopPage({
           <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
         ) : null}
         <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
-          {safeShopProducts.map((product) => {
+          {/* Consolidated Halloumi Product Card */}
+          {halloumiProducts.length > 0 && (
+            <ConsolidatedHalloumiProductCard
+              key="halloumi-consolidated"
+              variants={halloumiProducts}
+              quantities={quantities}
+              onAdd={(productId) => adjustQuantity(productId, quantities[productId] ? quantities[productId] + 1 : 1)}
+              onOpenDetails={() => {}}
+              onIncrease={(productId) => adjustQuantity(productId, quantities[productId] + 1)}
+              onDecrease={(productId) => adjustQuantity(productId, Math.max(quantities[productId] - 1, 0))}
+              disabled={false}
+              ctaLabel="Add to Cart"
+            />
+          )}
+          
+          {/* Other Products */}
+          {otherProducts.map((product) => {
             const backendProduct = product.product;
             const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (
@@ -1531,36 +1551,62 @@ function ShopPage({
           <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
         ) : null}
         <View style={styles.productGrid}>
-          {safeShopProducts.map((product) => {
-            const backendProduct = product.product;
-            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+          {(() => {
+            // Separate halloumi products from others
+            const halloumiProducts = safeShopProducts.filter(p => p.slug && ['200g', '500g', '1kg'].includes(p.slug));
+            const otherProducts = safeShopProducts.filter(p => !p.slug || !['200g', '500g', '1kg'].includes(p.slug));
+             
             return (
-              <ProductCard
-                key={product.slug}
-                product={product}
-                quantity={quantity}
-                onAdd={() => {
-                  if (!backendProduct) {
-                    return;
-                  }
-                  adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
-                }}
-                onOpenDetails={() => setSelectedProductSlug(product.slug)}
-                onIncrease={
-                  backendProduct
-                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
-                    : undefined
-                }
-                onDecrease={
-                  backendProduct
-                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
-                    : undefined
-                }
-                disabled={!backendProduct}
-                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
-              />
+              <>
+                {/* Consolidated Halloumi Product Card */}
+                {halloumiProducts.length > 0 && (
+                  <ConsolidatedHalloumiProductCard
+                    key="halloumi-consolidated"
+                    variants={halloumiProducts}
+                    quantities={quantities}
+                    onAdd={(productId) => adjustQuantity(productId, (quantities[productId] ?? 0) + 1)}
+                    onOpenDetails={() => {}}
+                    onIncrease={(productId) => adjustQuantity(productId, (quantities[productId] ?? 0) + 1)}
+                    onDecrease={(productId) => adjustQuantity(productId, Math.max((quantities[productId] ?? 0) - 1, 0))}
+                    disabled={false}
+                    ctaLabel="Add to Cart"
+                  />
+                )}
+                 
+                {/* Other Products */}
+                {otherProducts.map((product) => {
+                  const backendProduct = product.product;
+                  const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+                  return (
+                    <ProductCard
+                      key={product.slug}
+                      product={product}
+                      quantity={quantity}
+                      onAdd={() => {
+                        if (!backendProduct) {
+                          return;
+                        }
+                        adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
+                      }}
+                      onOpenDetails={() => setSelectedProductSlug(product.slug)}
+                      onIncrease={
+                        backendProduct
+                          ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
+                          : undefined
+                      }
+                      onDecrease={
+                        backendProduct
+                          ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
+                          : undefined
+                      }
+                      disabled={!backendProduct}
+                      ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+                    />
+                  );
+                })}
+              </>
             );
-          })}
+          })()}
         </View>
       </SectionShell>
     </>
@@ -1621,6 +1667,101 @@ function ProductCard({
       ) : null}
       
       <Pressable disabled={disabled} style={[styles.primaryButton, disabled && styles.disabledPrimaryButton]} onPress={onAdd}>
+        <Text style={styles.primaryButtonLabel}>{isInCart ? ctaLabel : `${ctaLabel} — ${price}`}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ConsolidatedHalloumiProductCard({
+  variants,
+  quantities,
+  onAdd,
+  onOpenDetails,
+  onIncrease,
+  onDecrease,
+  disabled,
+  ctaLabel,
+}: {
+  variants: ShopProductView[];
+  quantities: Record<number, number>;
+  onAdd: (productId: number) => void;
+  onOpenDetails: () => void;
+  onIncrease: (productId: number) => void;
+  onDecrease: (productId: number) => void;
+  disabled: boolean;
+  ctaLabel: string;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  const [selectedSize, setSelectedSize] = useState<'200g' | '500g' | '1kg'>('500g');
+  
+  const selectedVariant = variants.find(v => v.slug === selectedSize) ?? variants[0];
+  const backendProduct = selectedVariant.product;
+  const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+  const price = formatPrice(backendProduct);
+  const isInCart = quantity > 0;
+  
+  const sizeOptions: Array<{ label: string; size: '200g' | '500g' | '1kg' }> = [
+    { label: '200g', size: '200g' },
+    { label: '500g', size: '500g' },
+    { label: '1kg', size: '1kg' },
+  ];
+  
+  return (
+    <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
+      <View style={[styles.productLogoPanel, isMobile && styles.productLogoPanelMobile]}>
+        <Image source={selectedVariant.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${selectedVariant.name} product photo`} />
+      </View>
+      <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{selectedVariant.name}</Text>
+      
+      {/* Size Selector */}
+      <View style={styles.sizeSelectorRow}>
+        {sizeOptions.map(option => (
+          <Pressable
+            key={option.size}
+            style={[
+              styles.sizeSelectorButton,
+              selectedSize === option.size && styles.sizeSelectorButtonActive,
+            ]}
+            onPress={() => setSelectedSize(option.size)}
+          >
+            <Text
+              style={[
+                styles.sizeSelectorLabel,
+                selectedSize === option.size && styles.sizeSelectorLabelActive,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      
+      <Text style={styles.productCardDescription}>{selectedVariant.description}</Text>
+      <Text style={styles.productCardPrice}>{price}</Text>
+      <View style={styles.productActionsRow}>
+        <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
+          <Text style={styles.detailsButtonLabel}>Product details</Text>
+        </Pressable>
+      </View>
+      
+      {isInCart ? (
+        <>
+          <Text style={styles.quantityPanelLabel}>Quantity</Text>
+          <View style={styles.quantityRow}>
+            <Pressable disabled={!backendProduct || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={() => backendProduct && onDecrease(backendProduct.id)}>
+              <Text style={styles.quantityLabel}>-</Text>
+            </Pressable>
+            <Text style={styles.quantityValue}>{quantity}</Text>
+            <Pressable disabled={!backendProduct || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={() => backendProduct && onIncrease(backendProduct.id)}>
+              <Text style={styles.quantityLabel}>+</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+      
+      <Pressable disabled={disabled || !backendProduct} style={[styles.primaryButton, (disabled || !backendProduct) && styles.disabledPrimaryButton]} onPress={() => backendProduct && onAdd(backendProduct.id)}>
         <Text style={styles.primaryButtonLabel}>{isInCart ? ctaLabel : `${ctaLabel} — ${price}`}</Text>
       </Pressable>
     </View>
@@ -3938,6 +4079,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#123524',
     fontSize: 16,
+  },
+  sizeSelectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'flex-start',
+  },
+  sizeSelectorButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#d6e6db',
+    backgroundColor: 'transparent',
+  },
+  sizeSelectorButtonActive: {
+    backgroundColor: '#d6e6db',
+    borderColor: '#1f5c43',
+  },
+  sizeSelectorLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4d5c54',
+  },
+  sizeSelectorLabelActive: {
+    color: '#1f5c43',
+    fontWeight: '700',
   },
   primaryButton: {
     backgroundColor: '#1f5c43',

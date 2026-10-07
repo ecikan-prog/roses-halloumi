@@ -1048,36 +1048,102 @@ function SiteHeader({
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
   const isStaff = session?.user?.kind === 'staff';
+  const [menuOpen, setMenuOpen] = useState(false);
   
   // Mobile and desktop navigation items
   const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
     { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
     { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
     { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
-    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart', shortLabel: cartCount > 0 ? `Cart (${cartCount})` : 'Cart' },
   ];
 
+  const handleNavigation = (page: any) => {
+    onNavigate(page);
+    setMenuOpen(false);
+  };
+
   return (
-    <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
-      <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
-        <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-      </Pressable>
-      <View style={[styles.navRow, isMobile && styles.navRowMobile]}>
-        {mainNavItems.map((item) => {
-          const selected = item.page === currentPage;
-          return (
-            <Pressable key={item.page} style={[styles.navButton, isMobile && styles.navButtonMobile, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
-              <Text style={[styles.navButtonText, isMobile && styles.navButtonTextMobile, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
+    <>
+      <View style={[styles.headerShell, isCompact && styles.headerShellCompact, isMobile && styles.headerShellMobile]}>
+        {/* Left: Logo */}
+        <Pressable style={styles.brandLockup} onPress={() => handleNavigation('home')}>
+          <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        </Pressable>
+        
+        {/* Center/Right: Navigation */}
+        {isMobile ? (
+          /* Mobile: Cart + Hamburger Menu */
+          <View style={styles.mobileHeaderRight}>
+            <Pressable style={styles.cartIconButton} onPress={() => handleNavigation('cart')}>
+              <Text style={styles.cartIconEmoji}>🛒</Text>
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                </View>
+              )}
             </Pressable>
-          );
-        })}
-        {session && onSignOut ? (
-          <Pressable style={[styles.signOutButton, isMobile && styles.signOutButtonMobile]} onPress={() => void onSignOut()}>
-            <Text style={[styles.signOutButtonText, isMobile && styles.signOutButtonTextMobile]}>Sign out</Text>
-          </Pressable>
-        ) : null}
+            <Pressable style={styles.hamburgerButton} onPress={() => setMenuOpen(!menuOpen)}>
+              <Text style={styles.hamburgerIcon}>☰</Text>
+            </Pressable>
+          </View>
+        ) : (
+          /* Desktop: Full Navigation */
+          <View style={styles.navRow}>
+            {mainNavItems.map((item) => {
+              const selected = item.page === currentPage;
+              return (
+                <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => handleNavigation(item.page)}>
+                  <Text style={[styles.navButtonText, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
+                </Pressable>
+              );
+            })}
+            <Pressable style={styles.cartIconButton} onPress={() => handleNavigation('cart')}>
+              <Text style={styles.cartIconEmoji}>🛒</Text>
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                </View>
+              )}
+            </Pressable>
+            {session && onSignOut ? (
+              <Pressable style={styles.signOutButton} onPress={() => void onSignOut()}>
+                <Text style={styles.signOutButtonText}>Sign out</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        )}
       </View>
-    </View>
+      
+      {/* Hamburger Menu Overlay (Mobile Only) */}
+      {isMobile && menuOpen && (
+        <View style={styles.hamburgerMenuOverlay}>
+          <View style={styles.hamburgerMenuContent}>
+            {mainNavItems.map((item) => {
+              const selected = item.page === currentPage;
+              return (
+                <Pressable
+                  key={item.page}
+                  style={[styles.hamburgerMenuItem, selected && styles.hamburgerMenuItemActive]}
+                  onPress={() => handleNavigation(item.page)}
+                >
+                  <Text style={[styles.hamburgerMenuItemText, selected && styles.hamburgerMenuItemTextActive]}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            {session && onSignOut ? (
+              <Pressable style={styles.hamburgerMenuItem} onPress={() => { void onSignOut(); setMenuOpen(false); }}>
+                <Text style={styles.hamburgerMenuItemText}>Sign out</Text>
+              </Pressable>
+            ) : null}
+            <Pressable style={styles.hamburgerCloseButton} onPress={() => setMenuOpen(false)}>
+              <Text style={styles.hamburgerCloseButtonText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </>
   );
 }
 
@@ -3790,6 +3856,95 @@ const styles = StyleSheet.create({
   },
   headerShellCompact: {
     paddingHorizontal: 12,
+  },
+  headerShellMobile: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 0,
+    borderBottomWidth: 1,
+  },
+  mobileHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cartIconButton: {
+    position: 'relative',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  cartIconEmoji: {
+    fontSize: 24,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#d94040',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  hamburgerButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  hamburgerIcon: {
+    fontSize: 24,
+    color: '#123524',
+  },
+  hamburgerMenuOverlay: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 100,
+  },
+  hamburgerMenuContent: {
+    backgroundColor: '#fffdf8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e7ddc9',
+  },
+  hamburgerMenuItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5efe0',
+  },
+  hamburgerMenuItemActive: {
+    backgroundColor: '#f2ead9',
+  },
+  hamburgerMenuItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#123524',
+  },
+  hamburgerMenuItemTextActive: {
+    fontWeight: '700',
+    color: '#1f5c43',
+  },
+  hamburgerCloseButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e7ddc9',
+  },
+  hamburgerCloseButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8a6b2f',
   },
   brandLockup: {
     flexDirection: 'row',

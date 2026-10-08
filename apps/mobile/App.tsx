@@ -1531,62 +1531,36 @@ function ShopPage({
           <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
         ) : null}
         <View style={styles.productGrid}>
-          {(() => {
-            // Separate halloumi products from others
-            const halloumiProducts = safeShopProducts.filter(p => p.slug && ['200g', '500g', '1kg'].includes(p.slug));
-            const otherProducts = safeShopProducts.filter(p => !p.slug || !['200g', '500g', '1kg'].includes(p.slug));
-             
+          {safeShopProducts.map((product) => {
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (
-              <>
-                {/* Consolidated Halloumi Product Card */}
-                {halloumiProducts.length > 0 && (
-                  <ConsolidatedHalloumiProductCard
-                    key="halloumi-consolidated"
-                    variants={halloumiProducts}
-                    quantities={quantities}
-                    onAdd={(productId) => adjustQuantity(productId, (quantities[productId] ?? 0) + 1)}
-                    onOpenDetails={() => {}}
-                    onIncrease={(productId) => adjustQuantity(productId, (quantities[productId] ?? 0) + 1)}
-                    onDecrease={(productId) => adjustQuantity(productId, Math.max((quantities[productId] ?? 0) - 1, 0))}
-                    disabled={false}
-                    ctaLabel="Add to Cart"
-                  />
-                )}
-                 
-                {/* Other Products */}
-                {otherProducts.map((product) => {
-                  const backendProduct = product.product;
-                  const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
-                  return (
-                    <ProductCard
-                      key={product.slug}
-                      product={product}
-                      quantity={quantity}
-                      onAdd={() => {
-                        if (!backendProduct) {
-                          return;
-                        }
-                        adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
-                      }}
-                      onOpenDetails={() => setSelectedProductSlug(product.slug)}
-                      onIncrease={
-                        backendProduct
-                          ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
-                          : undefined
-                      }
-                      onDecrease={
-                        backendProduct
-                          ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
-                          : undefined
-                      }
-                      disabled={!backendProduct}
-                      ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
-                    />
-                  );
-                })}
-              </>
+              <ProductCard
+                key={product.slug}
+                product={product}
+                quantity={quantity}
+                onAdd={() => {
+                  if (!backendProduct) {
+                    return;
+                  }
+                  adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
+                }}
+                onOpenDetails={() => setSelectedProductSlug(product.slug)}
+                onIncrease={
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
+                    : undefined
+                }
+                onDecrease={
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
+                    : undefined
+                }
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+              />
             );
-          })()}
+          })}
         </View>
       </SectionShell>
     </>

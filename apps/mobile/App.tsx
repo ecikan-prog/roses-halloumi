@@ -1048,102 +1048,36 @@ function SiteHeader({
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
   const isStaff = session?.user?.kind === 'staff';
-  const [menuOpen, setMenuOpen] = useState(false);
   
   // Mobile and desktop navigation items
   const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
     { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
     { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
     { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
+    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart', shortLabel: cartCount > 0 ? `Cart (${cartCount})` : 'Cart' },
   ];
 
-  const handleNavigation = (page: any) => {
-    onNavigate(page);
-    setMenuOpen(false);
-  };
-
   return (
-    <>
-      <View style={[styles.headerShell, isCompact && styles.headerShellCompact, isMobile && styles.headerShellMobile]}>
-        {/* Left: Logo */}
-        <Pressable style={styles.brandLockup} onPress={() => handleNavigation('home')}>
-          <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
-        </Pressable>
-        
-        {/* Center/Right: Navigation */}
-        {isMobile ? (
-          /* Mobile: Cart + Hamburger Menu */
-          <View style={styles.mobileHeaderRight}>
-            <Pressable style={styles.cartIconButton} onPress={() => handleNavigation('cart')}>
-              <Text style={styles.cartIconEmoji}>🛒</Text>
-              {cartCount > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
-                </View>
-              )}
+    <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
+      <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
+        <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+      </Pressable>
+      <View style={[styles.navRow, isMobile && styles.navRowMobile]}>
+        {mainNavItems.map((item) => {
+          const selected = item.page === currentPage;
+          return (
+            <Pressable key={item.page} style={[styles.navButton, isMobile && styles.navButtonMobile, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.navButtonText, isMobile && styles.navButtonTextMobile, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
             </Pressable>
-            <Pressable style={styles.hamburgerButton} onPress={() => setMenuOpen(!menuOpen)}>
-              <Text style={styles.hamburgerIcon}>☰</Text>
-            </Pressable>
-          </View>
-        ) : (
-          /* Desktop: Full Navigation */
-          <View style={styles.navRow}>
-            {mainNavItems.map((item) => {
-              const selected = item.page === currentPage;
-              return (
-                <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => handleNavigation(item.page)}>
-                  <Text style={[styles.navButtonText, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
-                </Pressable>
-              );
-            })}
-            <Pressable style={styles.cartIconButton} onPress={() => handleNavigation('cart')}>
-              <Text style={styles.cartIconEmoji}>🛒</Text>
-              {cartCount > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
-                </View>
-              )}
-            </Pressable>
-            {session && onSignOut ? (
-              <Pressable style={styles.signOutButton} onPress={() => void onSignOut()}>
-                <Text style={styles.signOutButtonText}>Sign out</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        )}
+          );
+        })}
+        {session && onSignOut ? (
+          <Pressable style={[styles.signOutButton, isMobile && styles.signOutButtonMobile]} onPress={() => void onSignOut()}>
+            <Text style={[styles.signOutButtonText, isMobile && styles.signOutButtonTextMobile]}>Sign out</Text>
+          </Pressable>
+        ) : null}
       </View>
-      
-      {/* Hamburger Menu Overlay (Mobile Only) */}
-      {isMobile && menuOpen && (
-        <View style={styles.hamburgerMenuOverlay}>
-          <View style={styles.hamburgerMenuContent}>
-            {mainNavItems.map((item) => {
-              const selected = item.page === currentPage;
-              return (
-                <Pressable
-                  key={item.page}
-                  style={[styles.hamburgerMenuItem, selected && styles.hamburgerMenuItemActive]}
-                  onPress={() => handleNavigation(item.page)}
-                >
-                  <Text style={[styles.hamburgerMenuItemText, selected && styles.hamburgerMenuItemTextActive]}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            {session && onSignOut ? (
-              <Pressable style={styles.hamburgerMenuItem} onPress={() => { void onSignOut(); setMenuOpen(false); }}>
-                <Text style={styles.hamburgerMenuItemText}>Sign out</Text>
-              </Pressable>
-            ) : null}
-            <Pressable style={styles.hamburgerCloseButton} onPress={() => setMenuOpen(false)}>
-              <Text style={styles.hamburgerCloseButtonText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-    </>
+    </View>
   );
 }
 
@@ -1426,10 +1360,6 @@ function PublicShopPage({
   const isMobile = width < 640;
   // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
   const safeShopProducts = shopProducts ?? [];
-  
-  // Separate halloumi products from others
-  const halloumiProducts = safeShopProducts.filter(p => p.slug && ['200g', '500g', '1kg'].includes(p.slug));
-  const otherProducts = safeShopProducts.filter(p => !p.slug || !['200g', '500g', '1kg'].includes(p.slug));
 
   return (
     <>
@@ -1439,23 +1369,7 @@ function PublicShopPage({
           <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
         ) : null}
         <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
-          {/* Consolidated Halloumi Product Card */}
-          {halloumiProducts.length > 0 && (
-            <ConsolidatedHalloumiProductCard
-              key="halloumi-consolidated"
-              variants={halloumiProducts}
-              quantities={quantities}
-              onAdd={(productId) => adjustQuantity(productId, quantities[productId] ? quantities[productId] + 1 : 1)}
-              onOpenDetails={() => {}}
-              onIncrease={(productId) => adjustQuantity(productId, quantities[productId] + 1)}
-              onDecrease={(productId) => adjustQuantity(productId, Math.max(quantities[productId] - 1, 0))}
-              disabled={false}
-              ctaLabel="Add to Cart"
-            />
-          )}
-          
-          {/* Other Products */}
-          {otherProducts.map((product) => {
+          {safeShopProducts.map((product) => {
             const backendProduct = product.product;
             const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (
@@ -1617,62 +1531,36 @@ function ShopPage({
           <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
         ) : null}
         <View style={styles.productGrid}>
-          {(() => {
-            // Separate halloumi products from others
-            const halloumiProducts = safeShopProducts.filter(p => p.slug && ['200g', '500g', '1kg'].includes(p.slug));
-            const otherProducts = safeShopProducts.filter(p => !p.slug || !['200g', '500g', '1kg'].includes(p.slug));
-             
+          {safeShopProducts.map((product) => {
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
             return (
-              <>
-                {/* Consolidated Halloumi Product Card */}
-                {halloumiProducts.length > 0 && (
-                  <ConsolidatedHalloumiProductCard
-                    key="halloumi-consolidated"
-                    variants={halloumiProducts}
-                    quantities={quantities}
-                    onAdd={(productId) => adjustQuantity(productId, (quantities[productId] ?? 0) + 1)}
-                    onOpenDetails={() => {}}
-                    onIncrease={(productId) => adjustQuantity(productId, (quantities[productId] ?? 0) + 1)}
-                    onDecrease={(productId) => adjustQuantity(productId, Math.max((quantities[productId] ?? 0) - 1, 0))}
-                    disabled={false}
-                    ctaLabel="Add to Cart"
-                  />
-                )}
-                 
-                {/* Other Products */}
-                {otherProducts.map((product) => {
-                  const backendProduct = product.product;
-                  const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
-                  return (
-                    <ProductCard
-                      key={product.slug}
-                      product={product}
-                      quantity={quantity}
-                      onAdd={() => {
-                        if (!backendProduct) {
-                          return;
-                        }
-                        adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
-                      }}
-                      onOpenDetails={() => setSelectedProductSlug(product.slug)}
-                      onIncrease={
-                        backendProduct
-                          ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
-                          : undefined
-                      }
-                      onDecrease={
-                        backendProduct
-                          ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
-                          : undefined
-                      }
-                      disabled={!backendProduct}
-                      ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
-                    />
-                  );
-                })}
-              </>
+              <ProductCard
+                key={product.slug}
+                product={product}
+                quantity={quantity}
+                onAdd={() => {
+                  if (!backendProduct) {
+                    return;
+                  }
+                  adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
+                }}
+                onOpenDetails={() => setSelectedProductSlug(product.slug)}
+                onIncrease={
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
+                    : undefined
+                }
+                onDecrease={
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
+                    : undefined
+                }
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+              />
             );
-          })()}
+          })}
         </View>
       </SectionShell>
     </>
@@ -1700,8 +1588,6 @@ function ProductCard({
 }) {
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
-  const price = formatPrice(product.product);
-  const isInCart = quantity > 0;
   
   return (
     <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
@@ -1710,125 +1596,26 @@ function ProductCard({
       </View>
       <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
       <Text style={styles.productCardDescription}>{product.description}</Text>
-      <Text style={styles.productCardPrice}>{price}</Text>
+      <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
         <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
           <Text style={styles.detailsButtonLabel}>Product details</Text>
         </Pressable>
       </View>
-      
-      {isInCart ? (
-        <>
-          <Text style={styles.quantityPanelLabel}>Quantity</Text>
-          <View style={styles.quantityRow}>
-            <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onDecrease}>
-              <Text style={styles.quantityLabel}>-</Text>
-            </Pressable>
-            <Text style={styles.quantityValue}>{quantity}</Text>
-            <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onIncrease}>
-              <Text style={styles.quantityLabel}>+</Text>
-            </Pressable>
-          </View>
-        </>
-      ) : null}
-      
-      <Pressable disabled={disabled} style={[styles.primaryButton, disabled && styles.disabledPrimaryButton]} onPress={onAdd}>
-        <Text style={styles.primaryButtonLabel}>{isInCart ? ctaLabel : `${ctaLabel} — ${price}`}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function ConsolidatedHalloumiProductCard({
-  variants,
-  quantities,
-  onAdd,
-  onOpenDetails,
-  onIncrease,
-  onDecrease,
-  disabled,
-  ctaLabel,
-}: {
-  variants: ShopProductView[];
-  quantities: Record<number, number>;
-  onAdd: (productId: number) => void;
-  onOpenDetails: () => void;
-  onIncrease: (productId: number) => void;
-  onDecrease: (productId: number) => void;
-  disabled: boolean;
-  ctaLabel: string;
-}) {
-  const { width } = useWindowDimensions();
-  const isMobile = width < 640;
-  const [selectedSize, setSelectedSize] = useState<'200g' | '500g' | '1kg'>('500g');
-  
-  const selectedVariant = variants.find(v => v.slug === selectedSize) ?? variants[0];
-  const backendProduct = selectedVariant.product;
-  const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
-  const price = formatPrice(backendProduct);
-  const isInCart = quantity > 0;
-  
-  const sizeOptions: Array<{ label: string; size: '200g' | '500g' | '1kg' }> = [
-    { label: '200g', size: '200g' },
-    { label: '500g', size: '500g' },
-    { label: '1kg', size: '1kg' },
-  ];
-  
-  return (
-    <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
-      <View style={[styles.productLogoPanel, isMobile && styles.productLogoPanelMobile]}>
-        <Image source={selectedVariant.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${selectedVariant.name} product photo`} />
-      </View>
-      <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{selectedVariant.name}</Text>
-      
-      {/* Size Selector */}
-      <View style={styles.sizeSelectorRow}>
-        {sizeOptions.map(option => (
-          <Pressable
-            key={option.size}
-            style={[
-              styles.sizeSelectorButton,
-              selectedSize === option.size && styles.sizeSelectorButtonActive,
-            ]}
-            onPress={() => setSelectedSize(option.size)}
-          >
-            <Text
-              style={[
-                styles.sizeSelectorLabel,
-                selectedSize === option.size && styles.sizeSelectorLabelActive,
-              ]}
-            >
-              {option.label}
-            </Text>
+      <View style={styles.quantityPanel}>
+        <Text style={styles.quantityPanelLabel}>Quantity</Text>
+        <View style={styles.quantityRow}>
+          <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onDecrease}>
+            <Text style={styles.quantityLabel}>-</Text>
           </Pressable>
-        ))}
+          <Text style={styles.quantityValue}>{quantity}</Text>
+          <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onIncrease}>
+            <Text style={styles.quantityLabel}>+</Text>
+          </Pressable>
+        </View>
       </View>
-      
-      <Text style={styles.productCardDescription}>{selectedVariant.description}</Text>
-      <Text style={styles.productCardPrice}>{price}</Text>
-      <View style={styles.productActionsRow}>
-        <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
-          <Text style={styles.detailsButtonLabel}>Product details</Text>
-        </Pressable>
-      </View>
-      
-      {isInCart ? (
-        <>
-          <Text style={styles.quantityPanelLabel}>Quantity</Text>
-          <View style={styles.quantityRow}>
-            <Pressable disabled={!backendProduct || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={() => backendProduct && onDecrease(backendProduct.id)}>
-              <Text style={styles.quantityLabel}>-</Text>
-            </Pressable>
-            <Text style={styles.quantityValue}>{quantity}</Text>
-            <Pressable disabled={!backendProduct || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={() => backendProduct && onIncrease(backendProduct.id)}>
-              <Text style={styles.quantityLabel}>+</Text>
-            </Pressable>
-          </View>
-        </>
-      ) : null}
-      
-      <Pressable disabled={disabled || !backendProduct} style={[styles.primaryButton, (disabled || !backendProduct) && styles.disabledPrimaryButton]} onPress={() => backendProduct && onAdd(backendProduct.id)}>
-        <Text style={styles.primaryButtonLabel}>{isInCart ? ctaLabel : `${ctaLabel} — ${price}`}</Text>
+      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
+        <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
       </Pressable>
     </View>
   );
@@ -3857,95 +3644,6 @@ const styles = StyleSheet.create({
   headerShellCompact: {
     paddingHorizontal: 12,
   },
-  headerShellMobile: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderRadius: 0,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: 0,
-    borderBottomWidth: 1,
-  },
-  mobileHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  cartIconButton: {
-    position: 'relative',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  cartIconEmoji: {
-    fontSize: 24,
-  },
-  cartBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#d94040',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  hamburgerButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  hamburgerIcon: {
-    fontSize: 24,
-    color: '#123524',
-  },
-  hamburgerMenuOverlay: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 100,
-  },
-  hamburgerMenuContent: {
-    backgroundColor: '#fffdf8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e7ddc9',
-  },
-  hamburgerMenuItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5efe0',
-  },
-  hamburgerMenuItemActive: {
-    backgroundColor: '#f2ead9',
-  },
-  hamburgerMenuItemText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#123524',
-  },
-  hamburgerMenuItemTextActive: {
-    fontWeight: '700',
-    color: '#1f5c43',
-  },
-  hamburgerCloseButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e7ddc9',
-  },
-  hamburgerCloseButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8a6b2f',
-  },
   brandLockup: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4235,32 +3933,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#123524',
     fontSize: 16,
-  },
-  sizeSelectorRow: {
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'flex-start',
-  },
-  sizeSelectorButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#d6e6db',
-    backgroundColor: 'transparent',
-  },
-  sizeSelectorButtonActive: {
-    backgroundColor: '#d6e6db',
-    borderColor: '#1f5c43',
-  },
-  sizeSelectorLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4d5c54',
-  },
-  sizeSelectorLabelActive: {
-    color: '#1f5c43',
-    fontWeight: '700',
   },
   primaryButton: {
     backgroundColor: '#1f5c43',

@@ -338,6 +338,19 @@ const storyJourneyStages: StoryJourneyStage[] = [
   },
 ];
 
+// Responsive breakpoint helper that differentiates between native app and web.
+// Native app (iOS/Android): uses 640px breakpoint for mobile styles
+// Web: uses extremely narrow breakpoint (0px) to prevent mobile styles in normal browser widths
+// This ensures that the native app can have responsive mobile UI without affecting the website
+function shouldUseMobileStyles(windowWidth: number): boolean {
+  if (Platform.OS === 'web') {
+    // For web, never apply mobile styles (even at narrow widths) to keep website responsive
+    return false;
+  }
+  // For native app (iOS/Android), apply mobile styles at 640px breakpoint
+  return windowWidth < 640;
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Please try again.';
 }
@@ -1046,7 +1059,7 @@ function SiteHeader({
   isCompact: boolean;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const isStaff = session?.user?.kind === 'staff';
   
   // Mobile and desktop navigation items
@@ -1105,7 +1118,7 @@ function SiteFooter({
   session: SessionState | null;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
   type SocialLink = {
     label: string;
@@ -1226,7 +1239,7 @@ function resolveWebImageUri(source: ImageSourcePropType): string | null {
 
 function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
@@ -1296,7 +1309,7 @@ function PublicShopSection({
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   // Defensive default: shopProducts should always be an array by the time it reaches this
   // component (it is derived from a fixed list of product specs, never directly from the
   // API response), but a missing/null prop here previously crashed the whole app with
@@ -1357,7 +1370,7 @@ function PublicShopPage({
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
   const safeShopProducts = shopProducts ?? [];
 
@@ -1587,7 +1600,7 @@ function ProductCard({
   ctaLabel: string;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
@@ -1637,7 +1650,7 @@ function ProductDetailCard({
   onClose: () => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const isAvailable = Boolean(product.product);
 
   return (
@@ -1724,7 +1737,7 @@ function CartPage({
   orderError: string | null;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const isCustomer = session.user?.kind === 'customer';
   const deliveryAddressValid = !isCustomer || deliveryAddressReady;
   const isPayNow = paymentTerm === PaymentTerm.PAY_NOW;
@@ -1907,7 +1920,7 @@ function PublicCartPage({
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
 
   return (
@@ -1957,7 +1970,7 @@ function PublicCartPage({
 
 function RecipesPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <>
@@ -1972,7 +1985,7 @@ function RecipesPage() {
 
 function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {}) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Ideas to inspire your cooking. We sell halloumi cheese — recipes are for inspiration only.">
@@ -1996,7 +2009,7 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
 
 function WhyGrasslandSection() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Premium quality halloumi, crafted to perfection.">
@@ -2205,7 +2218,7 @@ function QualityDocumentCard({
 
 function QualityCompliancePage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell
@@ -2269,7 +2282,7 @@ function WholesalePage({ onNavigate }: { onNavigate: (page: any) => void }) {
 
 function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
@@ -2468,7 +2481,7 @@ function WholesaleContactForm({ isMobile = false }: { isMobile?: boolean } = {})
 
 function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
@@ -2489,7 +2502,7 @@ function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
 
 function BusinessCardPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const businessCardUrl = 'https://grasslandcheese.com/business-card';
 
   // Contact details for Grassland Cheese
@@ -2919,7 +2932,7 @@ function WholesaleApplicationForm({ isMobile = false }: { isMobile?: boolean } =
 
 function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
@@ -2939,7 +2952,7 @@ function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void })
 
 function PrivacyPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Privacy" title="Privacy" description="A concise overview for the current ordering experience.">
@@ -2953,7 +2966,7 @@ function PrivacyPage() {
 
 function TermsPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Terms" title="Terms" description="A simple placeholder for the current web ordering experience.">
@@ -2973,7 +2986,7 @@ function AccountPage({
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Customer Account" title="Sign in or create your account" description="Access customer ordering, save your place for future halloumi purchases, and keep wholesale enquiries moving through the existing account flow.">
@@ -3022,7 +3035,7 @@ function SignedInAccountPage({
   };
 
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Customer Account" title={`Welcome, ${session.user?.name ?? brandName}`} description="Manage your account, review your ordering history, and keep your halloumi shopping connected to the current sales flow.">
@@ -3133,7 +3146,7 @@ function getResetTokenFromWebLocation(): string | null {
 
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const initialResetToken = useMemo(() => getResetTokenFromWebLocation(), []);
   const [mode, setMode] = useState<AuthMode>(initialResetToken ? 'customer-reset-password' : 'customer-login');
   const [resetToken] = useState<string | null>(initialResetToken);
@@ -3438,7 +3451,7 @@ function CustomersScreen() {
 
 function SectionShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: ReactNode }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <View style={[styles.sectionShell, isMobile && styles.sectionShellMobile]}>
@@ -3701,7 +3714,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   navButtonTextMobile: {
-    fontSize: 12,
+    fontSize: 13,
   },
   navButtonTextActive: {
     color: '#fffef8',
@@ -3722,7 +3735,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   signOutButtonTextMobile: {
-    fontSize: 12,
+    fontSize: 13,
   },
   heroShell: {
     borderRadius: 32,
@@ -3829,8 +3842,8 @@ const styles = StyleSheet.create({
     maxWidth: 760,
   },
   sectionDescriptionMobile: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 24,
   },
   productGrid: {
     flexDirection: 'row',
@@ -3852,9 +3865,9 @@ const styles = StyleSheet.create({
   },
   productCardMobile: {
     flexBasis: 240,
-    padding: 10,
-    borderRadius: 16,
-    gap: 8,
+    padding: 12,
+    borderRadius: 20,
+    gap: 10,
   },
   productLogoPanel: {
     backgroundColor: '#f5efe0',
@@ -3865,9 +3878,9 @@ const styles = StyleSheet.create({
     height: 360,
   },
   productLogoPanelMobile: {
-    height: 180,
-    padding: 8,
-    borderRadius: 12,
+    height: 240,
+    padding: 10,
+    borderRadius: 14,
   },
   productLogo: {
     width: '100%',
@@ -3879,7 +3892,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   productCardNameMobile: {
-    fontSize: 14,
+    fontSize: 16,
   },
   productCardSize: {
     fontSize: 15,
@@ -3892,8 +3905,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   productCardDescriptionMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
   },
   productCardPrice: {
     fontSize: 24,
@@ -3933,9 +3946,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quantityButtonMobile: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   disabledButton: {
     opacity: 0.45,
@@ -3946,7 +3959,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   quantityLabelMobile: {
-    fontSize: 16,
+    fontSize: 18,
   },
   quantityValue: {
     minWidth: 20,
@@ -3963,8 +3976,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonMobile: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   disabledPrimaryButton: {
     opacity: 0.55,
@@ -3983,8 +3996,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonMobile: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
   secondaryButtonLabel: {
     color: '#1f5c43',
@@ -3999,8 +4012,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryHeroButtonMobile: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   secondaryHeroButtonLabel: {
     color: '#fffef8',
@@ -4015,8 +4028,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryHeroButtonMobile: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   primaryHeroButtonLabel: {
     color: '#1f5c43',
@@ -4105,7 +4118,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   noticeTitleMobile: {
-    fontSize: 16,
+    fontSize: 17,
   },
   noticeText: {
     fontSize: 15,
@@ -4113,8 +4126,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   noticeTextMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
   valueGrid: {
     flexDirection: 'row',
@@ -4136,8 +4149,8 @@ const styles = StyleSheet.create({
   },
   valueCardMobile: {
     flexBasis: 200,
-    padding: 10,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 20,
     gap: 8,
   },
   valueCardTitle: {
@@ -4146,7 +4159,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   valueCardTitleMobile: {
-    fontSize: 14,
+    fontSize: 16,
   },
   valueCardDescription: {
     fontSize: 15,
@@ -4154,8 +4167,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   valueCardDescriptionMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
   recipeGrid: {
     flexDirection: 'row',
@@ -4176,14 +4189,14 @@ const styles = StyleSheet.create({
   },
   recipeCardMobile: {
     flexBasis: 260,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   recipeCardImage: {
     width: '100%',
     height: 220,
   },
   recipeCardImageMobile: {
-    height: 140,
+    height: 160,
   },
   recipeCardTitle: {
     paddingHorizontal: 18,
@@ -4193,9 +4206,9 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   recipeCardTitleMobile: {
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    fontSize: 16,
   },
   recipeCardDescription: {
     paddingHorizontal: 18,
@@ -4206,11 +4219,11 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   recipeCardDescriptionMobile: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingTop: 4,
-    paddingBottom: 10,
-    fontSize: 12,
-    lineHeight: 18,
+    paddingBottom: 12,
+    fontSize: 13,
+    lineHeight: 19,
   },
   storyCard: {
     backgroundColor: '#fffdf8',
@@ -4221,8 +4234,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   storyCardMobile: {
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 20,
+    padding: 16,
   },
   storyParagraph: {
     color: '#4d5c54',
@@ -4230,8 +4243,8 @@ const styles = StyleSheet.create({
     lineHeight: 27,
   },
   storyParagraphMobile: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 23,
   },
   ourStoryPage: {
     gap: 32,
@@ -4274,8 +4287,8 @@ const styles = StyleSheet.create({
     maxWidth: 700,
   },
   storyHeroTitleMobile: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 25,
+    lineHeight: 30,
   },
   storyHeroSubtitle: {
     fontSize: 18,
@@ -4284,8 +4297,8 @@ const styles = StyleSheet.create({
     maxWidth: 620,
   },
   storyHeroSubtitleMobile: {
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 24,
   },
   storyJourneyShell: {
     gap: 24,
@@ -4352,8 +4365,8 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   storyJourneyTitleMobile: {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 26,
   },
   storyJourneyDescription: {
     color: '#4d5c54',
@@ -4362,8 +4375,8 @@ const styles = StyleSheet.create({
     maxWidth: 520,
   },
   storyJourneyDescriptionMobile: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 22,
   },
   storyFamilySection: {
     gap: 16,
@@ -4437,8 +4450,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   authPanelMobile: {
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
   },
   authPanelTitle: {
     fontSize: 26,
@@ -4446,7 +4459,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   authPanelTitleMobile: {
-    fontSize: 20,
+    fontSize: 22,
   },
   authPanelSubtitle: {
     fontSize: 15,
@@ -4454,8 +4467,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   authPanelSubtitleMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
   adminAccessSection: {
     marginTop: 12,
@@ -4652,8 +4665,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   productDetailCardMobile: {
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
   },
   productDetailHeader: {
     flexDirection: 'row',
@@ -4683,8 +4696,8 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   productDetailTitleMobile: {
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 22,
+    lineHeight: 28,
   },
   orderItemText: {
     color: '#4d5c54',
@@ -4696,8 +4709,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   footerShellMobile: {
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
     gap: 12,
   },
   footerBrandRow: {
@@ -4717,8 +4730,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   footerLogoMobile: {
-    width: 100,
-    height: 44,
+    width: 110,
+    height: 48,
   },
   footerBrandCopy: {
     gap: 4,
@@ -4732,21 +4745,21 @@ const styles = StyleSheet.create({
     color: '#fffef8',
   },
   footerBrandNameMobile: {
-    fontSize: 16,
+    fontSize: 18,
   },
   footerBrandTagline: {
     color: '#f0e7d2',
     fontSize: 14,
   },
   footerBrandTaglineMobile: {
-    fontSize: 11,
+    fontSize: 12,
   },
   footerStatement: {
     color: '#f2d77e',
     fontWeight: '700',
   },
   footerStatementMobile: {
-    fontSize: 11,
+    fontSize: 12,
   },
   footerLinksWrap: {
     flexDirection: 'row',
@@ -4769,7 +4782,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footerLinkTextMobile: {
-    fontSize: 12,
+    fontSize: 13,
   },
   footerLinkTextActive: {
     color: '#f2d77e',
@@ -4783,7 +4796,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footerSectionLabelMobile: {
-    fontSize: 13,
+    fontSize: 14,
   },
   footerSocialRow: {
     flexDirection: 'row',
@@ -4798,9 +4811,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerSocialButtonMobile: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   footerSocialButtonFocused: {
     borderWidth: 2,
@@ -4811,8 +4824,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   footerMetaMobile: {
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
   },
   // Business Card Styles
   businessCardHeader: {
@@ -4824,8 +4837,8 @@ const styles = StyleSheet.create({
    borderBottomColor: '#e5ddd2',
   },
   businessCardHeaderMobile: {
-   paddingVertical: 14,
-   paddingHorizontal: 14,
+   paddingVertical: 16,
+   paddingHorizontal: 16,
   },
   businessCardTitle: {
    fontSize: 32,
@@ -4834,7 +4847,7 @@ const styles = StyleSheet.create({
    marginBottom: 8,
   },
   businessCardTitleMobile: {
-   fontSize: 22,
+   fontSize: 24,
   },
   businessCardSubtitle: {
    fontSize: 14,
@@ -4859,9 +4872,9 @@ const styles = StyleSheet.create({
    elevation: 3,
   },
   businessCardContainerMobile: {
-   marginHorizontal: 12,
-   paddingHorizontal: 16,
-   paddingVertical: 20,
+   marginHorizontal: 16,
+   paddingHorizontal: 20,
+   paddingVertical: 24,
   },
   businessCardLogo: {
    width: '100%',
@@ -4869,8 +4882,8 @@ const styles = StyleSheet.create({
    marginBottom: 32,
   },
   businessCardLogoMobile: {
-   height: 52,
-   marginBottom: 20,
+   height: 60,
+   marginBottom: 24,
   },
   businessCardSection: {
    marginBottom: 28,
@@ -4879,8 +4892,8 @@ const styles = StyleSheet.create({
    borderBottomColor: '#e5ddd2',
   },
   businessCardSectionMobile: {
-   marginBottom: 16,
-   paddingBottom: 16,
+   marginBottom: 20,
+   paddingBottom: 20,
   },
   businessCardSectionTitle: {
    fontSize: 14,
@@ -4891,8 +4904,8 @@ const styles = StyleSheet.create({
    marginBottom: 16,
   },
   businessCardSectionTitleMobile: {
-   fontSize: 11,
-   marginBottom: 10,
+   fontSize: 12,
+   marginBottom: 12,
   },
   businessCardContactRow: {
    flexDirection: 'row',

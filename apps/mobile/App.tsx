@@ -1238,10 +1238,10 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
       <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>Pure Goodness From Our Pastures</Text>
       <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>{heroMessage}</Text>
       <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
-        <Pressable style={styles.primaryHeroButton} onPress={onPrimary}>
+        <Pressable style={[styles.primaryHeroButton, isMobile && styles.primaryHeroButtonMobile]} onPress={onPrimary}>
           <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
         </Pressable>
-        <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
+        <Pressable style={[styles.secondaryHeroButton, isMobile && styles.secondaryHeroButtonMobile]} onPress={onSecondary}>
           <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
         </Pressable>
       </View>
@@ -2189,12 +2189,12 @@ function QualityDocumentCard({
           ))}
         </View>
       ) : null}
-      <View style={styles.heroActionRow}>
-        <Pressable style={styles.primaryButton} onPress={() => openQualityDocument(source)}>
+      <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+        <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => openQualityDocument(source)}>
           <Text style={styles.primaryButtonLabel}>{viewLabel}</Text>
         </Pressable>
         {showDownload ? (
-          <Pressable style={styles.secondaryButton} onPress={() => openQualityDocument(source)}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => openQualityDocument(source)}>
             <Text style={styles.secondaryButtonLabel}>Download PDF</Text>
           </Pressable>
         ) : null}
@@ -2275,11 +2275,11 @@ function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
     <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
       <View style={[styles.wholesaleCard, isMobile && styles.wholesaleCardMobile]}>
         <Text style={[styles.wholesaleBody, isMobile && styles.wholesaleBodyMobile]}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
-        <View style={styles.heroActionRow}>
-          <Pressable style={styles.primaryButton} onPress={() => onNavigate('wholesale-apply')}>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+          <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('wholesale-apply')}>
             <Text style={styles.primaryButtonLabel}>Wholesale Enquiries</Text>
           </Pressable>
-          <Pressable style={[styles.secondaryButton, styles.wholesaleContactButton]} onPress={() => onNavigate('contact')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile, styles.wholesaleContactButton]} onPress={() => onNavigate('contact')}>
             <Text style={[styles.secondaryButtonLabel, styles.wholesaleContactButtonLabel]}>Contact</Text>
           </Pressable>
         </View>
@@ -2298,7 +2298,7 @@ const generalEnquiryTypeOptions: Array<{ label: string; value: GeneralEnquiryTyp
 
 type GeneralEnquiryType = 'GENERAL' | 'PRODUCT' | 'ORDER' | 'DELIVERY' | 'OTHER';
 
-function GeneralContactForm() {
+function GeneralContactForm({ isMobile = false }: { isMobile?: boolean } = {}) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -2372,7 +2372,7 @@ function GeneralContactForm() {
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable
         disabled={submitGeneral.isPending}
-        style={[styles.primaryButton, submitGeneral.isPending && styles.disabledPrimaryButton]}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitGeneral.isPending && styles.disabledPrimaryButton]}
         onPress={() => void submit()}
       >
         <Text style={styles.primaryButtonLabel}>{submitGeneral.isPending ? 'Sending…' : 'Send enquiry'}</Text>
@@ -2381,7 +2381,7 @@ function GeneralContactForm() {
   );
 }
 
-function WholesaleContactForm() {
+function WholesaleContactForm({ isMobile = false }: { isMobile?: boolean } = {}) {
   const [businessName, setBusinessName] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
@@ -2457,7 +2457,7 @@ function WholesaleContactForm() {
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable
         disabled={submitWholesale.isPending}
-        style={[styles.primaryButton, submitWholesale.isPending && styles.disabledPrimaryButton]}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitWholesale.isPending && styles.disabledPrimaryButton]}
         onPress={() => void submit()}
       >
         <Text style={styles.primaryButtonLabel}>{submitWholesale.isPending ? 'Sending…' : 'Send wholesale enquiry'}</Text>
@@ -2472,13 +2472,13 @@ function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
 
   return (
     <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
-      <GeneralContactForm />
-      <WholesaleContactForm />
+      <GeneralContactForm isMobile={isMobile} />
+      <WholesaleContactForm isMobile={isMobile} />
       <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
         <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Already a customer?</Text>
         <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in to your customer account to place orders and view order history.</Text>
         <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('account')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('account')}>
             <Text style={styles.secondaryButtonLabel}>Open Account</Text>
           </Pressable>
         </View>
@@ -2677,7 +2677,7 @@ END:VCARD`;
   );
 }
 
-function WholesaleApplicationForm() {
+function WholesaleApplicationForm({ isMobile = false }: { isMobile?: boolean } = {}) {
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState<'CAFÉ' | 'RESTAURANT' | 'DELI' | 'RETAILER' | 'DISTRIBUTOR' | 'OTHER'>('CAFÉ');
   const [nzbn, setNzbn] = useState('');
@@ -2908,7 +2908,7 @@ function WholesaleApplicationForm() {
 
       <Pressable
         disabled={submitApplication.isPending}
-        style={[styles.primaryButton, submitApplication.isPending && styles.disabledPrimaryButton]}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitApplication.isPending && styles.disabledPrimaryButton]}
         onPress={() => void submit()}
       >
         <Text style={styles.primaryButtonLabel}>{submitApplication.isPending ? 'Submitting…' : 'Submit Application'}</Text>
@@ -2923,12 +2923,12 @@ function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void })
 
   return (
     <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
-      <WholesaleApplicationForm />
+      <WholesaleApplicationForm isMobile={isMobile} />
       <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
         <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Questions?</Text>
         <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
         <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('contact')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('contact')}>
             <Text style={styles.secondaryButtonLabel}>Contact Us</Text>
           </Pressable>
         </View>
@@ -3998,6 +3998,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
+  secondaryHeroButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
   secondaryHeroButtonLabel: {
     color: '#fffef8',
     fontWeight: '700',
@@ -4009,6 +4013,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
+  },
+  primaryHeroButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   primaryHeroButtonLabel: {
     color: '#1f5c43',

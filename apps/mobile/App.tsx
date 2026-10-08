@@ -3701,7 +3701,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   navButtonTextMobile: {
-    fontSize: 12,
+    fontSize: 13,
   },
   navButtonTextActive: {
     color: '#fffef8',
@@ -3722,7 +3722,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   signOutButtonTextMobile: {
-    fontSize: 12,
+    fontSize: 13,
   },
   heroShell: {
     borderRadius: 32,
@@ -3829,8 +3829,8 @@ const styles = StyleSheet.create({
     maxWidth: 760,
   },
   sectionDescriptionMobile: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 24,
   },
   productGrid: {
     flexDirection: 'row',
@@ -3852,9 +3852,9 @@ const styles = StyleSheet.create({
   },
   productCardMobile: {
     flexBasis: 240,
-    padding: 10,
-    borderRadius: 16,
-    gap: 8,
+    padding: 12,
+    borderRadius: 20,
+    gap: 10,
   },
   productLogoPanel: {
     backgroundColor: '#f5efe0',
@@ -3865,9 +3865,9 @@ const styles = StyleSheet.create({
     height: 360,
   },
   productLogoPanelMobile: {
-    height: 180,
-    padding: 8,
-    borderRadius: 12,
+    height: 240,
+    padding: 10,
+    borderRadius: 14,
   },
   productLogo: {
     width: '100%',
@@ -3879,7 +3879,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   productCardNameMobile: {
-    fontSize: 14,
+    fontSize: 16,
   },
   productCardSize: {
     fontSize: 15,
@@ -3892,8 +3892,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   productCardDescriptionMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
   },
   productCardPrice: {
     fontSize: 24,
@@ -3933,9 +3933,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quantityButtonMobile: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   disabledButton: {
     opacity: 0.45,
@@ -3946,7 +3946,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   quantityLabelMobile: {
-    fontSize: 16,
+    fontSize: 18,
   },
   quantityValue: {
     minWidth: 20,
@@ -3963,8 +3963,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonMobile: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   disabledPrimaryButton: {
     opacity: 0.55,
@@ -3983,8 +3983,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonMobile: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
   secondaryButtonLabel: {
     color: '#1f5c43',
@@ -3999,8 +3999,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryHeroButtonMobile: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   secondaryHeroButtonLabel: {
     color: '#fffef8',
@@ -4015,8 +4015,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryHeroButtonMobile: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   primaryHeroButtonLabel: {
     color: '#1f5c43',
@@ -4105,7 +4105,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   noticeTitleMobile: {
-    fontSize: 16,
+    fontSize: 17,
   },
   noticeText: {
     fontSize: 15,
@@ -4113,8 +4113,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   noticeTextMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
   valueGrid: {
     flexDirection: 'row',
@@ -4136,8 +4136,8 @@ const styles = StyleSheet.create({
   },
   valueCardMobile: {
     flexBasis: 200,
-    padding: 10,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 20,
     gap: 8,
   },
   valueCardTitle: {
@@ -4146,7 +4146,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   valueCardTitleMobile: {
-    fontSize: 14,
+    fontSize: 16,
   },
   valueCardDescription: {
     fontSize: 15,
@@ -4154,8 +4154,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   valueCardDescriptionMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
   recipeGrid: {
     flexDirection: 'row',
@@ -4176,14 +4176,14 @@ const styles = StyleSheet.create({
   },
   recipeCardMobile: {
     flexBasis: 260,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   recipeCardImage: {
     width: '100%',
     height: 220,
   },
   recipeCardImageMobile: {
-    height: 140,
+    height: 160,
   },
   recipeCardTitle: {
     paddingHorizontal: 18,
@@ -4193,9 +4193,9 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   recipeCardTitleMobile: {
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    fontSize: 16,
   },
   recipeCardDescription: {
     paddingHorizontal: 18,
@@ -4206,11 +4206,11 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   recipeCardDescriptionMobile: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingTop: 4,
-    paddingBottom: 10,
-    fontSize: 12,
-    lineHeight: 18,
+    paddingBottom: 12,
+    fontSize: 13,
+    lineHeight: 19,
   },
   storyCard: {
     backgroundColor: '#fffdf8',
@@ -4221,8 +4221,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   storyCardMobile: {
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 20,
+    padding: 16,
   },
   storyParagraph: {
     color: '#4d5c54',
@@ -4230,8 +4230,8 @@ const styles = StyleSheet.create({
     lineHeight: 27,
   },
   storyParagraphMobile: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 23,
   },
   ourStoryPage: {
     gap: 32,
@@ -4274,8 +4274,8 @@ const styles = StyleSheet.create({
     maxWidth: 700,
   },
   storyHeroTitleMobile: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 25,
+    lineHeight: 30,
   },
   storyHeroSubtitle: {
     fontSize: 18,
@@ -4284,8 +4284,8 @@ const styles = StyleSheet.create({
     maxWidth: 620,
   },
   storyHeroSubtitleMobile: {
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 24,
   },
   storyJourneyShell: {
     gap: 24,
@@ -4352,8 +4352,8 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   storyJourneyTitleMobile: {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 26,
   },
   storyJourneyDescription: {
     color: '#4d5c54',
@@ -4362,8 +4362,8 @@ const styles = StyleSheet.create({
     maxWidth: 520,
   },
   storyJourneyDescriptionMobile: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 22,
   },
   storyFamilySection: {
     gap: 16,
@@ -4437,8 +4437,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   authPanelMobile: {
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
   },
   authPanelTitle: {
     fontSize: 26,
@@ -4446,7 +4446,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   authPanelTitleMobile: {
-    fontSize: 20,
+    fontSize: 22,
   },
   authPanelSubtitle: {
     fontSize: 15,
@@ -4454,8 +4454,8 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   authPanelSubtitleMobile: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
   adminAccessSection: {
     marginTop: 12,
@@ -4652,8 +4652,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   productDetailCardMobile: {
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
   },
   productDetailHeader: {
     flexDirection: 'row',
@@ -4683,8 +4683,8 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   productDetailTitleMobile: {
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 22,
+    lineHeight: 28,
   },
   orderItemText: {
     color: '#4d5c54',
@@ -4696,8 +4696,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   footerShellMobile: {
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
     gap: 12,
   },
   footerBrandRow: {
@@ -4717,8 +4717,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   footerLogoMobile: {
-    width: 100,
-    height: 44,
+    width: 110,
+    height: 48,
   },
   footerBrandCopy: {
     gap: 4,
@@ -4732,21 +4732,21 @@ const styles = StyleSheet.create({
     color: '#fffef8',
   },
   footerBrandNameMobile: {
-    fontSize: 16,
+    fontSize: 18,
   },
   footerBrandTagline: {
     color: '#f0e7d2',
     fontSize: 14,
   },
   footerBrandTaglineMobile: {
-    fontSize: 11,
+    fontSize: 12,
   },
   footerStatement: {
     color: '#f2d77e',
     fontWeight: '700',
   },
   footerStatementMobile: {
-    fontSize: 11,
+    fontSize: 12,
   },
   footerLinksWrap: {
     flexDirection: 'row',
@@ -4769,7 +4769,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footerLinkTextMobile: {
-    fontSize: 12,
+    fontSize: 13,
   },
   footerLinkTextActive: {
     color: '#f2d77e',
@@ -4783,7 +4783,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footerSectionLabelMobile: {
-    fontSize: 13,
+    fontSize: 14,
   },
   footerSocialRow: {
     flexDirection: 'row',
@@ -4798,9 +4798,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerSocialButtonMobile: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   footerSocialButtonFocused: {
     borderWidth: 2,
@@ -4811,8 +4811,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   footerMetaMobile: {
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
   },
   // Business Card Styles
   businessCardHeader: {
@@ -4824,8 +4824,8 @@ const styles = StyleSheet.create({
    borderBottomColor: '#e5ddd2',
   },
   businessCardHeaderMobile: {
-   paddingVertical: 14,
-   paddingHorizontal: 14,
+   paddingVertical: 16,
+   paddingHorizontal: 16,
   },
   businessCardTitle: {
    fontSize: 32,
@@ -4834,7 +4834,7 @@ const styles = StyleSheet.create({
    marginBottom: 8,
   },
   businessCardTitleMobile: {
-   fontSize: 22,
+   fontSize: 24,
   },
   businessCardSubtitle: {
    fontSize: 14,
@@ -4859,9 +4859,9 @@ const styles = StyleSheet.create({
    elevation: 3,
   },
   businessCardContainerMobile: {
-   marginHorizontal: 12,
-   paddingHorizontal: 16,
-   paddingVertical: 20,
+   marginHorizontal: 16,
+   paddingHorizontal: 20,
+   paddingVertical: 24,
   },
   businessCardLogo: {
    width: '100%',
@@ -4869,8 +4869,8 @@ const styles = StyleSheet.create({
    marginBottom: 32,
   },
   businessCardLogoMobile: {
-   height: 52,
-   marginBottom: 20,
+   height: 60,
+   marginBottom: 24,
   },
   businessCardSection: {
    marginBottom: 28,
@@ -4879,8 +4879,8 @@ const styles = StyleSheet.create({
    borderBottomColor: '#e5ddd2',
   },
   businessCardSectionMobile: {
-   marginBottom: 16,
-   paddingBottom: 16,
+   marginBottom: 20,
+   paddingBottom: 20,
   },
   businessCardSectionTitle: {
    fontSize: 14,
@@ -4891,8 +4891,8 @@ const styles = StyleSheet.create({
    marginBottom: 16,
   },
   businessCardSectionTitleMobile: {
-   fontSize: 11,
-   marginBottom: 10,
+   fontSize: 12,
+   marginBottom: 12,
   },
   businessCardContactRow: {
    flexDirection: 'row',

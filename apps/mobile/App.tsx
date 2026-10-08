@@ -1231,13 +1231,13 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
   const heroOverlayContent = (
-    <View style={styles.heroOverlay}>
+    <View style={[styles.heroOverlay, isMobile && styles.heroOverlayMobile]}>
       <View style={styles.heroBadge}>
         <Text style={styles.heroBadgeText}>{brandStatement}</Text>
       </View>
       <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>Pure Goodness From Our Pastures</Text>
       <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>{heroMessage}</Text>
-      <View style={styles.heroActionRow}>
+      <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
         <Pressable style={styles.primaryHeroButton} onPress={onPrimary}>
           <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
         </Pressable>
@@ -1595,7 +1595,7 @@ function ProductCard({
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
       <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
-      <Text style={styles.productCardDescription}>{product.description}</Text>
+      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.description}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
         <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
@@ -1605,16 +1605,16 @@ function ProductCard({
       <View style={styles.quantityPanel}>
         <Text style={styles.quantityPanelLabel}>Quantity</Text>
         <View style={styles.quantityRow}>
-          <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onDecrease}>
-            <Text style={styles.quantityLabel}>-</Text>
+          <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, disabled && styles.disabledButton]} onPress={onDecrease}>
+            <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
           </Pressable>
           <Text style={styles.quantityValue}>{quantity}</Text>
-          <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onIncrease}>
-            <Text style={styles.quantityLabel}>+</Text>
+          <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, disabled && styles.disabledButton]} onPress={onIncrease}>
+            <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
           </Pressable>
         </View>
       </View>
-      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
+      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
         <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
       </Pressable>
     </View>
@@ -3441,7 +3441,7 @@ function SectionShell({ eyebrow, title, description, children }: { eyebrow: stri
   const isMobile = width < 640;
   
   return (
-    <View style={styles.sectionShell}>
+    <View style={[styles.sectionShell, isMobile && styles.sectionShellMobile]}>
       <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
       <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]} numberOfLines={3}>{title}</Text>
       <Text style={[styles.sectionDescription, isMobile && styles.sectionDescriptionMobile]}>{description}</Text>
@@ -3635,11 +3635,11 @@ const styles = StyleSheet.create({
   headerShell: {
     backgroundColor: '#fffdf8',
     borderRadius: 28,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#e7ddc9',
-    gap: 12,
+    gap: 10,
   },
   headerShellCompact: {
     paddingHorizontal: 12,
@@ -3753,6 +3753,10 @@ const styles = StyleSheet.create({
     padding: 28,
     gap: 16,
   },
+  heroOverlayMobile: {
+    padding: 20,
+    gap: 12,
+  },
   heroBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#f5e7b2',
@@ -3796,6 +3800,10 @@ const styles = StyleSheet.create({
   sectionShell: {
     gap: 16,
     marginVertical: 24,
+  },
+  sectionShellMobile: {
+    gap: 12,
+    marginVertical: 16,
   },
   sectionEyebrow: {
     color: '#8a6b2f',
@@ -3844,8 +3852,9 @@ const styles = StyleSheet.create({
   },
   productCardMobile: {
     flexBasis: 240,
-    padding: 16,
+    padding: 12,
     borderRadius: 20,
+    gap: 10,
   },
   productLogoPanel: {
     backgroundColor: '#f5efe0',
@@ -3856,8 +3865,8 @@ const styles = StyleSheet.create({
     height: 360,
   },
   productLogoPanelMobile: {
-    height: 280,
-    padding: 12,
+    height: 240,
+    padding: 10,
     borderRadius: 14,
   },
   productLogo: {
@@ -3870,7 +3879,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   productCardNameMobile: {
-    fontSize: 18,
+    fontSize: 16,
   },
   productCardSize: {
     fontSize: 15,
@@ -3881,6 +3890,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     color: '#4d5c54',
+  },
+  productCardDescriptionMobile: {
+    fontSize: 13,
+    lineHeight: 19,
   },
   productCardPrice: {
     fontSize: 24,
@@ -3919,6 +3932,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  quantityButtonMobile: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
   disabledButton: {
     opacity: 0.45,
   },
@@ -3926,6 +3944,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#123524',
     fontWeight: '700',
+  },
+  quantityLabelMobile: {
+    fontSize: 18,
   },
   quantityValue: {
     minWidth: 20,
@@ -3940,6 +3961,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
+  },
+  primaryButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   disabledPrimaryButton: {
     opacity: 0.55,
@@ -3956,6 +3981,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
+  },
+  secondaryButtonMobile: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
   secondaryButtonLabel: {
     color: '#1f5c43',
@@ -4014,8 +4043,9 @@ const styles = StyleSheet.create({
   },
   qualityDocCardMobile: {
     flexBasis: 260,
-    padding: 16,
+    padding: 12,
     borderRadius: 20,
+    gap: 10,
   },
   qualityDocTitle: {
     fontSize: 20,
@@ -4058,7 +4088,8 @@ const styles = StyleSheet.create({
   },
   noticeCardMobile: {
     borderRadius: 20,
-    padding: 16,
+    padding: 12,
+    gap: 10,
   },
   noticeTitle: {
     fontSize: 20,
@@ -4097,8 +4128,9 @@ const styles = StyleSheet.create({
   },
   valueCardMobile: {
     flexBasis: 200,
-    padding: 16,
+    padding: 12,
     borderRadius: 20,
+    gap: 8,
   },
   valueCardTitle: {
     fontSize: 19,
@@ -4143,7 +4175,7 @@ const styles = StyleSheet.create({
     height: 220,
   },
   recipeCardImageMobile: {
-    height: 180,
+    height: 160,
   },
   recipeCardTitle: {
     paddingHorizontal: 18,
@@ -4153,9 +4185,9 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   recipeCardTitleMobile: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    fontSize: 17,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    fontSize: 16,
   },
   recipeCardDescription: {
     paddingHorizontal: 18,
@@ -4166,11 +4198,11 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   recipeCardDescriptionMobile: {
-    paddingHorizontal: 14,
-    paddingTop: 6,
-    paddingBottom: 14,
-    fontSize: 14,
-    lineHeight: 21,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 12,
+    fontSize: 13,
+    lineHeight: 19,
   },
   storyCard: {
     backgroundColor: '#fffdf8',
@@ -4458,7 +4490,8 @@ const styles = StyleSheet.create({
   },
   inlineCardMobile: {
     borderRadius: 20,
-    padding: 16,
+    padding: 12,
+    gap: 10,
   },
   inlineCardTitle: {
     fontSize: 20,

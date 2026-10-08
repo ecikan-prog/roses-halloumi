@@ -1231,17 +1231,17 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
   const heroOverlayContent = (
-    <View style={styles.heroOverlay}>
+    <View style={[styles.heroOverlay, isMobile && styles.heroOverlayMobile]}>
       <View style={styles.heroBadge}>
         <Text style={styles.heroBadgeText}>{brandStatement}</Text>
       </View>
       <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>Pure Goodness From Our Pastures</Text>
       <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>{heroMessage}</Text>
-      <View style={styles.heroActionRow}>
-        <Pressable style={styles.primaryHeroButton} onPress={onPrimary}>
+      <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+        <Pressable style={[styles.primaryHeroButton, isMobile && styles.primaryHeroButtonMobile]} onPress={onPrimary}>
           <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
         </Pressable>
-        <Pressable style={styles.secondaryHeroButton} onPress={onSecondary}>
+        <Pressable style={[styles.secondaryHeroButton, isMobile && styles.secondaryHeroButtonMobile]} onPress={onSecondary}>
           <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
         </Pressable>
       </View>
@@ -1595,7 +1595,7 @@ function ProductCard({
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
       <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
-      <Text style={styles.productCardDescription}>{product.description}</Text>
+      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.description}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
         <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
@@ -1605,16 +1605,16 @@ function ProductCard({
       <View style={styles.quantityPanel}>
         <Text style={styles.quantityPanelLabel}>Quantity</Text>
         <View style={styles.quantityRow}>
-          <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onDecrease}>
-            <Text style={styles.quantityLabel}>-</Text>
+          <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, disabled && styles.disabledButton]} onPress={onDecrease}>
+            <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
           </Pressable>
           <Text style={styles.quantityValue}>{quantity}</Text>
-          <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, disabled && styles.disabledButton]} onPress={onIncrease}>
-            <Text style={styles.quantityLabel}>+</Text>
+          <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, disabled && styles.disabledButton]} onPress={onIncrease}>
+            <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
           </Pressable>
         </View>
       </View>
-      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
+      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
         <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
       </Pressable>
     </View>
@@ -1650,23 +1650,23 @@ function ProductDetailCard({
             <Text style={[styles.productDetailTitle, isMobile && styles.productDetailTitleMobile]} numberOfLines={3}>{product.name}</Text>
           </View>
         </View>
-        <Pressable style={styles.secondaryButton} onPress={onClose}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={onClose}>
           <Text style={styles.secondaryButtonLabel}>Close</Text>
         </Pressable>
       </View>
       <Text style={styles.productCardSize}>{product.size}</Text>
-      <Text style={styles.productCardDescription}>{product.detail}</Text>
+      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.detail}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.quantityRow}>
-        <Pressable disabled={!isAvailable} style={[styles.quantityButton, !isAvailable && styles.disabledButton]} onPress={onDecrease}>
-          <Text style={styles.quantityLabel}>-</Text>
+        <Pressable disabled={!isAvailable} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, !isAvailable && styles.disabledButton]} onPress={onDecrease}>
+          <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
         </Pressable>
         <Text style={styles.quantityValue}>{quantity}</Text>
-        <Pressable disabled={!isAvailable} style={[styles.quantityButton, !isAvailable && styles.disabledButton]} onPress={onIncrease}>
-          <Text style={styles.quantityLabel}>+</Text>
+        <Pressable disabled={!isAvailable} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, !isAvailable && styles.disabledButton]} onPress={onIncrease}>
+          <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
         </Pressable>
       </View>
-      <Pressable disabled={!isAvailable} style={[styles.primaryButton, !isAvailable && styles.disabledPrimaryButton]} onPress={onAdd}>
+      <Pressable disabled={!isAvailable} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, !isAvailable && styles.disabledPrimaryButton]} onPress={onAdd}>
         <Text style={styles.primaryButtonLabel}>{isAvailable ? 'Add to Cart' : 'Available Soon'}</Text>
       </Pressable>
     </View>
@@ -1758,14 +1758,14 @@ function CartPage({
                     <Text style={styles.cartLineTitle}>{item.name}</Text>
                     <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
                     <View style={styles.quantityRow}>
-                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty - 1)}>
-                        <Text style={styles.quantityLabel}>-</Text>
+                      <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => changeQuantity(item.id, item.qty - 1)}>
+                        <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
                       </Pressable>
                       <Text style={styles.quantityValue}>{item.qty}</Text>
-                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty + 1)}>
-                        <Text style={styles.quantityLabel}>+</Text>
+                      <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => changeQuantity(item.id, item.qty + 1)}>
+                        <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
                       </Pressable>
-                      <Pressable style={styles.secondaryButton} onPress={() => removeItem(item.id)}>
+                      <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => removeItem(item.id)}>
                         <Text style={styles.secondaryButtonLabel}>Remove</Text>
                       </Pressable>
                     </View>
@@ -1777,7 +1777,7 @@ function CartPage({
               <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
             )}
             {selectedItems.length ? <Text style={styles.metaText}>Total product weight: {totalWeightKg.toFixed(3)} kg</Text> : null}
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
             </Pressable>
           </View>
@@ -1885,10 +1885,10 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
         <Text style={styles.metaText}>Payment status: {getPaymentStatusLabel(order.paymentStatus)}</Text>
         <Text style={styles.metaText}>A confirmation email has been sent to your registered email address.</Text>
         <View style={styles.heroActionRow}>
-          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+          <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('account')}>
             <Text style={styles.primaryButtonLabel}>View Order History</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
             <Text style={styles.secondaryButtonLabel}>Continue Shopping</Text>
           </Pressable>
         </View>
@@ -1921,14 +1921,14 @@ function PublicCartPage({
                 <Text style={styles.cartLineTitle}>{item.name}</Text>
                 <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
                 <View style={styles.quantityRow}>
-                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
-                    <Text style={styles.quantityLabel}>-</Text>
+                  <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
+                    <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
                   </Pressable>
                   <Text style={styles.quantityValue}>{item.qty}</Text>
-                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
-                    <Text style={styles.quantityLabel}>+</Text>
+                  <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
+                    <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
                   </Pressable>
-                  <Pressable style={styles.secondaryButton} onPress={() => adjustQuantity(item.id, 0)}>
+                  <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => adjustQuantity(item.id, 0)}>
                     <Text style={styles.secondaryButtonLabel}>Remove</Text>
                   </Pressable>
                 </View>
@@ -1939,7 +1939,7 @@ function PublicCartPage({
         ) : (
           <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
         )}
-        <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
           <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
         </Pressable>
       </View>
@@ -1947,7 +1947,7 @@ function PublicCartPage({
       <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
         <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Ready to order?</Text>
         <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
-        <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+        <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('account')}>
           <Text style={styles.primaryButtonLabel}>Go to Account</Text>
         </Pressable>
       </View>
@@ -1986,7 +1986,7 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
         ))}
       </View>
       {onNavigate ? (
-        <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
           <Text style={styles.secondaryButtonLabel}>Back to Halloumi Shop</Text>
         </Pressable>
       ) : null}
@@ -2189,12 +2189,12 @@ function QualityDocumentCard({
           ))}
         </View>
       ) : null}
-      <View style={styles.heroActionRow}>
-        <Pressable style={styles.primaryButton} onPress={() => openQualityDocument(source)}>
+      <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+        <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => openQualityDocument(source)}>
           <Text style={styles.primaryButtonLabel}>{viewLabel}</Text>
         </Pressable>
         {showDownload ? (
-          <Pressable style={styles.secondaryButton} onPress={() => openQualityDocument(source)}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => openQualityDocument(source)}>
             <Text style={styles.secondaryButtonLabel}>Download PDF</Text>
           </Pressable>
         ) : null}
@@ -2275,11 +2275,11 @@ function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
     <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
       <View style={[styles.wholesaleCard, isMobile && styles.wholesaleCardMobile]}>
         <Text style={[styles.wholesaleBody, isMobile && styles.wholesaleBodyMobile]}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
-        <View style={styles.heroActionRow}>
-          <Pressable style={styles.primaryButton} onPress={() => onNavigate('wholesale-apply')}>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+          <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('wholesale-apply')}>
             <Text style={styles.primaryButtonLabel}>Wholesale Enquiries</Text>
           </Pressable>
-          <Pressable style={[styles.secondaryButton, styles.wholesaleContactButton]} onPress={() => onNavigate('contact')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile, styles.wholesaleContactButton]} onPress={() => onNavigate('contact')}>
             <Text style={[styles.secondaryButtonLabel, styles.wholesaleContactButtonLabel]}>Contact</Text>
           </Pressable>
         </View>
@@ -2298,7 +2298,7 @@ const generalEnquiryTypeOptions: Array<{ label: string; value: GeneralEnquiryTyp
 
 type GeneralEnquiryType = 'GENERAL' | 'PRODUCT' | 'ORDER' | 'DELIVERY' | 'OTHER';
 
-function GeneralContactForm() {
+function GeneralContactForm({ isMobile = false }: { isMobile?: boolean } = {}) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -2372,7 +2372,7 @@ function GeneralContactForm() {
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable
         disabled={submitGeneral.isPending}
-        style={[styles.primaryButton, submitGeneral.isPending && styles.disabledPrimaryButton]}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitGeneral.isPending && styles.disabledPrimaryButton]}
         onPress={() => void submit()}
       >
         <Text style={styles.primaryButtonLabel}>{submitGeneral.isPending ? 'Sending…' : 'Send enquiry'}</Text>
@@ -2381,7 +2381,7 @@ function GeneralContactForm() {
   );
 }
 
-function WholesaleContactForm() {
+function WholesaleContactForm({ isMobile = false }: { isMobile?: boolean } = {}) {
   const [businessName, setBusinessName] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
@@ -2457,7 +2457,7 @@ function WholesaleContactForm() {
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
       <Pressable
         disabled={submitWholesale.isPending}
-        style={[styles.primaryButton, submitWholesale.isPending && styles.disabledPrimaryButton]}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitWholesale.isPending && styles.disabledPrimaryButton]}
         onPress={() => void submit()}
       >
         <Text style={styles.primaryButtonLabel}>{submitWholesale.isPending ? 'Sending…' : 'Send wholesale enquiry'}</Text>
@@ -2472,13 +2472,13 @@ function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
 
   return (
     <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
-      <GeneralContactForm />
-      <WholesaleContactForm />
+      <GeneralContactForm isMobile={isMobile} />
+      <WholesaleContactForm isMobile={isMobile} />
       <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
         <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Already a customer?</Text>
         <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in to your customer account to place orders and view order history.</Text>
         <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('account')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('account')}>
             <Text style={styles.secondaryButtonLabel}>Open Account</Text>
           </Pressable>
         </View>
@@ -2677,7 +2677,7 @@ END:VCARD`;
   );
 }
 
-function WholesaleApplicationForm() {
+function WholesaleApplicationForm({ isMobile = false }: { isMobile?: boolean } = {}) {
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState<'CAFÉ' | 'RESTAURANT' | 'DELI' | 'RETAILER' | 'DISTRIBUTOR' | 'OTHER'>('CAFÉ');
   const [nzbn, setNzbn] = useState('');
@@ -2908,7 +2908,7 @@ function WholesaleApplicationForm() {
 
       <Pressable
         disabled={submitApplication.isPending}
-        style={[styles.primaryButton, submitApplication.isPending && styles.disabledPrimaryButton]}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitApplication.isPending && styles.disabledPrimaryButton]}
         onPress={() => void submit()}
       >
         <Text style={styles.primaryButtonLabel}>{submitApplication.isPending ? 'Submitting…' : 'Submit Application'}</Text>
@@ -2923,12 +2923,12 @@ function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void })
 
   return (
     <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
-      <WholesaleApplicationForm />
+      <WholesaleApplicationForm isMobile={isMobile} />
       <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
         <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Questions?</Text>
         <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
         <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('contact')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('contact')}>
             <Text style={styles.secondaryButtonLabel}>Contact Us</Text>
           </Pressable>
         </View>
@@ -2984,7 +2984,7 @@ function AccountPage({
             <Text style={[styles.brandPanelTitle, isMobile && styles.brandPanelTitleMobile]} numberOfLines={3}>{brandName}</Text>
             <Text style={[styles.brandPanelSubtitle, isMobile && styles.brandPanelSubtitleMobile]}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
             <Text style={[styles.brandPanelMeta, isMobile && styles.brandPanelMetaMobile]}>{brandStatement}</Text>
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Browse Halloumi</Text>
             </Pressable>
           </View>
@@ -3034,10 +3034,10 @@ function SignedInAccountPage({
             <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
             <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
-              <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
+              <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('shop')}>
                 <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
               </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={() => void onSignOut()}>
+              <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => void onSignOut()}>
                 <Text style={styles.secondaryButtonLabel}>Sign out</Text>
               </Pressable>
             </View>
@@ -3045,7 +3045,7 @@ function SignedInAccountPage({
               <>
                 <Text style={[styles.metaText, { marginTop: 16, marginBottom: 8, fontWeight: '600', color: '#999' }]}>Danger zone</Text>
                 <Pressable
-                  style={[styles.secondaryButton, { borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)' }]}
+                  style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile, { borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)' }]}
                   onPress={() => setShowDeleteConfirm(true)}
                   disabled={deleteAccountMutation.isPending}
                 >
@@ -3067,10 +3067,10 @@ function SignedInAccountPage({
                 <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • {formatMoney(order.total)}</Text>
               </View>
             ))}
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('orders')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('orders')}>
               <Text style={styles.secondaryButtonLabel}>View All Orders</Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('cart')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('cart')}>
               <Text style={styles.secondaryButtonLabel}>Open Cart & Checkout</Text>
             </Pressable>
           </View>
@@ -3092,9 +3092,9 @@ function SignedInAccountPage({
             onChangeText={setDeleteConfirmEmail}
             editable={!deleteAccountMutation.isPending}
           />
-          <View style={styles.heroActionRow}>
+          <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
             <Pressable
-              style={[styles.primaryButton, { backgroundColor: '#dc3545' }]}
+              style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, { backgroundColor: '#dc3545' }]}
               onPress={() => void handleDeleteAccount()}
               disabled={deleteConfirmEmail !== session.user?.email || deleteAccountMutation.isPending}
             >
@@ -3103,7 +3103,7 @@ function SignedInAccountPage({
               </Text>
             </Pressable>
             <Pressable
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]}
               onPress={() => {
                 setShowDeleteConfirm(false);
                 setDeleteConfirmEmail('');
@@ -3262,10 +3262,10 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+        <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
           <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Sign in'}</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       </View>
@@ -3280,10 +3280,10 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+        <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
           <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Send reset link'}</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       </View>
@@ -3304,14 +3304,14 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
         )}
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
         {resetToken ? (
-          <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
             <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Reset password'}</Text>
           </Pressable>
         ) : null}
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-forgot-password')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-forgot-password')}>
           <Text style={styles.secondaryButtonLabel}>Request a new reset link</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       </View>
@@ -3340,18 +3340,18 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
       ) : null}
       {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-      <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+      <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
       </Pressable>
       {mode === 'customer-login' ? (
         <>
           <Text style={styles.metaText}>Don&apos;t have an account?</Text>
-          <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-register')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-register')}>
             <Text style={styles.secondaryButtonLabel}>Create a customer account</Text>
           </Pressable>
         </>
       ) : (
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       )}
@@ -3441,7 +3441,7 @@ function SectionShell({ eyebrow, title, description, children }: { eyebrow: stri
   const isMobile = width < 640;
   
   return (
-    <View style={styles.sectionShell}>
+    <View style={[styles.sectionShell, isMobile && styles.sectionShellMobile]}>
       <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
       <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]} numberOfLines={3}>{title}</Text>
       <Text style={[styles.sectionDescription, isMobile && styles.sectionDescriptionMobile]}>{description}</Text>
@@ -3635,11 +3635,11 @@ const styles = StyleSheet.create({
   headerShell: {
     backgroundColor: '#fffdf8',
     borderRadius: 28,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#e7ddc9',
-    gap: 12,
+    gap: 10,
   },
   headerShellCompact: {
     paddingHorizontal: 12,
@@ -3753,6 +3753,10 @@ const styles = StyleSheet.create({
     padding: 28,
     gap: 16,
   },
+  heroOverlayMobile: {
+    padding: 20,
+    gap: 12,
+  },
   heroBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#f5e7b2',
@@ -3796,6 +3800,10 @@ const styles = StyleSheet.create({
   sectionShell: {
     gap: 16,
     marginVertical: 24,
+  },
+  sectionShellMobile: {
+    gap: 12,
+    marginVertical: 16,
   },
   sectionEyebrow: {
     color: '#8a6b2f',
@@ -3844,8 +3852,9 @@ const styles = StyleSheet.create({
   },
   productCardMobile: {
     flexBasis: 240,
-    padding: 16,
+    padding: 12,
     borderRadius: 20,
+    gap: 10,
   },
   productLogoPanel: {
     backgroundColor: '#f5efe0',
@@ -3856,8 +3865,8 @@ const styles = StyleSheet.create({
     height: 360,
   },
   productLogoPanelMobile: {
-    height: 280,
-    padding: 12,
+    height: 240,
+    padding: 10,
     borderRadius: 14,
   },
   productLogo: {
@@ -3870,7 +3879,7 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   productCardNameMobile: {
-    fontSize: 18,
+    fontSize: 16,
   },
   productCardSize: {
     fontSize: 15,
@@ -3881,6 +3890,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     color: '#4d5c54',
+  },
+  productCardDescriptionMobile: {
+    fontSize: 13,
+    lineHeight: 19,
   },
   productCardPrice: {
     fontSize: 24,
@@ -3919,6 +3932,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  quantityButtonMobile: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
   disabledButton: {
     opacity: 0.45,
   },
@@ -3926,6 +3944,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#123524',
     fontWeight: '700',
+  },
+  quantityLabelMobile: {
+    fontSize: 18,
   },
   quantityValue: {
     minWidth: 20,
@@ -3940,6 +3961,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
+  },
+  primaryButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   disabledPrimaryButton: {
     opacity: 0.55,
@@ -3957,6 +3982,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
+  secondaryButtonMobile: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
   secondaryButtonLabel: {
     color: '#1f5c43',
     fontWeight: '700',
@@ -3969,6 +3998,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
+  secondaryHeroButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
   secondaryHeroButtonLabel: {
     color: '#fffef8',
     fontWeight: '700',
@@ -3980,6 +4013,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
+  },
+  primaryHeroButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   primaryHeroButtonLabel: {
     color: '#1f5c43',
@@ -4014,8 +4051,9 @@ const styles = StyleSheet.create({
   },
   qualityDocCardMobile: {
     flexBasis: 260,
-    padding: 16,
+    padding: 12,
     borderRadius: 20,
+    gap: 10,
   },
   qualityDocTitle: {
     fontSize: 20,
@@ -4058,7 +4096,8 @@ const styles = StyleSheet.create({
   },
   noticeCardMobile: {
     borderRadius: 20,
-    padding: 16,
+    padding: 12,
+    gap: 10,
   },
   noticeTitle: {
     fontSize: 20,
@@ -4097,8 +4136,9 @@ const styles = StyleSheet.create({
   },
   valueCardMobile: {
     flexBasis: 200,
-    padding: 16,
+    padding: 12,
     borderRadius: 20,
+    gap: 8,
   },
   valueCardTitle: {
     fontSize: 19,
@@ -4143,7 +4183,7 @@ const styles = StyleSheet.create({
     height: 220,
   },
   recipeCardImageMobile: {
-    height: 180,
+    height: 160,
   },
   recipeCardTitle: {
     paddingHorizontal: 18,
@@ -4153,9 +4193,9 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   recipeCardTitleMobile: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    fontSize: 17,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    fontSize: 16,
   },
   recipeCardDescription: {
     paddingHorizontal: 18,
@@ -4166,11 +4206,11 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   recipeCardDescriptionMobile: {
-    paddingHorizontal: 14,
-    paddingTop: 6,
-    paddingBottom: 14,
-    fontSize: 14,
-    lineHeight: 21,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 12,
+    fontSize: 13,
+    lineHeight: 19,
   },
   storyCard: {
     backgroundColor: '#fffdf8',
@@ -4458,7 +4498,8 @@ const styles = StyleSheet.create({
   },
   inlineCardMobile: {
     borderRadius: 20,
-    padding: 16,
+    padding: 12,
+    gap: 10,
   },
   inlineCardTitle: {
     fontSize: 20,

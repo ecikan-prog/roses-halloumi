@@ -1650,23 +1650,23 @@ function ProductDetailCard({
             <Text style={[styles.productDetailTitle, isMobile && styles.productDetailTitleMobile]} numberOfLines={3}>{product.name}</Text>
           </View>
         </View>
-        <Pressable style={styles.secondaryButton} onPress={onClose}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={onClose}>
           <Text style={styles.secondaryButtonLabel}>Close</Text>
         </Pressable>
       </View>
       <Text style={styles.productCardSize}>{product.size}</Text>
-      <Text style={styles.productCardDescription}>{product.detail}</Text>
+      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.detail}</Text>
       <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
       <View style={styles.quantityRow}>
-        <Pressable disabled={!isAvailable} style={[styles.quantityButton, !isAvailable && styles.disabledButton]} onPress={onDecrease}>
-          <Text style={styles.quantityLabel}>-</Text>
+        <Pressable disabled={!isAvailable} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, !isAvailable && styles.disabledButton]} onPress={onDecrease}>
+          <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
         </Pressable>
         <Text style={styles.quantityValue}>{quantity}</Text>
-        <Pressable disabled={!isAvailable} style={[styles.quantityButton, !isAvailable && styles.disabledButton]} onPress={onIncrease}>
-          <Text style={styles.quantityLabel}>+</Text>
+        <Pressable disabled={!isAvailable} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, !isAvailable && styles.disabledButton]} onPress={onIncrease}>
+          <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
         </Pressable>
       </View>
-      <Pressable disabled={!isAvailable} style={[styles.primaryButton, !isAvailable && styles.disabledPrimaryButton]} onPress={onAdd}>
+      <Pressable disabled={!isAvailable} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, !isAvailable && styles.disabledPrimaryButton]} onPress={onAdd}>
         <Text style={styles.primaryButtonLabel}>{isAvailable ? 'Add to Cart' : 'Available Soon'}</Text>
       </Pressable>
     </View>
@@ -1758,14 +1758,14 @@ function CartPage({
                     <Text style={styles.cartLineTitle}>{item.name}</Text>
                     <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
                     <View style={styles.quantityRow}>
-                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty - 1)}>
-                        <Text style={styles.quantityLabel}>-</Text>
+                      <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => changeQuantity(item.id, item.qty - 1)}>
+                        <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
                       </Pressable>
                       <Text style={styles.quantityValue}>{item.qty}</Text>
-                      <Pressable style={styles.quantityButton} onPress={() => changeQuantity(item.id, item.qty + 1)}>
-                        <Text style={styles.quantityLabel}>+</Text>
+                      <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => changeQuantity(item.id, item.qty + 1)}>
+                        <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
                       </Pressable>
-                      <Pressable style={styles.secondaryButton} onPress={() => removeItem(item.id)}>
+                      <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => removeItem(item.id)}>
                         <Text style={styles.secondaryButtonLabel}>Remove</Text>
                       </Pressable>
                     </View>
@@ -1777,7 +1777,7 @@ function CartPage({
               <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
             )}
             {selectedItems.length ? <Text style={styles.metaText}>Total product weight: {totalWeightKg.toFixed(3)} kg</Text> : null}
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
             </Pressable>
           </View>
@@ -1885,10 +1885,10 @@ function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | 
         <Text style={styles.metaText}>Payment status: {getPaymentStatusLabel(order.paymentStatus)}</Text>
         <Text style={styles.metaText}>A confirmation email has been sent to your registered email address.</Text>
         <View style={styles.heroActionRow}>
-          <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+          <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('account')}>
             <Text style={styles.primaryButtonLabel}>View Order History</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
             <Text style={styles.secondaryButtonLabel}>Continue Shopping</Text>
           </Pressable>
         </View>
@@ -1921,14 +1921,14 @@ function PublicCartPage({
                 <Text style={styles.cartLineTitle}>{item.name}</Text>
                 <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
                 <View style={styles.quantityRow}>
-                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
-                    <Text style={styles.quantityLabel}>-</Text>
+                  <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
+                    <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
                   </Pressable>
                   <Text style={styles.quantityValue}>{item.qty}</Text>
-                  <Pressable style={styles.quantityButton} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
-                    <Text style={styles.quantityLabel}>+</Text>
+                  <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
+                    <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
                   </Pressable>
-                  <Pressable style={styles.secondaryButton} onPress={() => adjustQuantity(item.id, 0)}>
+                  <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => adjustQuantity(item.id, 0)}>
                     <Text style={styles.secondaryButtonLabel}>Remove</Text>
                   </Pressable>
                 </View>
@@ -1939,7 +1939,7 @@ function PublicCartPage({
         ) : (
           <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
         )}
-        <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
           <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
         </Pressable>
       </View>
@@ -1947,7 +1947,7 @@ function PublicCartPage({
       <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
         <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Ready to order?</Text>
         <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
-        <Pressable style={styles.primaryButton} onPress={() => onNavigate('account')}>
+        <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('account')}>
           <Text style={styles.primaryButtonLabel}>Go to Account</Text>
         </Pressable>
       </View>
@@ -1986,7 +1986,7 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
         ))}
       </View>
       {onNavigate ? (
-        <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
           <Text style={styles.secondaryButtonLabel}>Back to Halloumi Shop</Text>
         </Pressable>
       ) : null}

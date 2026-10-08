@@ -338,6 +338,19 @@ const storyJourneyStages: StoryJourneyStage[] = [
   },
 ];
 
+// Responsive breakpoint helper that differentiates between native app and web.
+// Native app (iOS/Android): uses 640px breakpoint for mobile styles
+// Web: uses extremely narrow breakpoint (0px) to prevent mobile styles in normal browser widths
+// This ensures that the native app can have responsive mobile UI without affecting the website
+function shouldUseMobileStyles(windowWidth: number): boolean {
+  if (Platform.OS === 'web') {
+    // For web, never apply mobile styles (even at narrow widths) to keep website responsive
+    return false;
+  }
+  // For native app (iOS/Android), apply mobile styles at 640px breakpoint
+  return windowWidth < 640;
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Please try again.';
 }
@@ -1046,7 +1059,7 @@ function SiteHeader({
   isCompact: boolean;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const isStaff = session?.user?.kind === 'staff';
   
   // Mobile and desktop navigation items
@@ -1105,7 +1118,7 @@ function SiteFooter({
   session: SessionState | null;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
   type SocialLink = {
     label: string;
@@ -1226,7 +1239,7 @@ function resolveWebImageUri(source: ImageSourcePropType): string | null {
 
 function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
@@ -1296,7 +1309,7 @@ function PublicShopSection({
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   // Defensive default: shopProducts should always be an array by the time it reaches this
   // component (it is derived from a fixed list of product specs, never directly from the
   // API response), but a missing/null prop here previously crashed the whole app with
@@ -1357,7 +1370,7 @@ function PublicShopPage({
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
   const safeShopProducts = shopProducts ?? [];
 
@@ -1587,7 +1600,7 @@ function ProductCard({
   ctaLabel: string;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
@@ -1637,7 +1650,7 @@ function ProductDetailCard({
   onClose: () => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const isAvailable = Boolean(product.product);
 
   return (
@@ -1724,7 +1737,7 @@ function CartPage({
   orderError: string | null;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const isCustomer = session.user?.kind === 'customer';
   const deliveryAddressValid = !isCustomer || deliveryAddressReady;
   const isPayNow = paymentTerm === PaymentTerm.PAY_NOW;
@@ -1907,7 +1920,7 @@ function PublicCartPage({
   adjustQuantity: (productId: number, nextQuantity: number) => void;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
 
   return (
@@ -1957,7 +1970,7 @@ function PublicCartPage({
 
 function RecipesPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <>
@@ -1972,7 +1985,7 @@ function RecipesPage() {
 
 function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {}) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Ideas to inspire your cooking. We sell halloumi cheese — recipes are for inspiration only.">
@@ -1996,7 +2009,7 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
 
 function WhyGrasslandSection() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Premium quality halloumi, crafted to perfection.">
@@ -2205,7 +2218,7 @@ function QualityDocumentCard({
 
 function QualityCompliancePage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell
@@ -2269,7 +2282,7 @@ function WholesalePage({ onNavigate }: { onNavigate: (page: any) => void }) {
 
 function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
@@ -2468,7 +2481,7 @@ function WholesaleContactForm({ isMobile = false }: { isMobile?: boolean } = {})
 
 function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
@@ -2489,7 +2502,7 @@ function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
 
 function BusinessCardPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const businessCardUrl = 'https://grasslandcheese.com/business-card';
 
   // Contact details for Grassland Cheese
@@ -2919,7 +2932,7 @@ function WholesaleApplicationForm({ isMobile = false }: { isMobile?: boolean } =
 
 function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
@@ -2939,7 +2952,7 @@ function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void })
 
 function PrivacyPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Privacy" title="Privacy" description="A concise overview for the current ordering experience.">
@@ -2953,7 +2966,7 @@ function PrivacyPage() {
 
 function TermsPage() {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Terms" title="Terms" description="A simple placeholder for the current web ordering experience.">
@@ -2973,7 +2986,7 @@ function AccountPage({
   onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Customer Account" title="Sign in or create your account" description="Access customer ordering, save your place for future halloumi purchases, and keep wholesale enquiries moving through the existing account flow.">
@@ -3022,7 +3035,7 @@ function SignedInAccountPage({
   };
 
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
 
   return (
     <SectionShell eyebrow="Customer Account" title={`Welcome, ${session.user?.name ?? brandName}`} description="Manage your account, review your ordering history, and keep your halloumi shopping connected to the current sales flow.">
@@ -3133,7 +3146,7 @@ function getResetTokenFromWebLocation(): string | null {
 
 function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   const initialResetToken = useMemo(() => getResetTokenFromWebLocation(), []);
   const [mode, setMode] = useState<AuthMode>(initialResetToken ? 'customer-reset-password' : 'customer-login');
   const [resetToken] = useState<string | null>(initialResetToken);
@@ -3438,7 +3451,7 @@ function CustomersScreen() {
 
 function SectionShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: ReactNode }) {
   const { width } = useWindowDimensions();
-  const isMobile = width < 640;
+  const isMobile = shouldUseMobileStyles(width);
   
   return (
     <View style={[styles.sectionShell, isMobile && styles.sectionShellMobile]}>

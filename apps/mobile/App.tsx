@@ -2984,7 +2984,7 @@ function AccountPage({
             <Text style={[styles.brandPanelTitle, isMobile && styles.brandPanelTitleMobile]} numberOfLines={3}>{brandName}</Text>
             <Text style={[styles.brandPanelSubtitle, isMobile && styles.brandPanelSubtitleMobile]}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
             <Text style={[styles.brandPanelMeta, isMobile && styles.brandPanelMetaMobile]}>{brandStatement}</Text>
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('shop')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
               <Text style={styles.secondaryButtonLabel}>Browse Halloumi</Text>
             </Pressable>
           </View>
@@ -3034,10 +3034,10 @@ function SignedInAccountPage({
             <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
             {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
             <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
-              <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
+              <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('shop')}>
                 <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
               </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={() => void onSignOut()}>
+              <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => void onSignOut()}>
                 <Text style={styles.secondaryButtonLabel}>Sign out</Text>
               </Pressable>
             </View>
@@ -3045,7 +3045,7 @@ function SignedInAccountPage({
               <>
                 <Text style={[styles.metaText, { marginTop: 16, marginBottom: 8, fontWeight: '600', color: '#999' }]}>Danger zone</Text>
                 <Pressable
-                  style={[styles.secondaryButton, { borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)' }]}
+                  style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile, { borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)' }]}
                   onPress={() => setShowDeleteConfirm(true)}
                   disabled={deleteAccountMutation.isPending}
                 >
@@ -3067,10 +3067,10 @@ function SignedInAccountPage({
                 <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • {formatMoney(order.total)}</Text>
               </View>
             ))}
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('orders')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('orders')}>
               <Text style={styles.secondaryButtonLabel}>View All Orders</Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => onNavigate('cart')}>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('cart')}>
               <Text style={styles.secondaryButtonLabel}>Open Cart & Checkout</Text>
             </Pressable>
           </View>
@@ -3092,9 +3092,9 @@ function SignedInAccountPage({
             onChangeText={setDeleteConfirmEmail}
             editable={!deleteAccountMutation.isPending}
           />
-          <View style={styles.heroActionRow}>
+          <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
             <Pressable
-              style={[styles.primaryButton, { backgroundColor: '#dc3545' }]}
+              style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, { backgroundColor: '#dc3545' }]}
               onPress={() => void handleDeleteAccount()}
               disabled={deleteConfirmEmail !== session.user?.email || deleteAccountMutation.isPending}
             >
@@ -3103,7 +3103,7 @@ function SignedInAccountPage({
               </Text>
             </Pressable>
             <Pressable
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]}
               onPress={() => {
                 setShowDeleteConfirm(false);
                 setDeleteConfirmEmail('');
@@ -3262,10 +3262,10 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+        <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
           <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Sign in'}</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       </View>
@@ -3280,10 +3280,10 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
         {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-        <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+        <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
           <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Send reset link'}</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       </View>
@@ -3304,14 +3304,14 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
         )}
         {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
         {resetToken ? (
-          <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
             <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Reset password'}</Text>
           </Pressable>
         ) : null}
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-forgot-password')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-forgot-password')}>
           <Text style={styles.secondaryButtonLabel}>Request a new reset link</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       </View>
@@ -3340,18 +3340,18 @@ function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user:
       ) : null}
       {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
       {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
-      <Pressable disabled={loading} style={[styles.primaryButton, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+      <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
         <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
       </Pressable>
       {mode === 'customer-login' ? (
         <>
           <Text style={styles.metaText}>Don&apos;t have an account?</Text>
-          <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-register')}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-register')}>
             <Text style={styles.secondaryButtonLabel}>Create a customer account</Text>
           </Pressable>
         </>
       ) : (
-        <Pressable style={styles.secondaryButton} onPress={() => changeMode('customer-login')}>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
           <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
         </Pressable>
       )}

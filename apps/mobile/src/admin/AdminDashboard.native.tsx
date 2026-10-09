@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { trpc } from '../lib/trpc';
-import type { SessionState } from '../../App';
+import type { SessionState } from '../lib/sessionTypes';
 
 // The backend still models this as a "staff" session (StaffUser/staffLogin/staffProcedure).
 // Everything user-facing in this file must be presented as "Admin" only.

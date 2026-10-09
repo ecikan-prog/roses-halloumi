@@ -1,0 +1,14 @@
+[phases.install]
+cmds = ["cd ../.. && npm ci"]
+
+[phases.build]
+cmds = ["cd ../.. && npm run build:api"]
+
+[phases.deploy]
+cmds = ["cd ../.. && npm --workspace @dairy-sales/api exec prisma migrate deploy"]
+
+[start]
+# Run database migrations at startup (fail loudly if they fail), then start the API server.
+# This ensures migrations are applied even if the deploy phase was skipped.
+# The prisma CLI and migrations folder are part of the final Docker image.
+cmd = "cd ../.. && npm --workspace @dairy-sales/api exec prisma migrate deploy && npm run start:api"

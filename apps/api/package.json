@@ -7,10 +7,18 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc --project tsconfig.json",
+    "start": "node dist/src/server.js",
     "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "update-admin-email": "tsx scripts/update-admin-email.ts",
+    "reset-admin-password": "tsx scripts/reset-admin-password.ts",
+    "verify-halloumi-products": "tsx scripts/verify-halloumi-products.ts",
+    "fix-halloumi-products": "tsx scripts/fix-halloumi-products.ts",
+    "ensure-order-number-column": "tsx scripts/ensure-order-number-column.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -24,6 +32,8 @@
     "express": "5.2.1",
     "jsonwebtoken": "9.0.3",
     "mysql2": "3.24.4",
+    "nodemailer": "10.0.10",
+    "stripe": "^22.6.2",
     "superjson": "2.2.6",
     "zod": "4.6.2"
   },
@@ -34,6 +44,7 @@
     "@types/node": "22.20.2",
     "prisma": "6.12.0",
     "tsx": "4.23.13",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "5.0.1"
   }
 }

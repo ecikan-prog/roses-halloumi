@@ -1,0 +1,5013 @@
+import { useEffect, useMemo, useState, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ImageBackground,
+  Linking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+  type ImageSourcePropType,
+} from 'react-native';
+import { Asset } from 'expo-asset';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StatusBar } from 'expo-status-bar';
+import { QRCodeSVG } from 'qrcode.react';
+import { trpc, createApiClient } from './src/lib/trpc';
+import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/session';
+import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
+import { SOCIAL_LINKS } from './src/lib/constants';
+import { initializeTawkToChat } from './src/lib/crispChat';
+import AdminDashboardScreen from './src/admin/AdminDashboard';
+
+const grasslandLogo = require('./assets/grassland-cheese-logo.png');
+const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg(1).jpg');
+const grilledHalloumiImage = require('./assets/grassland/halloumi-burger-grilled.jpeg');
+const halloumiBurgerImage = require('./assets/grassland/halloumi-burger-recipe.jpeg');
+const halloumiChickenSkewersImage = require('./assets/grassland/halloumi-chicken-skewers.jpeg');
+const halloumiFigsImage = require('./assets/grassland/grilled-halloumi-figs.jpeg');
+const halloumiDinnerIdeasImage = require('./assets/grassland/halloumi-rice-dinner.jpeg');
+const halloumiSharingPlatterImage = require('./assets/grassland/halloumi-sharing-platter.jpeg');
+const halloumi1kgImage = require('./assets/grassland/grassland-halloumi-1kg.jpg');
+const halloumi500gImage = require('./assets/grassland/grassland-halloumi-500g.jpg');
+const halloumi200gImage = require('./assets/grassland/grassland-halloumi-200g.jpg');
+const mpiRegistrationPdf = require('./assets/quality-compliance/01-MPI-Animal-Products-Exporter-Registration.pdf');
+const foodSafetyAuditPdf = require('./assets/quality-compliance/02-Food-Safety-Quality-Audit-Certificate.pdf');
+const halloumiProductSpecPdf = require('./assets/quality-compliance/03-Roses-Dairy-Halloumi-Product-Specification.pdf');
+const storySectionImages = {
+  '01': require('./assets/grassland/grassland-cows-calves.jpeg'),
+  '02': require('./assets/grassland/grassland-fresh-milk.jpeg'),
+  '03': require('./assets/grassland/grassland-cheese-moulds.jpeg'),
+  '04': require('./assets/grassland/grassland-pressing-trays.jpeg'),
+  '05': require('./assets/grassland/grassland-halloumi-curds.jpeg'),
+} as const;
+const storyHeroImage = storySectionImages['01'];
+const brandName = 'Grassland Cheese';
+const brandTagline = 'PURE GOODNESS FROM OUR PASTURES';
+const brandStatement = 'New Zealand Product';
+const heroMessage = 'Premium New Zealand Halloumi made for grilling, frying and sharing.';
+
+const PaymentTerm = {
+  PAY_NOW: 'PAY_NOW',
+  PAY_30: 'PAY_30',
+} as const;
+
+type PaymentTerm = (typeof PaymentTerm)[keyof typeof PaymentTerm];
+
+const PaymentMethod = {
+  IN_APP: 'IN_APP',
+  EFTPOS: 'EFTPOS',
+} as const;
+
+type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
+
+const PaymentStatus = {
+  PAID: 'PAID',
+  OUTSTANDING: 'OUTSTANDING',
+  OVERDUE: 'OVERDUE',
+} as const;
+
+type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
+
+type CustomerUser = {
+  kind: 'customer';
+  id: number;
+  name: string;
+  email: string;
+  type: 'WHOLESALE' | 'RETAIL';
+  contact: string | null;
+};
+
+type StaffUser = {
+  kind: 'staff';
+  id: number;
+  name: string;
+  email: string;
+  role: 'STAFF' | 'ADMIN';
+};
+
+type SessionUser = CustomerUser | StaffUser;
+type AuthMode = 'customer-login' | 'admin-login' | 'customer-register' | 'customer-forgot-password' | 'customer-reset-password';
+type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'wholesale-apply' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms' | 'business-card';
+type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
+
+type ConfirmedOrder = {
+  orderNumber: string;
+  subtotal: number;
+  deliveryCharge: number;
+  discountApplied: number;
+  total: number;
+  createdAt: Date | string;
+  paymentTerm: PaymentTerm;
+  paymentStatus: PaymentStatus;
+  deliveryAddress?: string | null;
+  isTemporaryShippingRate?: boolean;
+  shippingZoneLabel?: string | null;
+  totalShipmentWeightKg?: number | null;
+  items: Array<{ id: number; qty: number; unitPrice: number; product: { id: number; name: string; unit: string } }>;
+};
+
+const PAY_NOW_DISCOUNT_RATE = 0.1;
+
+function roundMoney(amount: number) {
+  return Number(amount.toFixed(2));
+}
+
+function getPayNowDiscountedUnitPrice(unitPrice: number) {
+  return roundMoney(unitPrice * (1 - PAY_NOW_DISCOUNT_RATE));
+}
+
+function getPaymentStatusLabel(status: PaymentStatus) {
+  switch (status) {
+    case PaymentStatus.PAID:
+      return 'Paid';
+    case PaymentStatus.OVERDUE:
+      return 'Overdue';
+    case PaymentStatus.OUTSTANDING:
+    default:
+      return 'Deferred / unpaid';
+  }
+}
+
+export type SessionState = {
+  token: string | null;
+  user: SessionUser | null;
+};
+
+type ProductRecord = {
+  id: number;
+  name: string;
+  unit: string;
+  active: boolean;
+  wholesalePrice: number;
+  retailPrice: number;
+  effectivePrice: number;
+  customerType: 'WHOLESALE' | 'RETAIL';
+};
+
+type ShopProductSpec = {
+  slug: '1kg' | '500g' | '200g';
+  name: string;
+  size: string;
+  description: string;
+  detail: string;
+  image: ImageSourcePropType;
+};
+
+type ShopProductView = ShopProductSpec & {
+  product?: ProductRecord;
+};
+
+// Mirrors apps/api/src/lib/productWeights.ts so the checkout can preview a
+// shipping estimate before the order is submitted (the API always
+// recalculates shipping itself from the same weights when the order is
+// created — this is only used for the live on-screen estimate).
+const PRODUCT_WEIGHT_KG_BY_SLUG: Record<ShopProductSpec['slug'], number> = {
+  '1kg': 1.0,
+  '500g': 0.5,
+  '200g': 0.2,
+};
+
+function getProductWeightKg(product: ProductRecord): number {
+  const spec = shopProductSpecs.find((candidate) => candidate.name.toLowerCase() === product.name.trim().toLowerCase());
+  return spec ? PRODUCT_WEIGHT_KG_BY_SLUG[spec.slug] : 0;
+}
+
+type DeliveryAddressForm = {
+  name: string;
+  addressLine: string;
+  suburb: string;
+  region: string;
+  postcode: string;
+  country: string;
+};
+
+const emptyDeliveryAddress: DeliveryAddressForm = {
+  name: '',
+  addressLine: '',
+  suburb: '',
+  region: '',
+  postcode: '',
+  country: 'New Zealand',
+};
+
+function isDeliveryAddressComplete(address: DeliveryAddressForm) {
+  return (
+    address.name.trim().length >= 2 &&
+    address.addressLine.trim().length >= 3 &&
+    address.suburb.trim().length >= 1 &&
+    address.postcode.trim().length >= 1 &&
+    address.country.trim().length >= 2
+  );
+}
+
+type RecipeFeature = {
+  title: string;
+  description: string;
+  image: ImageSourcePropType;
+};
+
+type StoryJourneyStage = {
+  number: string;
+  title: string;
+  description: string;
+  image: ImageSourcePropType;
+};
+
+const paymentStatusOptions: Array<PaymentStatus | 'ALL'> = ['ALL', PaymentStatus.PAID, PaymentStatus.OUTSTANDING, PaymentStatus.OVERDUE];
+
+const shopProductSpecs: ShopProductSpec[] = [
+  {
+    slug: '1kg',
+    name: 'Grassland Cheese Halloumi — 1kg',
+    size: '1 kg',
+    description: 'A generous halloumi format for bigger family meals, grilling trays, and sharing platters.',
+    detail: 'Designed for customers who want a larger halloumi format ready for slicing, grilling, frying, and sharing.',
+    image: halloumi1kgImage,
+  },
+  {
+    slug: '500g',
+    name: 'Grassland Cheese Halloumi — 500g',
+    size: '500 g',
+    description: 'A versatile mid-size halloumi option for weeknight meals, salads, and pan-frying.',
+    detail: 'A balanced everyday halloumi size that suits quick dinners, lunch plates, and smaller entertaining moments.',
+    image: halloumi500gImage,
+  },
+  {
+    slug: '200g',
+    name: 'Grassland Cheese Halloumi — 200g',
+    size: '200 g',
+    description: 'A smaller halloumi size that is ideal for lighter meals, snacks, and trial purchases.',
+    detail: 'A compact halloumi option for individual meals, smaller households, or customers trying the range for the first time.',
+    image: halloumi200gImage,
+  },
+];
+
+const whyGrasslandItems = [
+  {
+    title: 'New Zealand Product',
+    description: 'Premium halloumi made from New Zealand milk, grilled to perfection.',
+  },
+  {
+    title: 'Quality Halloumi',
+    description: 'Pure, simple halloumi with nothing else — no extras, just quality cheese.',
+  },
+  {
+    title: 'Made for Grilling',
+    description: 'Slice, grill, and share — a high-melting cheese that holds its shape on the plate.',
+  },
+  {
+    title: 'Everyday to Entertaining',
+    description: 'A versatile cheese for quick meals, platters, and simple ways to elevate daily cooking.',
+  },
+] as const;
+
+const recipeFeatures: RecipeFeature[] = [
+  // NOTE: 'Grilled Halloumi' recipe card is hidden due to image containing typo "BURGGER".
+  // Will be restored once corrected image is supplied.
+  // {
+  //   title: 'Grilled Halloumi',
+  //   description: 'Golden, charred halloumi inspiration for simple meals and warm platters.',
+  //   image: grilledHalloumiImage,
+  // },
+  {
+    title: 'Halloumi Burger',
+    description: 'A burger-style serving idea that stays firmly in the recipe and inspiration category.',
+    image: halloumiBurgerImage,
+  },
+  {
+    title: 'Halloumi & Chicken Skewers',
+    description: 'An easy entertaining idea pairing grilled halloumi with skewers.',
+    image: halloumiChickenSkewersImage,
+  },
+  {
+    title: 'Halloumi with Figs',
+    description: 'A serving idea that balances grilled halloumi with fruit and premium presentation.',
+    image: halloumiFigsImage,
+  },
+  {
+    title: 'Halloumi Dinner Ideas',
+    description: 'Simple dinner inspiration showing how halloumi fits into everyday cooking.',
+    image: halloumiDinnerIdeasImage,
+  },
+  {
+    title: 'Halloumi Sharing Platter',
+    description: 'A platter-led inspiration card designed for entertaining and sharing occasions.',
+    image: halloumiSharingPlatterImage,
+  },
+];
+
+const storyJourneyStages: StoryJourneyStage[] = [
+  {
+    number: '01',
+    title: 'Where It Begins',
+    description: 'The journey starts in open pasture, where the herd is cared for as the first step in bringing Grassland Cheese Halloumi to your table.',
+    image: require('./assets/grassland/grassland-cows-calves.jpeg'),
+  },
+  {
+    number: '02',
+    title: 'Fresh Milk',
+    description: 'Fresh milk moves into the cheesemaking process, connecting the farm stage to the careful production steps that follow.',
+    image: require('./assets/grassland/grassland-fresh-milk.jpeg'),
+  },
+  {
+    number: '03',
+    title: 'Shaping the Cheese',
+    description: 'The cheese is placed into moulds to form its structure, shaping each batch with consistency and care.',
+    image: require('./assets/grassland/grassland-cheese-moulds.jpeg'),
+  },
+  {
+    number: '04',
+    title: 'Pressing & Preparing',
+    description: 'Pressing and preparation refine texture and readiness before the final stage of Halloumi production.',
+    image: require('./assets/grassland/grassland-pressing-trays.jpeg'),
+  },
+  {
+    number: '05',
+    title: 'Creating Our Halloumi',
+    description: 'The final stage shown here captures Halloumi curds as the process comes together into the cheese ready for customers.',
+    image: require('./assets/grassland/grassland-halloumi-curds.jpeg'),
+  },
+];
+
+// Responsive breakpoint helper that differentiates between native app and web.
+// Native app (iOS/Android): uses 640px breakpoint for mobile styles
+// Web: uses extremely narrow breakpoint (0px) to prevent mobile styles in normal browser widths
+// This ensures that the native app can have responsive mobile UI without affecting the website
+function shouldUseMobileStyles(windowWidth: number): boolean {
+  if (Platform.OS === 'web') {
+    // For web, never apply mobile styles (even at narrow widths) to keep website responsive
+    return false;
+  }
+  // For native app (iOS/Android), apply mobile styles at 640px breakpoint
+  return windowWidth < 640;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Please try again.';
+}
+
+function matchesAllowedProduct(product: ProductRecord, spec: ShopProductSpec) {
+  return product.name.trim().toLowerCase() === spec.name.toLowerCase();
+}
+
+// All retail pricing is quoted in New Zealand Dollars. The catalog/order backend
+// (apps/api) is the source of truth for the actual amount; this only controls display
+// formatting so the same NZD figure shown here matches what checkout charges.
+function formatMoney(amount: number) {
+  return `NZD $${amount.toFixed(2)}`;
+}
+
+function formatPrice(product?: ProductRecord) {
+  return product ? formatMoney(product.effectivePrice) : 'Available Soon';
+}
+
+function AppContent({
+  hydrated,
+  queryClient,
+  session,
+  setSession,
+}: {
+  hydrated: boolean;
+  queryClient: QueryClient;
+  session: SessionState;
+  setSession: Dispatch<SetStateAction<SessionState>>;
+}) {
+  const [publicPage, setPublicPage] = useState<PublicPage>('home');
+  const meQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: Boolean(session.token),
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!session.token || !meQuery.data) {
+      return;
+    }
+
+    setSession((current) =>
+      current.token === session.token ? { ...current, user: meQuery.data as SessionUser } : current,
+    );
+  }, [meQuery.data, session.token, setSession]);
+
+  useEffect(() => {
+    if (!meQuery.error) {
+      return;
+    }
+
+    void clearStoredToken();
+    setSession({ token: null, user: null });
+    queryClient.clear();
+  }, [meQuery.error, queryClient, setSession]);
+
+  async function handleAuthenticated(nextToken: string, user: SessionUser) {
+    await setStoredToken(nextToken);
+    setSession({ token: nextToken, user });
+  }
+
+  async function handleSignOut() {
+    await clearStoredToken();
+    setSession({ token: null, user: null });
+    queryClient.clear();
+    setPublicPage('home');
+  }
+
+  if (!hydrated) {
+    return (
+      <SafeAreaView style={styles.centeredScreen}>
+        <ActivityIndicator size="large" color="#1f5c43" />
+      </SafeAreaView>
+    );
+  }
+
+  if (session.token && !session.user && (meQuery.isLoading || meQuery.isFetching)) {
+    return (
+      <SafeAreaView style={styles.centeredScreen}>
+        <ActivityIndicator size="large" color="#1f5c43" />
+      </SafeAreaView>
+    );
+  }
+
+  if (session.token && session.user) {
+    if (session.user.kind === 'staff') {
+      return <AdminDashboardScreen session={session} onSignOut={handleSignOut} />;
+    }
+
+    return <Dashboard session={session} onSignOut={handleSignOut} />;
+  }
+
+  return <PublicWebsite currentPage={publicPage} onNavigate={setPublicPage} onAuthenticated={handleAuthenticated} />;
+}
+
+function PublicWebsite({
+  currentPage,
+  onNavigate,
+  onAuthenticated,
+}: {
+  currentPage: PublicPage;
+  onNavigate: (page: PublicPage) => void;
+  onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
+}) {
+  // Retail visitors can browse live halloumi pricing and build a cart before creating
+  // an account. This is the same cart storage the signed-in checkout reads on login.
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const productsQuery = trpc.catalog.listProducts.useQuery();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
+
+  const shopProducts = useMemo<ShopProductView[]>(() => {
+    const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
+    return shopProductSpecs.map((spec) => ({
+      ...spec,
+      product: backendProducts.find((product) => matchesAllowedProduct(product, spec)),
+    }));
+  }, [productsQuery.data]);
+
+  const selectedItems = shopProducts
+    .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
+    .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
+
+  const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  const content = renderPublicPage(currentPage, onNavigate, onAuthenticated, {
+    productsQuery,
+    shopProducts,
+    quantities,
+    adjustQuantity,
+    selectedItems,
+  });
+
+  return (
+    <SiteScreen currentPage={currentPage} onNavigate={onNavigate} session={null} cartCount={cartCount}>
+      {content}
+    </SiteScreen>
+  );
+}
+
+function renderPublicPage(
+  currentPage: PublicPage,
+  onNavigate: (page: PublicPage) => void,
+  onAuthenticated: (token: string, user: SessionUser) => Promise<void>,
+  cart: {
+    productsQuery: ReturnType<typeof trpc.catalog.listProducts.useQuery>;
+    shopProducts: ShopProductView[];
+    quantities: Record<number, number>;
+    adjustQuantity: (productId: number, nextQuantity: number) => void;
+    selectedItems: Array<ProductRecord & { qty: number }>;
+  },
+) {
+  switch (currentPage) {
+    case 'shop':
+      return (
+        <PublicShopPage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          isLoading={cart.productsQuery.isLoading}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
+    case 'recipes':
+      return <RecipesPage />;
+    case 'wholesale':
+      return <WholesalePage onNavigate={onNavigate} />;
+    case 'wholesale-apply':
+      return <WholesaleApplyPage onNavigate={onNavigate} />;
+    case 'about':
+      return <AboutPage />;
+    case 'quality-compliance':
+      return <QualityCompliancePage />;
+    case 'cart':
+      return (
+        <PublicCartPage
+          onNavigate={onNavigate}
+          selectedItems={cart.selectedItems}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
+    case 'account':
+      return <AccountPage onNavigate={onNavigate} onAuthenticated={onAuthenticated} />;
+    case 'contact':
+      return <ContactPage onNavigate={onNavigate} />;
+    case 'business-card':
+      return <BusinessCardPage />;
+    case 'privacy':
+      return <PrivacyPage />;
+    case 'terms':
+      return <TermsPage />;
+    case 'home':
+    default:
+      return (
+        <HomePage
+          onNavigate={onNavigate}
+          shopProducts={cart.shopProducts}
+          quantities={cart.quantities}
+          adjustQuantity={cart.adjustQuantity}
+        />
+      );
+  }
+}
+
+function Dashboard({ session, onSignOut }: { session: SessionState; onSignOut: () => Promise<void> }) {
+  const user = session.user as SessionUser;
+  const [page, setPage] = useState<SignedInPage>('home');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>(user.kind === 'customer' ? user.id : undefined);
+  const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>(PaymentTerm.PAY_30);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.IN_APP);
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressForm>(emptyDeliveryAddress);
+  const [orderNotes, setOrderNotes] = useState('');
+  const [lastOrder, setLastOrder] = useState<ConfirmedOrder | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [selectedProductSlug, setSelectedProductSlug] = useState<ShopProductSpec['slug'] | null>(null);
+  const isStaff = user.kind === 'staff';
+  const effectiveCustomerId = user.kind === 'customer' ? user.id : selectedCustomerId;
+  const customerQuery = trpc.staff.listCustomers.useQuery(undefined, { enabled: isStaff });
+  const productsQuery = trpc.catalog.listProducts.useQuery(
+    user.kind === 'staff' && effectiveCustomerId ? { customerId: effectiveCustomerId } : undefined,
+    { enabled: user.kind === 'customer' || Boolean(effectiveCustomerId) },
+  );
+  const createOrder = trpc.orders.create.useMutation();
+  const createCheckoutSession = trpc.orders.createCheckoutSession.useMutation();
+  const completeCheckoutSession = trpc.orders.completeCheckoutSession.useMutation();
+  const cancelCheckoutSession = trpc.orders.cancelCheckoutSession.useMutation();
+  const utils = trpc.useUtils();
+
+  useEffect(() => {
+    if (user.kind === 'customer') {
+      setSelectedCustomerId(user.id);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!isStaff && page === 'customers') {
+      setPage('account');
+    }
+  }, [isStaff, page]);
+
+  useEffect(() => {
+    setQuantities({});
+  }, [effectiveCustomerId]);
+
+  // Restore any cart saved before a refresh so the customer doesn't lose their selections.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const storedCart = await getStoredCart();
+
+      if (!cancelled && storedCart) {
+        setQuantities(storedCart);
+      }
+
+      if (!cancelled) {
+        setCartHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist the cart whenever it changes so it survives navigation and page refreshes.
+  useEffect(() => {
+    if (!cartHydrated) {
+      return;
+    }
+
+    void setStoredCart(quantities);
+  }, [quantities, cartHydrated]);
+
+  const shopProducts = useMemo<ShopProductView[]>(() => {
+    const backendProducts = (productsQuery.data ?? []) as ProductRecord[];
+    return shopProductSpecs.map((spec) => ({
+      ...spec,
+      product: backendProducts.find((product) => matchesAllowedProduct(product, spec)),
+    }));
+  }, [productsQuery.data]);
+
+  const selectedItems = shopProducts
+    .filter((product): product is ShopProductView & { product: ProductRecord } => Boolean(product.product && quantities[product.product.id] > 0))
+    .map((product) => ({ ...product.product, qty: quantities[product.product.id] }));
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
+  const discount = paymentTerm === PaymentTerm.PAY_NOW
+    ? roundMoney(selectedItems.reduce((sum, item) => sum + (item.effectivePrice - getPayNowDiscountedUnitPrice(item.effectivePrice)) * item.qty, 0))
+    : 0;
+  const totalWeightKg = selectedItems.reduce((sum, item) => sum + getProductWeightKg(item) * item.qty, 0);
+  const deliveryAddressReady = isDeliveryAddressComplete(deliveryAddress);
+  const shippingEstimateQuery = trpc.shipping.estimate.useQuery(
+    {
+      items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
+      destination: {
+        country: deliveryAddress.country.trim(),
+        region: deliveryAddress.region.trim() || undefined,
+        city: deliveryAddress.suburb.trim() || undefined,
+        postcode: deliveryAddress.postcode.trim() || undefined,
+      },
+    },
+    { enabled: selectedItems.length > 0 && deliveryAddressReady },
+  );
+  const deliveryCharge = deliveryAddressReady ? shippingEstimateQuery.data?.amount ?? 0 : 0;
+  const total = subtotal - discount + deliveryCharge;
+  const cartCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+  const isSubmittingOrder =
+    createOrder.isPending || createCheckoutSession.isPending || completeCheckoutSession.isPending || cancelCheckoutSession.isPending;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || user.kind !== 'customer' || typeof window === 'undefined') {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    const checkout = url.searchParams.get('checkout');
+
+    if (!checkout) {
+      return;
+    }
+
+    const orderId = Number(url.searchParams.get('order_id'));
+
+    const clearCheckoutParams = () => {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('checkout');
+      cleanUrl.searchParams.delete('order_id');
+      cleanUrl.searchParams.delete('session_id');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    };
+
+    if (checkout === 'cancel') {
+      if (Number.isFinite(orderId)) {
+        void cancelCheckoutSession.mutateAsync({ orderId }).catch(() => undefined);
+      }
+
+      setOrderError('Payment was cancelled. Your cart is still ready whenever you want to checkout.');
+      setPage('cart');
+      clearCheckoutParams();
+      return;
+    }
+
+    if (checkout === 'success') {
+      const sessionId = url.searchParams.get('session_id');
+
+      if (!sessionId || !Number.isFinite(orderId)) {
+        setOrderError('We could not verify the Stripe payment session. Please try checkout again.');
+        setPage('cart');
+        clearCheckoutParams();
+        return;
+      }
+
+      void (async () => {
+        try {
+          const result = await completeCheckoutSession.mutateAsync({ orderId, sessionId });
+          await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
+          setQuantities({});
+          await clearStoredCart();
+          setDeliveryAddress(emptyDeliveryAddress);
+          setOrderNotes('');
+          setOrderError(null);
+          setLastOrder({
+            orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
+            subtotal: result.subtotal,
+            deliveryCharge: result.deliveryCharge,
+            discountApplied: result.discountApplied,
+            total: result.total,
+            createdAt: result.createdAt,
+            paymentTerm: result.paymentTerm,
+            paymentStatus: result.paymentStatus,
+            deliveryAddress: result.deliveryAddress,
+            isTemporaryShippingRate: result.isTemporaryShippingRate,
+            shippingZoneLabel: result.shippingZoneLabel,
+            totalShipmentWeightKg: result.totalShipmentWeightKg,
+            items: result.items,
+          });
+          setPage('order-confirmation');
+        } catch (error) {
+          setOrderError(getErrorMessage(error));
+          setPage('cart');
+        } finally {
+          clearCheckoutParams();
+        }
+      })();
+    }
+  }, [
+    cancelCheckoutSession,
+    completeCheckoutSession,
+    user.kind,
+    utils,
+  ]);
+
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  async function submitOrder() {
+    setOrderError(null);
+
+    if (!selectedItems.length) {
+      Alert.alert('Add items', 'Choose at least one Halloumi product before confirming the order.');
+      setOrderError('Choose at least one Halloumi product before confirming the order.');
+      return;
+    }
+
+    if (user.kind === 'staff' && !effectiveCustomerId) {
+      Alert.alert('Choose customer', 'Select a customer before creating an admin order.');
+      setOrderError('Select a customer before creating an admin order.');
+      return;
+    }
+
+    if (user.kind === 'staff' && paymentTerm === PaymentTerm.PAY_NOW) {
+      Alert.alert('Pay now unavailable for staff orders', 'Staff-created orders currently support Pay in 30 only.');
+      setOrderError('Staff-created orders currently support Pay in 30 only.');
+      return;
+    }
+
+    if (user.kind === 'customer' && !deliveryAddressReady) {
+      Alert.alert('Delivery address required', 'Enter your name, address, suburb/town/city, postcode and country before confirming the order.');
+      setOrderError('Enter your name, address, suburb/town/city, postcode and country before confirming the order.');
+      return;
+    }
+
+    try {
+      const orderPayload = {
+        customerId: user.kind === 'staff' ? effectiveCustomerId : undefined,
+        items: selectedItems.map((item) => ({ productId: item.id, qty: item.qty })),
+        ...(deliveryAddressReady
+          ? {
+              deliveryAddress: {
+                name: deliveryAddress.name.trim(),
+                addressLine: deliveryAddress.addressLine.trim(),
+                suburb: deliveryAddress.suburb.trim(),
+                region: deliveryAddress.region.trim() || undefined,
+                postcode: deliveryAddress.postcode.trim(),
+                country: deliveryAddress.country.trim(),
+              },
+            }
+          : {}),
+        ...(orderNotes.trim() ? { orderNotes: orderNotes.trim() } : {}),
+      };
+
+      if (user.kind === 'customer' && paymentTerm === PaymentTerm.PAY_NOW) {
+        const checkout = await createCheckoutSession.mutateAsync({
+          items: orderPayload.items,
+          deliveryAddress: orderPayload.deliveryAddress ?? {
+            name: deliveryAddress.name.trim(),
+            addressLine: deliveryAddress.addressLine.trim(),
+            suburb: deliveryAddress.suburb.trim(),
+            region: deliveryAddress.region.trim() || undefined,
+            postcode: deliveryAddress.postcode.trim(),
+            country: deliveryAddress.country.trim(),
+          },
+          orderNotes: orderPayload.orderNotes,
+        });
+
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.assign(checkout.checkoutUrl);
+        } else {
+          await Linking.openURL(checkout.checkoutUrl);
+        }
+
+        return;
+      }
+
+      const result = await createOrder.mutateAsync({
+        ...orderPayload,
+        paymentTerm,
+      });
+      await Promise.all([utils.orders.list.invalidate(), utils.catalog.listProducts.invalidate()]);
+      setQuantities({});
+      await clearStoredCart();
+      setDeliveryAddress(emptyDeliveryAddress);
+      setOrderNotes('');
+      setOrderError(null);
+      setLastOrder({
+        orderNumber: result.orderNumber ?? `GC-${String(result.id).padStart(6, '0')}`,
+        subtotal: result.subtotal ?? subtotal,
+        deliveryCharge: result.deliveryCharge ?? deliveryCharge,
+        discountApplied: result.discountApplied,
+        total: result.total,
+        createdAt: result.createdAt,
+        paymentTerm: result.paymentTerm,
+        paymentStatus: result.paymentStatus,
+        deliveryAddress: result.deliveryAddress,
+        isTemporaryShippingRate: result.isTemporaryShippingRate,
+        shippingZoneLabel: result.shippingZoneLabel,
+        totalShipmentWeightKg: result.totalShipmentWeightKg,
+        items: result.items ?? selectedItems.map((item) => ({ id: item.id, qty: item.qty, unitPrice: item.effectivePrice, product: { id: item.id, name: item.name, unit: item.unit } })),
+      });
+      setPage('order-confirmation');
+    } catch (error) {
+      // Alert.alert is a no-op on web (react-native-web), so on the web
+      // build the customer would otherwise see nothing happen at all when
+      // order creation fails. orderError is rendered directly in the
+      // checkout UI so the failure (and the real reason, e.g. a server
+      // error) is always visible regardless of platform.
+      const message = getErrorMessage(error);
+      Alert.alert('Order failed', message);
+      setOrderError(message);
+    }
+  }
+
+  let content;
+  switch (page) {
+    case 'shop':
+      content = (
+        <ShopPage
+          session={{ ...session, user }}
+          isStaff={isStaff}
+          customerQuery={customerQuery}
+          productsQuery={productsQuery}
+          selectedCustomerId={selectedCustomerId}
+          setSelectedCustomerId={setSelectedCustomerId}
+          paymentTerm={paymentTerm}
+          setPaymentTerm={setPaymentTerm}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          quantities={quantities}
+          setQuantities={setQuantities}
+          shopProducts={shopProducts}
+          selectedProductSlug={selectedProductSlug}
+          setSelectedProductSlug={setSelectedProductSlug}
+          onNavigate={setPage}
+        />
+      );
+      break;
+    case 'recipes':
+      content = <RecipesPage />;
+      break;
+    case 'wholesale':
+      content = <WholesalePage onNavigate={setPage} />;
+      break;
+    case 'wholesale-apply':
+      content = <WholesaleApplyPage onNavigate={setPage} />;
+      break;
+    case 'about':
+      content = <AboutPage />;
+      break;
+    case 'quality-compliance':
+      content = <QualityCompliancePage />;
+      break;
+    case 'cart':
+      content = (
+        <CartPage
+          session={session}
+          paymentTerm={paymentTerm}
+          setPaymentTerm={setPaymentTerm}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          selectedItems={selectedItems}
+          quantities={quantities}
+          setQuantities={setQuantities}
+          deliveryAddress={deliveryAddress}
+          setDeliveryAddress={setDeliveryAddress}
+          orderNotes={orderNotes}
+          setOrderNotes={setOrderNotes}
+          subtotal={subtotal}
+          discount={discount}
+          deliveryCharge={deliveryCharge}
+          total={total}
+          totalWeightKg={totalWeightKg}
+          deliveryAddressReady={deliveryAddressReady}
+          shippingEstimateQuery={shippingEstimateQuery}
+          onNavigate={setPage}
+          onSubmitOrder={submitOrder}
+          isSubmitting={isSubmittingOrder}
+          orderError={orderError}
+        />
+      );
+      break;
+    case 'order-confirmation':
+      content = <OrderConfirmationPage order={lastOrder} onNavigate={setPage} />;
+      break;
+    case 'account':
+      content = <SignedInAccountPage session={session} onNavigate={setPage} onSignOut={onSignOut} />;
+      break;
+    case 'orders':
+      content = (
+        <OrdersPage
+          title={isStaff ? 'Order history' : 'My orders'}
+          description={isStaff ? 'Review customer orders and payment status.' : 'Review your Halloumi order history, current orders, and status.'}
+        />
+      );
+      break;
+    case 'customers':
+      content = <CustomersScreen />;
+      break;
+    case 'contact':
+      content = <ContactPage onNavigate={setPage} />;
+      break;
+    case 'business-card':
+      content = <BusinessCardPage />;
+      break;
+    case 'privacy':
+      content = <PrivacyPage />;
+      break;
+    case 'terms':
+      content = <TermsPage />;
+      break;
+    case 'home':
+    default:
+      content = (
+        <HomePage
+          onNavigate={setPage}
+          shopProducts={shopProducts}
+          quantities={quantities}
+          adjustQuantity={adjustQuantity}
+        />
+      );
+      break;
+  }
+
+  return (
+    <SiteScreen currentPage={page} onNavigate={setPage} session={session} onSignOut={onSignOut} cartCount={cartCount}>
+      {content}
+    </SiteScreen>
+  );
+}
+
+function SiteScreen({
+  currentPage,
+  onNavigate,
+  session,
+  onSignOut,
+  cartCount = 0,
+  children,
+}: {
+  currentPage: SignedInPage | PublicPage;
+  onNavigate: (page: any) => void;
+  session: SessionState | null;
+  onSignOut?: () => Promise<void>;
+  cartCount?: number;
+  children: ReactNode;
+}) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 960;
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="dark" />
+      <ScrollView style={styles.siteScroll} contentContainerStyle={styles.siteContent}>
+        <View style={styles.siteInner}>
+          <SiteHeader
+            currentPage={currentPage}
+            onNavigate={onNavigate}
+            session={session}
+            onSignOut={onSignOut}
+            cartCount={cartCount}
+            isCompact={isCompact}
+          />
+          <View style={styles.pageContentWrap}>{children}</View>
+          <SiteFooter currentPage={currentPage} onNavigate={onNavigate} session={session} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function SiteHeader({
+  currentPage,
+  onNavigate,
+  session,
+  onSignOut,
+  cartCount,
+  isCompact,
+}: {
+  currentPage: SignedInPage | PublicPage;
+  onNavigate: (page: any) => void;
+  session: SessionState | null;
+  onSignOut?: () => Promise<void>;
+  cartCount: number;
+  isCompact: boolean;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const isStaff = session?.user?.kind === 'staff';
+  
+  // Mobile and desktop navigation items
+  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
+    { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
+    { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
+    { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
+    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart', shortLabel: cartCount > 0 ? `Cart (${cartCount})` : 'Cart' },
+  ];
+
+  return (
+    <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
+      <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
+        <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+      </Pressable>
+      <View style={[styles.navRow, isMobile && styles.navRowMobile]}>
+        {mainNavItems.map((item) => {
+          const selected = item.page === currentPage;
+          return (
+            <Pressable key={item.page} style={[styles.navButton, isMobile && styles.navButtonMobile, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.navButtonText, isMobile && styles.navButtonTextMobile, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
+        {session && onSignOut ? (
+          <Pressable style={[styles.signOutButton, isMobile && styles.signOutButtonMobile]} onPress={() => void onSignOut()}>
+            <Text style={[styles.signOutButtonText, isMobile && styles.signOutButtonTextMobile]}>Sign out</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+async function openExternalUrl(url: string) {
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (!supported) {
+      Alert.alert('Unable to open link', 'This link is not available right now.');
+      return;
+    }
+
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('Unable to open link', 'This link is not available right now.');
+  }
+}
+
+function SiteFooter({
+  currentPage,
+  onNavigate,
+  session,
+}: {
+  currentPage: SignedInPage | PublicPage;
+  onNavigate: (page: any) => void;
+  session: SessionState | null;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const [focusedSocialLabel, setFocusedSocialLabel] = useState<string | null>(null);
+  type SocialLink = {
+    label: string;
+    iconName: ComponentProps<typeof FontAwesome5>['name'];
+    backgroundColor: string;
+    webBackgroundImage?: string;
+    url: string;
+  };
+  const footerLinks: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
+    { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
+    { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
+    { label: 'Wholesale', page: 'wholesale', shortLabel: 'Wholesale' },
+    { label: 'About', page: 'about', shortLabel: 'About' },
+    { label: 'Quality', page: 'quality-compliance', shortLabel: 'Quality' },
+    { label: 'Contact', page: 'contact', shortLabel: 'Contact' },
+    { label: 'Privacy', page: 'privacy', shortLabel: 'Privacy' },
+    { label: 'Terms', page: 'terms', shortLabel: 'Terms' },
+    { label: 'Cart', page: 'cart', shortLabel: 'Cart' },
+    { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
+  ];
+  const socialLinks: ReadonlyArray<SocialLink> = SOCIAL_LINKS;
+
+  return (
+    <View style={[styles.footerShell, isMobile && styles.footerShellMobile]}>
+      <View style={[styles.footerBrandRow, isMobile && styles.footerBrandRowMobile]}>
+        <Image source={grasslandLogo} style={[styles.footerLogo, isMobile && styles.footerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <View style={[styles.footerBrandCopy, isMobile && styles.footerBrandCopyMobile]}>
+          <Text style={[styles.footerBrandName, isMobile && styles.footerBrandNameMobile]}>{brandName}</Text>
+          <Text style={[styles.footerBrandTagline, isMobile && styles.footerBrandTaglineMobile]}>Pure Goodness From Our Pastures</Text>
+          <Text style={[styles.footerStatement, isMobile && styles.footerStatementMobile]}>{brandStatement}</Text>
+        </View>
+      </View>
+      <View style={[styles.footerLinksWrap, isMobile && styles.footerLinksWrapMobile]}>
+        {footerLinks.map((item) => {
+          const selected = item.page === currentPage;
+          const linkLabel = isMobile ? (item.shortLabel || item.label) : item.label;
+          return (
+            <Pressable key={item.page} style={[styles.footerLinkButton, isMobile && styles.footerLinkButtonMobile]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.footerLinkText, isMobile && styles.footerLinkTextMobile, selected && styles.footerLinkTextActive]} numberOfLines={1}>{linkLabel}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={styles.footerSocialSection}>
+        <Text style={[styles.footerSectionLabel, isMobile && styles.footerSectionLabelMobile]}>Follow us</Text>
+        <View style={styles.footerSocialRow}>
+          {socialLinks.map((item) => (
+            <Pressable
+              key={item.label}
+              style={[
+                styles.footerSocialButton,
+                isMobile && styles.footerSocialButtonMobile,
+                { backgroundColor: item.backgroundColor },
+                item.webBackgroundImage && Platform.OS === 'web'
+                  ? ({ backgroundImage: item.webBackgroundImage } as any)
+                  : null,
+                focusedSocialLabel === item.label && styles.footerSocialButtonFocused,
+              ]}
+              onPress={() => void openExternalUrl(item.url)}
+              onFocus={() => setFocusedSocialLabel(item.label)}
+              onBlur={() => setFocusedSocialLabel((current) => (current === item.label ? null : current))}
+              accessibilityRole="link"
+              accessibilityLabel={`Follow Grassland Cheese on ${item.label}`}
+            >
+              <FontAwesome5 name={item.iconName} size={isMobile ? 16 : 18} color="#ffffff" />
+            </Pressable>
+          ))}
+        </View>
+      </View>
+      <Text style={[styles.footerMeta, isMobile && styles.footerMetaMobile]}>Grassland Cheese halloumi recipes are inspiration only and never sold as products.</Text>
+    </View>
+  );
+}
+
+function HomePage({
+  onNavigate,
+  shopProducts = [],
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts: ShopProductView[];
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  return (
+    <>
+      <HeroSection onPrimary={() => onNavigate('shop')} onSecondary={() => onNavigate('about')} />
+      <PublicShopSection onNavigate={onNavigate} shopProducts={shopProducts} quantities={quantities} adjustQuantity={adjustQuantity} />
+      <WhyGrasslandSection />
+      <RecipesSection onNavigate={onNavigate} />
+      <StorySection />
+      <WholesaleSection onNavigate={onNavigate} />
+    </>
+  );
+}
+
+// React Native Web renders <Image>/<ImageBackground> as a CSS `background-image` on an
+// inner <div>, so the `objectPosition` passed via `imageStyle` never reaches a real
+// replaced element and has no visual effect (it only affects `object-fit` elements like
+// <img>/<video>). To keep the cows + green pasture visible in the hero banner on Expo Web,
+// we render a real <img> with `objectFit`/`objectPosition` for web only, while native
+// iOS/Android keep using <ImageBackground> unchanged.
+//
+// IMPORTANT: `Image.resolveAssetSource` (used by a previous, reverted attempt at this fix)
+// does not exist on react-native-web's <Image> export and throws at runtime on web,
+// crashing the whole app with no error boundary (blank page in production). Use
+// `expo-asset`'s `Asset.fromModule`, which is the Expo-supported, cross-platform way to
+// resolve a `require()`'d image module to a usable URI, instead.
+function resolveWebImageUri(source: ImageSourcePropType): string | null {
+  try {
+    const uri = Asset.fromModule(source as number | string | { uri: string; width: number; height: number }).uri;
+    return typeof uri === 'string' && uri.length > 0 ? uri : null;
+  } catch {
+    return null;
+  }
+}
+
+function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
+  const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
+
+  const heroOverlayContent = (
+    <View style={[styles.heroOverlay, isMobile && styles.heroOverlayMobile]}>
+      <View style={styles.heroBadge}>
+        <Text style={styles.heroBadgeText}>{brandStatement}</Text>
+      </View>
+      <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>Pure Goodness From Our Pastures</Text>
+      <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>{heroMessage}</Text>
+      <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+        <Pressable style={[styles.primaryHeroButton, isMobile && styles.primaryHeroButtonMobile]} onPress={onPrimary}>
+          <Text style={styles.primaryHeroButtonLabel}>Shop Halloumi</Text>
+        </Pressable>
+        <Pressable style={[styles.secondaryHeroButton, isMobile && styles.secondaryHeroButtonMobile]} onPress={onSecondary}>
+          <Text style={styles.secondaryHeroButtonLabel}>Discover Our Story</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  if (Platform.OS === 'web') {
+    const heroImageUri = resolveWebImageUri(heroImage);
+
+    return (
+      <View style={[styles.heroShell, { minHeight: heroHeight }]}>
+        <View style={[styles.heroBackground, styles.heroWebImageWrapper]}>
+          {heroImageUri ? (
+            <img
+              src={heroImageUri}
+              alt="Cows grazing on the green Grassland Cheese pasture"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 85%',
+                borderRadius: 32,
+              }}
+            />
+          ) : null}
+          {heroOverlayContent}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.heroShell, { minHeight: heroHeight }]}> 
+      <ImageBackground source={heroImage} style={styles.heroBackground} imageStyle={[styles.heroImage, heroImageStyle]} resizeMode="cover">
+        {heroOverlayContent}
+      </ImageBackground>
+    </View>
+  );
+}
+
+function PublicShopSection({
+  onNavigate,
+  shopProducts = [],
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts?: ShopProductView[] | null;
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  // Defensive default: shopProducts should always be an array by the time it reaches this
+  // component (it is derived from a fixed list of product specs, never directly from the
+  // API response), but a missing/null prop here previously crashed the whole app with
+  // "shopProducts.map is not a function". Never let a data-flow regression upstream take
+  // down the homepage (and, transitively, customer login) again. The `= []` default only
+  // covers `undefined`, so `?? []` below also guards against an explicit `null`.
+  const safeShopProducts = shopProducts ?? [];
+
+  if (safeShopProducts.length === 0) {
+    return (
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
+        <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+      </SectionShell>
+    );
+  }
+
+  return (
+    <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="A focused halloumi range with three retail sizes, priced and ready to order.">
+      <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
+        {safeShopProducts.map((product) => {
+          const backendProduct = product.product;
+          const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+          return (
+            <ProductCard
+              key={product.slug}
+              product={product}
+              quantity={quantity}
+              onAdd={() => {
+                if (!backendProduct) {
+                  return;
+                }
+                adjustQuantity(backendProduct.id, quantity + 1);
+              }}
+              onOpenDetails={() => onNavigate('shop')}
+              onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+              onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+              disabled={!backendProduct}
+              ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+            />
+          );
+        })}
+      </View>
+    </SectionShell>
+  );
+}
+
+function PublicShopPage({
+  onNavigate,
+  shopProducts = [],
+  isLoading,
+  quantities,
+  adjustQuantity,
+}: {
+  onNavigate: (page: any) => void;
+  shopProducts?: ShopProductView[] | null;
+  isLoading: boolean;
+  quantities: Record<number, number>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
+  const safeShopProducts = shopProducts ?? [];
+
+  return (
+    <>
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Add halloumi to your cart now, then sign in or create an account to complete checkout.">
+        {isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
+        {!isLoading && safeShopProducts.length === 0 ? (
+          <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+        ) : null}
+        <View style={[styles.productGrid, isMobile && styles.productGridMobile]}>
+          {safeShopProducts.map((product) => {
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+            return (
+              <ProductCard
+                key={product.slug}
+                product={product}
+                quantity={quantity}
+                onAdd={() => {
+                  if (!backendProduct) {
+                    return;
+                  }
+                  adjustQuantity(backendProduct.id, quantity + 1);
+                }}
+                onOpenDetails={() => {}}
+                onIncrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity + 1) : undefined}
+                onDecrease={backendProduct ? () => adjustQuantity(backendProduct.id, quantity - 1) : undefined}
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+              />
+            );
+          })}
+        </View>
+        <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+          <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Halloumi only</Text>
+          <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Recipes and food photography remain inspiration only and are never shown as products, prices, cart items, or orderable dishes.</Text>
+        </View>
+      </SectionShell>
+      <WholesaleSection onNavigate={onNavigate} />
+    </>
+  );
+}
+
+function ShopPage({
+  session,
+  isStaff,
+  customerQuery,
+  productsQuery,
+  selectedCustomerId,
+  setSelectedCustomerId,
+  paymentTerm,
+  setPaymentTerm,
+  paymentMethod,
+  setPaymentMethod,
+  quantities,
+  setQuantities,
+  shopProducts = [],
+  selectedProductSlug,
+  setSelectedProductSlug,
+  onNavigate,
+}: {
+  session: SessionState;
+  isStaff: boolean;
+  customerQuery: ReturnType<typeof trpc.staff.listCustomers.useQuery>;
+  productsQuery: ReturnType<typeof trpc.catalog.listProducts.useQuery>;
+  selectedCustomerId: number | undefined;
+  setSelectedCustomerId: Dispatch<SetStateAction<number | undefined>>;
+  paymentTerm: PaymentTerm;
+  setPaymentTerm: Dispatch<SetStateAction<PaymentTerm>>;
+  paymentMethod: PaymentMethod;
+  setPaymentMethod: Dispatch<SetStateAction<PaymentMethod>>;
+  quantities: Record<number, number>;
+  setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
+  shopProducts?: ShopProductView[] | null;
+  selectedProductSlug: ShopProductSpec['slug'] | null;
+  setSelectedProductSlug: Dispatch<SetStateAction<ShopProductSpec['slug'] | null>>;
+  onNavigate: (page: SignedInPage) => void;
+}) {
+  // Guard against an explicit `null` too, since the `= []` default only covers `undefined`.
+  const safeShopProducts = shopProducts ?? [];
+  const featuredProduct = safeShopProducts.find((product) => product.slug === selectedProductSlug) ?? null;
+  const customers = (customerQuery.data ?? []) as Array<{ id: number; name: string; type: 'WHOLESALE' | 'RETAIL' }>;
+
+  function adjustQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  return (
+    <>
+      <SectionShell eyebrow="Shop Halloumi" title="Shop Grassland Cheese Halloumi" description="Only three customer-facing halloumi products are shown here. If a matching live product is not available from the backend yet, the card stays in an available soon state.">
+        {isStaff ? (
+          <View style={styles.inlineCard}>
+            <Text style={styles.inlineCardTitle}>Order for customer</Text>
+            {customerQuery.isLoading ? <Text style={styles.metaText}>Loading customers…</Text> : null}
+            {customers.length > 0 ? (
+              <SegmentedControl
+                groupLabel="Select customer"
+                value={String(selectedCustomerId ?? '')}
+                options={customers.map((customer) => ({
+                  label: `${customer.name} (${customer.type})`,
+                  value: String(customer.id),
+                }))}
+                onChange={(value) => setSelectedCustomerId(Number(value))}
+              />
+            ) : (
+              <Text style={styles.metaText}>Choose a customer to access live pricing and ordering.</Text>
+            )}
+          </View>
+        ) : null}
+
+        <View style={styles.inlineTwoColumnRow}>
+          <View style={styles.inlineCardColumn}>
+            <View style={styles.inlineCard}>
+              <Text style={styles.inlineCardTitle}>Payment terms</Text>
+              <SegmentedControl
+                groupLabel="Payment term"
+                value={paymentTerm}
+                options={[
+                  { label: 'Pay now (Stripe Checkout, 10% off)', value: PaymentTerm.PAY_NOW, disabled: isStaff },
+                  { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
+                ]}
+                onChange={(value) => setPaymentTerm(value as PaymentTerm)}
+              />
+              <Text style={styles.metaText}>
+                {isStaff
+                  ? 'Staff-created orders currently use Pay in 30 only.'
+                  : 'Retail customers can pay now with Stripe Checkout for 10% off, or choose Pay in 30 at full price.'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.inlineCardColumn}>
+            <View style={styles.inlineCard}>
+              <Text style={styles.inlineCardTitle}>Shop note</Text>
+              <Text style={styles.metaText}>Recipes stay informational only and never move into the cart or checkout.</Text>
+              <Pressable style={styles.secondaryButton} onPress={() => onNavigate('cart')}>
+                <Text style={styles.secondaryButtonLabel}>View Cart & Checkout</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        {featuredProduct ? (
+          <ProductDetailCard
+            product={featuredProduct}
+            quantity={featuredProduct.product ? quantities[featuredProduct.product.id] ?? 0 : 0}
+            onAdd={() => {
+              if (!featuredProduct.product) {
+                return;
+              }
+              adjustQuantity(featuredProduct.product.id, (quantities[featuredProduct.product.id] ?? 0) + 1);
+            }}
+            onIncrease={() => {
+              if (!featuredProduct.product) {
+                return;
+              }
+              adjustQuantity(featuredProduct.product.id, (quantities[featuredProduct.product.id] ?? 0) + 1);
+            }}
+            onDecrease={() => {
+              if (!featuredProduct.product) {
+                return;
+              }
+              adjustQuantity(featuredProduct.product.id, (quantities[featuredProduct.product.id] ?? 0) - 1);
+            }}
+            onClose={() => setSelectedProductSlug(null)}
+          />
+        ) : null}
+
+        {productsQuery.isLoading ? <Text style={styles.metaText}>Loading live halloumi products…</Text> : null}
+        {!productsQuery.isLoading && safeShopProducts.length === 0 ? (
+          <Text style={styles.metaText}>Halloumi products are not available right now. Please check back shortly.</Text>
+        ) : null}
+        <View style={styles.productGrid}>
+          {safeShopProducts.map((product) => {
+            const backendProduct = product.product;
+            const quantity = backendProduct ? quantities[backendProduct.id] ?? 0 : 0;
+            return (
+              <ProductCard
+                key={product.slug}
+                product={product}
+                quantity={quantity}
+                onAdd={() => {
+                  if (!backendProduct) {
+                    return;
+                  }
+                  adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1);
+                }}
+                onOpenDetails={() => setSelectedProductSlug(product.slug)}
+                onIncrease={
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) + 1)
+                    : undefined
+                }
+                onDecrease={
+                  backendProduct
+                    ? () => adjustQuantity(backendProduct.id, (quantities[backendProduct.id] ?? 0) - 1)
+                    : undefined
+                }
+                disabled={!backendProduct}
+                ctaLabel={backendProduct ? 'Add to Cart' : 'Available Soon'}
+              />
+            );
+          })}
+        </View>
+      </SectionShell>
+    </>
+  );
+}
+
+function ProductCard({
+  product,
+  quantity,
+  onAdd,
+  onOpenDetails,
+  onIncrease,
+  onDecrease,
+  disabled,
+  ctaLabel,
+}: {
+  product: ShopProductView;
+  quantity: number;
+  onAdd: () => void;
+  onOpenDetails: () => void;
+  onIncrease?: () => void;
+  onDecrease?: () => void;
+  disabled: boolean;
+  ctaLabel: string;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  
+  return (
+    <View style={[styles.productCard, isMobile && styles.productCardMobile]}>
+      <View style={[styles.productLogoPanel, isMobile && styles.productLogoPanelMobile]}>
+        <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
+      </View>
+      <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
+      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.description}</Text>
+      <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
+      <View style={styles.productActionsRow}>
+        <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
+          <Text style={styles.detailsButtonLabel}>Product details</Text>
+        </Pressable>
+      </View>
+      <View style={styles.quantityPanel}>
+        <Text style={styles.quantityPanelLabel}>Quantity</Text>
+        <View style={styles.quantityRow}>
+          <Pressable disabled={!onDecrease || disabled} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, disabled && styles.disabledButton]} onPress={onDecrease}>
+            <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
+          </Pressable>
+          <Text style={styles.quantityValue}>{quantity}</Text>
+          <Pressable disabled={!onIncrease || disabled} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, disabled && styles.disabledButton]} onPress={onIncrease}>
+            <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+      <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
+        <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ProductDetailCard({
+  product,
+  quantity,
+  onAdd,
+  onIncrease,
+  onDecrease,
+  onClose,
+}: {
+  product: ShopProductView;
+  quantity: number;
+  onAdd: () => void;
+  onIncrease: () => void;
+  onDecrease: () => void;
+  onClose: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const isAvailable = Boolean(product.product);
+
+  return (
+    <View style={[styles.productDetailCard, isMobile && styles.productDetailCardMobile]}>
+      <View style={styles.productDetailHeader}>
+        <View style={styles.productDetailBrandRow}>
+          <Image source={grasslandLogo} style={[styles.productDetailLogo, isMobile && styles.productDetailLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+          <View>
+            <Text style={styles.sectionEyebrow}>Product details</Text>
+            <Text style={[styles.productDetailTitle, isMobile && styles.productDetailTitleMobile]} numberOfLines={3}>{product.name}</Text>
+          </View>
+        </View>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={onClose}>
+          <Text style={styles.secondaryButtonLabel}>Close</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.productCardSize}>{product.size}</Text>
+      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.detail}</Text>
+      <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
+      <View style={styles.quantityRow}>
+        <Pressable disabled={!isAvailable} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, !isAvailable && styles.disabledButton]} onPress={onDecrease}>
+          <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
+        </Pressable>
+        <Text style={styles.quantityValue}>{quantity}</Text>
+        <Pressable disabled={!isAvailable} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, !isAvailable && styles.disabledButton]} onPress={onIncrease}>
+          <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
+        </Pressable>
+      </View>
+      <Pressable disabled={!isAvailable} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, !isAvailable && styles.disabledPrimaryButton]} onPress={onAdd}>
+        <Text style={styles.primaryButtonLabel}>{isAvailable ? 'Add to Cart' : 'Available Soon'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function CartPage({
+  session,
+  paymentTerm,
+  setPaymentTerm,
+  selectedItems,
+  quantities,
+  setQuantities,
+  deliveryAddress,
+  setDeliveryAddress,
+  orderNotes,
+  setOrderNotes,
+  subtotal,
+  discount,
+  deliveryCharge,
+  total,
+  totalWeightKg,
+  deliveryAddressReady,
+  shippingEstimateQuery,
+  onNavigate,
+  onSubmitOrder,
+  isSubmitting,
+  orderError,
+}: {
+  session: SessionState;
+  paymentTerm: PaymentTerm;
+  setPaymentTerm: Dispatch<SetStateAction<PaymentTerm>>;
+  paymentMethod?: PaymentMethod;
+  setPaymentMethod?: Dispatch<SetStateAction<PaymentMethod>>;
+  selectedItems: Array<ProductRecord & { qty: number }>;
+  quantities: Record<number, number>;
+  setQuantities: Dispatch<SetStateAction<Record<number, number>>>;
+  deliveryAddress: DeliveryAddressForm;
+  setDeliveryAddress: Dispatch<SetStateAction<DeliveryAddressForm>>;
+  orderNotes: string;
+  setOrderNotes: Dispatch<SetStateAction<string>>;
+  subtotal: number;
+  discount: number;
+  deliveryCharge: number;
+  total: number;
+  totalWeightKg: number;
+  deliveryAddressReady: boolean;
+  shippingEstimateQuery: {
+    data?: { amount: number; isTemporaryRate: boolean; zoneLabel: string; totalShipmentWeightKg: number; parcelCount: number } | null;
+    isLoading: boolean;
+  };
+  onNavigate: (page: SignedInPage) => void;
+  onSubmitOrder: () => Promise<void>;
+  isSubmitting: boolean;
+  orderError: string | null;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const isCustomer = session.user?.kind === 'customer';
+  const deliveryAddressValid = !isCustomer || deliveryAddressReady;
+  const isPayNow = paymentTerm === PaymentTerm.PAY_NOW;
+
+  function changeQuantity(productId: number, nextQuantity: number) {
+    setQuantities((current) => ({ ...current, [productId]: Math.max(nextQuantity, 0) }));
+  }
+
+  function removeItem(productId: number) {
+    setQuantities((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+  }
+
+  function updateAddressField(field: keyof DeliveryAddressForm) {
+    return (value: string) => setDeliveryAddress((current) => ({ ...current, [field]: value }));
+  }
+
+  return (
+    <SectionShell eyebrow="Cart & Checkout" title="Review your Halloumi order" description="Your cart and checkout stay connected to the existing ordering flow.">
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
+        <View style={styles.inlineCardColumn}>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Cart</Text>
+            {selectedItems.length ? (
+              selectedItems.map((item) => (
+                <View key={item.id} style={styles.cartLineItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cartLineTitle}>{item.name}</Text>
+                    <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
+                    <View style={styles.quantityRow}>
+                      <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => changeQuantity(item.id, item.qty - 1)}>
+                        <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
+                      </Pressable>
+                      <Text style={styles.quantityValue}>{item.qty}</Text>
+                      <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => changeQuantity(item.id, item.qty + 1)}>
+                        <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
+                      </Pressable>
+                      <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => removeItem(item.id)}>
+                        <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                  <Text style={styles.cartLineTotal}>{formatMoney(item.qty * item.effectivePrice)}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
+            )}
+            {selectedItems.length ? <Text style={styles.metaText}>Total product weight: {totalWeightKg.toFixed(3)} kg</Text> : null}
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
+              <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.inlineCardColumn}>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Checkout</Text>
+            <Text style={styles.metaText}>Ordering as {session.user?.name}</Text>
+            <Text style={styles.metaText}>{session.user?.email}</Text>
+            {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
+            {isCustomer ? (
+              <>
+                <Text style={styles.inlineCardTitle}>Delivery address</Text>
+                <Field label="Full name" value={deliveryAddress.name} onChangeText={updateAddressField('name')} />
+                <Field label="Address" value={deliveryAddress.addressLine} onChangeText={updateAddressField('addressLine')} />
+                <Field label="Suburb / town / city" value={deliveryAddress.suburb} onChangeText={updateAddressField('suburb')} />
+                <Field label="Region (if applicable)" value={deliveryAddress.region} onChangeText={updateAddressField('region')} />
+                <Field label="Postcode" value={deliveryAddress.postcode} onChangeText={updateAddressField('postcode')} />
+                <Field label="Country" value={deliveryAddress.country} onChangeText={updateAddressField('country')} editable={false} />
+                <Text style={styles.metaText}>We currently sell and ship within New Zealand only.</Text>
+                <Field label="Order notes (optional)" value={orderNotes} onChangeText={setOrderNotes} />
+                {!deliveryAddressValid ? (
+                  <Text style={styles.errorText}>Enter your name, address, suburb/town/city, postcode and country so shipping can be calculated.</Text>
+                ) : null}
+              </>
+            ) : null}
+            <SegmentedControl
+              groupLabel="Checkout payment term"
+              value={paymentTerm}
+              options={[
+                { label: 'Pay now (Stripe Checkout, 10% off)', value: PaymentTerm.PAY_NOW },
+                { label: 'Pay in 30', value: PaymentTerm.PAY_30 },
+              ]}
+              onChange={(value) => setPaymentTerm(value as PaymentTerm)}
+            />
+            {isPayNow ? (
+              <Text style={styles.metaText}>Pay now: save 10% on products, pay securely in Stripe Checkout, and return here after payment.</Text>
+            ) : (
+              <Text style={styles.metaText}>Pay in 30: confirm now, no payment gateway required. Due date is set to 30 days from confirmation.</Text>
+            )}
+            <Text style={styles.summaryLine}>Subtotal: {formatMoney(subtotal)}</Text>
+            <Text style={styles.summaryLine}>Discount: -{formatMoney(discount)}</Text>
+            {deliveryAddressReady && shippingEstimateQuery.data ? (
+              <Text style={styles.metaText}>
+                Delivery destination: {shippingEstimateQuery.data.zoneLabel} · Shipment weight: {shippingEstimateQuery.data.totalShipmentWeightKg.toFixed(3)} kg
+                {shippingEstimateQuery.data.parcelCount > 1 ? ` (${shippingEstimateQuery.data.parcelCount} parcels)` : ''}
+              </Text>
+            ) : null}
+            <Text style={styles.summaryLine}>
+              Shipping: {deliveryAddressReady ? (shippingEstimateQuery.isLoading ? 'Calculating…' : deliveryCharge > 0 ? formatMoney(deliveryCharge) : 'Free') : 'Enter delivery address to calculate'}
+            </Text>
+            {deliveryAddressReady && shippingEstimateQuery.data?.isTemporaryRate ? (
+              <Text style={styles.metaText}>Shipping shown uses a configurable NZ courier rate table pending our final courier rate card — this is not yet the official price.</Text>
+            ) : null}
+            <Text style={styles.summaryTotal}>Total: {formatMoney(total)}</Text>
+            {orderError ? <Text style={styles.errorText}>{orderError}</Text> : null}
+            <Pressable
+              disabled={!selectedItems.length || isSubmitting || !deliveryAddressValid}
+              style={[styles.primaryButton, (!selectedItems.length || isSubmitting || !deliveryAddressValid) && styles.disabledPrimaryButton]}
+              onPress={() => void onSubmitOrder()}
+            >
+              <Text style={styles.primaryButtonLabel}>{isSubmitting ? 'Processing…' : isPayNow ? 'Continue to Stripe' : 'Confirm order'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function OrderConfirmationPage({ order, onNavigate }: { order: ConfirmedOrder | null; onNavigate: (page: SignedInPage) => void }) {
+  if (!order) {
+    return (
+      <SectionShell eyebrow="Order Confirmation" title="No recent order found" description="Place an order from the shop to see your confirmation here.">
+        <Pressable style={styles.primaryButton} onPress={() => onNavigate('shop')}>
+          <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+        </Pressable>
+      </SectionShell>
+    );
+  }
+
+  return (
+    <SectionShell eyebrow="Order Confirmation" title="Thank you for your order!" description={`Order ${order.orderNumber} has been received and confirmed.`}>
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Order {order.orderNumber}</Text>
+        <Text style={styles.metaText}>Placed {new Date(order.createdAt).toLocaleString()}</Text>
+        {order.items.map((item) => (
+          <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ {formatMoney(item.unitPrice)}</Text>
+        ))}
+        <Text style={styles.summaryLine}>Subtotal: {formatMoney(order.subtotal)}</Text>
+        <Text style={styles.summaryLine}>Discount: -{formatMoney(order.discountApplied)}</Text>
+        <Text style={styles.summaryLine}>Shipping: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text>
+        {order.shippingZoneLabel ? (
+          <Text style={styles.metaText}>
+            Delivery destination: {order.shippingZoneLabel}
+            {order.totalShipmentWeightKg ? ` · Shipment weight: ${order.totalShipmentWeightKg.toFixed(3)} kg` : ''}
+          </Text>
+        ) : null}
+        {order.isTemporaryShippingRate ? (
+          <Text style={styles.metaText}>Shipping was calculated using a configurable NZ courier rate table pending our final courier rate card — this is not yet the official price.</Text>
+        ) : null}
+        <Text style={styles.summaryTotal}>Total: {formatMoney(order.total)}</Text>
+        {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to:{'\n'}{order.deliveryAddress}</Text> : null}
+        <Text style={styles.metaText}>Payment method: {order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now (Stripe Checkout)' : 'Pay in 30'}</Text>
+        <Text style={styles.metaText}>Payment status: {getPaymentStatusLabel(order.paymentStatus)}</Text>
+        <Text style={styles.metaText}>A confirmation email has been sent to your registered email address.</Text>
+        <View style={styles.heroActionRow}>
+          <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('account')}>
+            <Text style={styles.primaryButtonLabel}>View Order History</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
+            <Text style={styles.secondaryButtonLabel}>Continue Shopping</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function PublicCartPage({
+  onNavigate,
+  selectedItems,
+  adjustQuantity,
+}: {
+  onNavigate: (page: PublicPage) => void;
+  selectedItems: Array<ProductRecord & { qty: number }>;
+  adjustQuantity: (productId: number, nextQuantity: number) => void;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.qty * item.effectivePrice, 0);
+
+  return (
+    <SectionShell eyebrow="Cart" title="Cart and checkout" description="Sign in or create an account to complete checkout with existing server-side pricing.">
+      <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+        <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Cart</Text>
+        {selectedItems.length ? (
+          selectedItems.map((item) => (
+            <View key={item.id} style={styles.cartLineItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cartLineTitle}>{item.name}</Text>
+                <Text style={styles.metaText}>{item.qty} × {formatMoney(item.effectivePrice)}</Text>
+                <View style={styles.quantityRow}>
+                  <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => adjustQuantity(item.id, item.qty - 1)}>
+                    <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
+                  </Pressable>
+                  <Text style={styles.quantityValue}>{item.qty}</Text>
+                  <Pressable style={[styles.quantityButton, isMobile && styles.quantityButtonMobile]} onPress={() => adjustQuantity(item.id, item.qty + 1)}>
+                    <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>+</Text>
+                  </Pressable>
+                  <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => adjustQuantity(item.id, 0)}>
+                    <Text style={styles.secondaryButtonLabel}>Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={styles.cartLineTotal}>{formatMoney(item.qty * item.effectivePrice)}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.metaText}>Your cart is empty. Add one of the halloumi products from the shop page.</Text>
+        )}
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Shop</Text>
+        </Pressable>
+      </View>
+      {selectedItems.length ? <Text style={styles.summaryTotal}>Subtotal: {formatMoney(subtotal)}</Text> : null}
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Ready to order?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in or register to complete checkout. Your cart carries over automatically once you're signed in.</Text>
+        <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('account')}>
+          <Text style={styles.primaryButtonLabel}>Go to Account</Text>
+        </Pressable>
+      </View>
+    </SectionShell>
+  );
+}
+
+function RecipesPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
+  return (
+    <>
+      <RecipesSection />
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Recipes are inspiration only</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Prepared dishes never become products, cart items, inventory, checkout lines, or orderable food.</Text>
+      </View>
+    </>
+  );
+}
+
+function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  
+  return (
+    <SectionShell eyebrow="Halloumi Inspiration" title="Recipes and serving ideas" description="Ideas to inspire your cooking. We sell halloumi cheese — recipes are for inspiration only.">
+      <View style={[styles.recipeGrid, isMobile && styles.recipeGridMobile]}>
+        {recipeFeatures.map((recipe) => (
+          <View key={recipe.title} style={[styles.recipeCard, isMobile && styles.recipeCardMobile]}>
+            <Image source={recipe.image} style={[styles.recipeCardImage, isMobile && styles.recipeCardImageMobile]} resizeMode="cover" accessibilityLabel={`${recipe.title} inspiration image`} />
+            <Text style={[styles.recipeCardTitle, isMobile && styles.recipeCardTitleMobile]}>{recipe.title}</Text>
+            <Text style={[styles.recipeCardDescription, isMobile && styles.recipeCardDescriptionMobile]}>{recipe.description}</Text>
+          </View>
+        ))}
+      </View>
+      {onNavigate ? (
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Halloumi Shop</Text>
+        </Pressable>
+      ) : null}
+    </SectionShell>
+  );
+}
+
+function WhyGrasslandSection() {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  
+  return (
+    <SectionShell eyebrow="Why Grassland Cheese" title="A premium halloumi brand with a clear focus" description="Premium quality halloumi, crafted to perfection.">
+      <View style={[styles.valueGrid, isMobile && styles.valueGridMobile]}>
+        {whyGrasslandItems.map((item) => (
+          <View key={item.title} style={[styles.valueCard, isMobile && styles.valueCardMobile]}>
+            <Text style={[styles.valueCardTitle, isMobile && styles.valueCardTitleMobile]}>{item.title}</Text>
+            <Text style={[styles.valueCardDescription, isMobile && styles.valueCardDescriptionMobile]}>{item.description}</Text>
+          </View>
+        ))}
+      </View>
+    </SectionShell>
+  );
+}
+
+function StorySection() {
+  return (
+    <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.">
+      <View style={styles.storyCard}>
+        <Text style={styles.storyParagraph}>Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.</Text>
+        <Text style={styles.storyParagraph}>We focus on one thing: producing the best halloumi for your table. Slice it, grill it, share it.</Text>
+        <Text style={styles.storyParagraph}>From weeknight dinners to special occasions, Grassland Cheese is halloumi the way it should be.</Text>
+      </View>
+    </SectionShell>
+  );
+}
+
+function OurStoryPageSection() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 900;
+  const isSmallMobile = width < 640;
+  const heroHeight = width < 640 ? 340 : width < 1024 ? 430 : 520;
+
+  return (
+    <View style={styles.ourStoryPage}>
+      <View style={[styles.storyHeroShell, { minHeight: heroHeight }]}>
+        <ImageBackground source={storyHeroImage} style={styles.storyHeroBackground} imageStyle={styles.storyHeroImage} resizeMode="cover">
+          <View style={styles.storyHeroOverlay}>
+            <View style={styles.storyHeroBadge}>
+              <Text style={styles.storyHeroBadgeText}>New Zealand Product</Text>
+            </View>
+            <Text style={[styles.storyHeroTitle, isSmallMobile && styles.storyHeroTitleMobile]}>From Our Pastures to Your Table</Text>
+            <Text style={[styles.storyHeroSubtitle, isSmallMobile && styles.storyHeroSubtitleMobile]}>
+              Discover the journey behind our Halloumi, from the farm to the finished cheese.
+            </Text>
+          </View>
+        </ImageBackground>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Family Story</Text>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
+            At Rose’s Dairy, cheese-making is more than a craft — it’s a family tradition. Since 2010 we have been producing specialty Halloumi on our boutique dairy farm in Pukekohe, Auckland, using a recipe that has been passed down through generations of our family dynasty.
+          </Text>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
+            We believe good food nourishes both body and spirit. That simple belief guides everything we do. Every batch of our Halloumi begins with fresh, pasteurised whole cow’s milk from the paddock next door. It doesn’t get fresher than that.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyJourneyShell}>
+        {storyJourneyStages.map((stage, index) => {
+          const reverseDesktop = !isMobile && index % 2 === 1;
+          return (
+            <View key={stage.number} style={[styles.storyJourneyRow, reverseDesktop && styles.storyJourneyRowReverse]}>
+              <View style={styles.storyJourneyImageColumn}>
+                <Image source={stage.image} style={styles.storyJourneyImage} resizeMode="cover" />
+              </View>
+              <View style={styles.storyJourneyTextColumn}>
+                <View style={styles.storyJourneyDecorativeLeaf} />
+                <View style={styles.storyJourneyNumberCircle}>
+                  <Text style={styles.storyJourneyNumberText}>{stage.number}</Text>
+                </View>
+                <Text style={[styles.storyJourneyTitle, isSmallMobile && styles.storyJourneyTitleMobile]} numberOfLines={3}>{stage.title}</Text>
+                <Text style={[styles.storyJourneyDescription, isSmallMobile && styles.storyJourneyDescriptionMobile]}>{stage.description}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>What Makes Our Halloumi Special</Text>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
+            Our Halloumi is soft and gently squeaky, with a clean, creamy flavour that is never overly salty. We use just the right amount of rock salt so the natural taste of the milk shines through.
+          </Text>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
+            Because it is made the traditional way and finished with modern precision, our cheese holds its shape beautifully when cooked. Chefs love it — it flips easily with tongs, browns evenly, and stays consistent batch after batch.
+          </Text>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
+            Whether you fry, grill, bake, or pan-sear it in a little olive oil, Rose’s Halloumi delivers the same wonderful creamy taste every time. It is ready to enjoy straight from the pack and works equally well in savoury or sweet dishes.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>How to Enjoy It</Text>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <View style={styles.storyBulletList}>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Slice and pan-fry until golden for salads, burgers, or warm sandwiches</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Grill or bake for a delicious centrepiece</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Pair with honey and pancakes for a sweet treat</Text>
+            <Text style={[styles.storyBulletItem, isSmallMobile && styles.storyParagraphMobile]}>• Add to a plated toaster or simple skillet meal</Text>
+          </View>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
+            Our Halloumi is naturally vegetarian and loved by everyone from age 7 to 70. Once you taste it, you’ll understand why this centuries-old style of cheese has never gone out of favour.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFarmToTableSection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>From Our Farm to Your Table</Text>
+        <View style={[styles.storyCard, isSmallMobile && styles.storyCardMobile]}>
+          <Text style={[styles.storyParagraph, isSmallMobile && styles.storyParagraphMobile]}>
+            We operate a small, carefully run facility right on the dairy farm. Modern equipment helps us maintain the highest standards of hygiene and consistency, while the heart of the process remains the time-honoured family methods we have perfected over many years.
+          </Text>
+        </View>
+        <View style={[styles.storyBrandStatementCard, isSmallMobile && styles.wholesaleCardMobile]}>
+          <Text style={styles.storyBrandStatement}>Fresh milk. Honest ingredients. A recipe rooted in family history.</Text>
+          <Text style={styles.storyBrandClosingLine}>That’s the Rose’s Dairy difference.</Text>
+          <Text style={styles.storyBrandClosingLine}>Good food. Good life.</Text>
+          <Text style={styles.storyBrandClosingLine}>Rose’s Halloumi — one of a kind.</Text>
+        </View>
+      </View>
+
+      <View style={styles.storyFamilySection}>
+        <Text style={[styles.sectionTitle, isSmallMobile && styles.storyJourneyTitleMobile]}>Our Halloumi</Text>
+        <View style={styles.storyBrandStatementCard}>
+          <Text style={styles.storyBrandStatement}>One cheese, so many possibilities.</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function AboutPage() {
+  return (
+    <>
+      <OurStoryPageSection />
+    </>
+  );
+}
+
+function openQualityDocument(source: ImageSourcePropType) {
+  const uri = resolveWebImageUri(source);
+  if (!uri) {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+    return;
+  }
+  if (Platform.OS === 'web') {
+    // Open in a new browser tab, as PDFs should not replace the current page.
+    (globalThis as any).open?.(uri, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  Linking.openURL(uri).catch(() => {
+    Alert.alert('Unable to open document', 'This document is not available right now.');
+  });
+}
+
+function QualityDocumentCard({
+  title,
+  description,
+  meta,
+  source,
+  viewLabel,
+  showDownload,
+  isMobile,
+}: {
+  title: string;
+  description: string;
+  meta: Array<{ label: string; value: string }>;
+  source: ImageSourcePropType;
+  viewLabel: string;
+  showDownload?: boolean;
+  isMobile?: boolean;
+}) {
+  return (
+    <View style={[styles.qualityDocCard, isMobile && styles.qualityDocCardMobile]}>
+      <Text style={[styles.qualityDocTitle, isMobile && styles.qualityDocTitleMobile]}>{title}</Text>
+      <Text style={styles.qualityDocDescription}>{description}</Text>
+      {meta.length > 0 ? (
+        <View style={styles.qualityDocMetaList}>
+          {meta.map((item) => (
+            <View key={item.label} style={styles.qualityDocMetaRow}>
+              <Text style={styles.qualityDocMetaLabel}>{item.label}</Text>
+              <Text style={styles.qualityDocMetaValue}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+        <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => openQualityDocument(source)}>
+          <Text style={styles.primaryButtonLabel}>{viewLabel}</Text>
+        </Pressable>
+        {showDownload ? (
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => openQualityDocument(source)}>
+            <Text style={styles.secondaryButtonLabel}>Download PDF</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function QualityCompliancePage() {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  
+  return (
+    <SectionShell
+      eyebrow="Quality & Compliance"
+      title="Quality, safety and product information"
+      description="We believe in being transparent about the products we make and the standards that support them. Explore our official Rose's Dairy registration, audit certification and Halloumi product information below."
+    >
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Official Certifications</Text>
+        <View style={[styles.qualityDocGrid, isMobile && styles.qualityDocGridMobile]}>
+          <QualityDocumentCard
+            title="MPI Animal Products Exporter Registration"
+            description="Official MPI Animal Products Exporter registration for AYYILDIZ Limited trading as Roses Dairy (Halloumi Cheese)."
+            meta={[
+              { label: 'MPI ID', value: 'AEX000656' },
+              { label: 'Validity', value: '16 March 2026 – 16 March 2027' },
+            ]}
+            source={mpiRegistrationPdf}
+            viewLabel="View Certificate"
+            showDownload
+            isMobile={isMobile}
+          />
+          <QualityDocumentCard
+            title="Food Safety & Quality Audit Certificate"
+            description="Certificate of Audit for Ayyildiz Ltd, trading as Rose's Halloumi."
+            meta={[{ label: 'Certificate expiry', value: '2 January 2027' }]}
+            source={foodSafetyAuditPdf}
+            viewLabel="View Certificate"
+            showDownload
+            isMobile={isMobile}
+          />
+        </View>
+      </View>
+      <View style={styles.qualitySection}>
+        <Text style={styles.qualitySectionHeading}>Halloumi Product Information</Text>
+        <View style={[styles.qualityDocGrid, isMobile && styles.qualityDocGridMobile]}>
+          <QualityDocumentCard
+            title="Rose's Dairy Halloumi Product Specification"
+            description="Product specification containing product, ingredient, storage, preparation, shelf-life and nutrition information."
+            meta={[
+              { label: 'Product', value: 'Rose\'s Dairy Halloumi' },
+              { label: 'Description', value: 'Halloumi – semi hard brine salted cheese' },
+              { label: 'Ingredients', value: 'Pasteurised Cow\'s Milk, Vinegar, Salt, Vegetable Rennet.' },
+              { label: 'Preparation', value: 'Fry, grill, bake or poach. Cook until golden brown.' },
+              { label: 'Storage', value: 'Refrigerate at colder than 5°C or frozen at -18°C.' },
+              { label: 'Opened', value: 'Consume within 5 days once opened.' },
+            ]}
+            source={halloumiProductSpecPdf}
+            viewLabel="View Product Specification"
+            showDownload
+          />
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function WholesalePage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  return <WholesaleSection onNavigate={onNavigate} />;
+}
+
+function WholesaleSection({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  
+  return (
+    <SectionShell eyebrow="Wholesale" title="Wholesale Grassland Cheese" description="Looking to stock Grassland Cheese Halloumi? Talk to us about wholesale supply.">
+      <View style={[styles.wholesaleCard, isMobile && styles.wholesaleCardMobile]}>
+        <Text style={[styles.wholesaleBody, isMobile && styles.wholesaleBodyMobile]}>Apply for a wholesale account. We'll review your application and respond within 1 business day.</Text>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+          <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('wholesale-apply')}>
+            <Text style={styles.primaryButtonLabel}>Wholesale Enquiries</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile, styles.wholesaleContactButton]} onPress={() => onNavigate('contact')}>
+            <Text style={[styles.secondaryButtonLabel, styles.wholesaleContactButtonLabel]}>Contact</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+const generalEnquiryTypeOptions: Array<{ label: string; value: GeneralEnquiryType }> = [
+  { label: 'General enquiry', value: 'GENERAL' },
+  { label: 'Product enquiry', value: 'PRODUCT' },
+  { label: 'Order enquiry', value: 'ORDER' },
+  { label: 'Delivery enquiry', value: 'DELIVERY' },
+  { label: 'Other', value: 'OTHER' },
+];
+
+type GeneralEnquiryType = 'GENERAL' | 'PRODUCT' | 'ORDER' | 'DELIVERY' | 'OTHER';
+
+function GeneralContactForm({ isMobile = false }: { isMobile?: boolean } = {}) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [enquiryType, setEnquiryType] = useState<GeneralEnquiryType>('GENERAL');
+  const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitGeneral = trpc.contact.submitGeneral.useMutation();
+
+  function validate(): string | null {
+    if (name.trim().length < 1) {
+      return 'Enter your name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (message.trim().length < 1) {
+      return 'Enter a message.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      setSubmitted(false);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await submitGeneral.mutateAsync({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        enquiryType,
+        message: message.trim(),
+      });
+      setSubmitted(true);
+      setName('');
+      setEmail('');
+      setPhone('');
+      setEnquiryType('GENERAL');
+      setMessage('');
+    } catch (error) {
+      setSubmitted(false);
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>General enquiry</Text>
+      <Field label="Name" value={name} onChangeText={setName} />
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <View style={styles.fieldWrap}>
+        <Text style={styles.fieldLabel}>Enquiry type</Text>
+        <SegmentedControl
+          groupLabel="Enquiry type"
+          value={enquiryType}
+          options={generalEnquiryTypeOptions}
+          onChange={(value) => setEnquiryType(value as GeneralEnquiryType)}
+        />
+      </View>
+      <Field label="Message" value={message} onChangeText={setMessage} multiline />
+      {submitted ? <Text style={styles.successText}>Thanks — your enquiry has been sent. We'll be in touch soon.</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable
+        disabled={submitGeneral.isPending}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitGeneral.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitGeneral.isPending ? 'Sending…' : 'Send enquiry'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function WholesaleContactForm({ isMobile = false }: { isMobile?: boolean } = {}) {
+  const [businessName, setBusinessName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [businessLocation, setBusinessLocation] = useState('');
+  const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitWholesale = trpc.contact.submitWholesale.useMutation();
+
+  function validate(): string | null {
+    if (businessName.trim().length < 1) {
+      return 'Enter your business name.';
+    }
+    if (contactName.trim().length < 1) {
+      return 'Enter a contact name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (businessLocation.trim().length < 1) {
+      return 'Enter your business/location.';
+    }
+    if (message.trim().length < 1) {
+      return 'Enter a message.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setFormError(validationError);
+      setSubmitted(false);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      await submitWholesale.mutateAsync({
+        businessName: businessName.trim(),
+        contactName: contactName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        businessLocation: businessLocation.trim(),
+        message: message.trim(),
+      });
+      setSubmitted(true);
+      setBusinessName('');
+      setContactName('');
+      setEmail('');
+      setPhone('');
+      setBusinessLocation('');
+      setMessage('');
+    } catch (error) {
+      setSubmitted(false);
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>Wholesale enquiry</Text>
+      <Field label="Business name" value={businessName} onChangeText={setBusinessName} />
+      <Field label="Contact name" value={contactName} onChangeText={setContactName} />
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <Field label="Business/location" value={businessLocation} onChangeText={setBusinessLocation} />
+      <Field label="Message" value={message} onChangeText={setMessage} multiline />
+      {submitted ? <Text style={styles.successText}>Thanks — your wholesale enquiry has been sent. We'll be in touch soon.</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable
+        disabled={submitWholesale.isPending}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitWholesale.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitWholesale.isPending ? 'Sending…' : 'Send wholesale enquiry'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ContactPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
+  return (
+    <SectionShell eyebrow="Contact" title="Get in touch" description="Send us a general enquiry or a wholesale enquiry and the Grassland Cheese team will respond.">
+      <GeneralContactForm isMobile={isMobile} />
+      <WholesaleContactForm isMobile={isMobile} />
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Already a customer?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Sign in to your customer account to place orders and view order history.</Text>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('account')}>
+            <Text style={styles.secondaryButtonLabel}>Open Account</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function BusinessCardPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const businessCardUrl = 'https://grasslandcheese.com/business-card';
+
+  // Contact details for Grassland Cheese
+  const contactDetails = {
+    name: 'Grassland Cheese',
+    phone: '0800422175',
+    phoneDisplay: '0800 422 175',
+    whatsapp: '+6427756599',
+    whatsappDisplay: '+64 27 756 599',
+    email: 'info@grasslandcheese.com',
+    website: 'grasslandcheese.com',
+    websiteUrl: 'https://grasslandcheese.com',
+    linkedin: 'https://www.linkedin.com/in/teyfik-ayyildiz-1ba379439',
+    facebook: 'https://www.facebook.com/share/1BBDwkHH91/?mibextid=wwXIfr',
+    tiktok: 'https://www.tiktok.com/@grassland.cheese',
+  };
+
+  // Generate vCard
+  const generateVCard = () => {
+    const vcard = `BEGIN:VCARD
+VERSION:3.0
+FN:${contactDetails.name}
+ORG:${contactDetails.name}
+TEL;TYPE=WORK,VOICE:${contactDetails.phone}
+TEL;TYPE=WORK,CELL:${contactDetails.whatsapp}
+EMAIL;TYPE=INTERNET:${contactDetails.email}
+URL:${contactDetails.websiteUrl}
+END:VCARD`;
+    return vcard;
+  };
+
+  // Download vCard
+  const downloadVCard = () => {
+    if (Platform.OS !== 'web') {
+      Alert.alert('Download vCard', 'To save the contact, use the contact information displayed on this page.');
+      return;
+    }
+     
+    const vcard = generateVCard();
+    try {
+      const element = document.createElement('a');
+      const file = new Blob([vcard], { type: 'text/vcard' });
+      element.href = URL.createObjectURL(file);
+      element.download = 'grassland-cheese-contact.vcf';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to download vCard. Please copy the contact information manually.');
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.siteScroll} contentContainerStyle={styles.siteContent}>
+        {/* Header */}
+        <View style={[styles.businessCardHeader, isMobile && styles.businessCardHeaderMobile]}>
+          <Text style={[styles.businessCardTitle, isMobile && styles.businessCardTitleMobile]}>
+            Grassland Cheese
+          </Text>
+          <Text style={[styles.businessCardSubtitle, isMobile && styles.businessCardSubtitleMobile]}>
+            Digital Business Card
+          </Text>
+        </View>
+
+        {/* Business Card Container */}
+        <View style={[styles.businessCardContainer, isMobile && styles.businessCardContainerMobile]}>
+          {/* Logo */}
+          <Image
+            source={grasslandLogo}
+            style={[styles.businessCardLogo, isMobile && styles.businessCardLogoMobile]}
+            resizeMode="contain"
+          />
+
+          {/* Contact Information */}
+          <View style={[styles.businessCardSection, isMobile && styles.businessCardSectionMobile]}>
+            <Text style={[styles.businessCardSectionTitle, isMobile && styles.businessCardSectionTitleMobile]}>
+              Contact
+            </Text>
+
+            {/* Phone */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(`tel:${contactDetails.phone}`)}
+            >
+              <FontAwesome5 name="phone" size={16} color="#8B7355" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                {contactDetails.phoneDisplay}
+              </Text>
+            </Pressable>
+
+            {/* WhatsApp */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(`whatsapp://send?phone=${contactDetails.whatsapp.replace(/[^0-9]/g, '')}`)}
+            >
+              <FontAwesome5 name="whatsapp" size={16} color="#25D366" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                WhatsApp {contactDetails.whatsappDisplay}
+              </Text>
+            </Pressable>
+
+            {/* Email */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(`mailto:${contactDetails.email}`)}
+            >
+              <FontAwesome5 name="envelope" size={16} color="#EA4C89" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                {contactDetails.email}
+              </Text>
+            </Pressable>
+
+            {/* Website */}
+            <Pressable
+              style={[styles.businessCardContactRow, isMobile && styles.businessCardContactRowMobile]}
+              onPress={() => Linking.openURL(contactDetails.websiteUrl)}
+            >
+              <FontAwesome5 name="globe" size={16} color="#1F2937" style={styles.businessCardIcon} />
+              <Text style={[styles.businessCardContactLink, isMobile && styles.businessCardContactLinkMobile]}>
+                {contactDetails.website}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Social Links */}
+          <View style={[styles.businessCardSection, isMobile && styles.businessCardSectionMobile]}>
+            <Text style={[styles.businessCardSectionTitle, isMobile && styles.businessCardSectionTitleMobile]}>
+              Follow Us
+            </Text>
+            <View style={[styles.businessCardSocialRow, isMobile && styles.businessCardSocialRowMobile]}>
+              {/* LinkedIn */}
+              <Pressable
+                style={[styles.businessCardSocialIcon, isMobile && styles.businessCardSocialIconMobile]}
+                onPress={() => Linking.openURL(contactDetails.linkedin)}
+              >
+                <FontAwesome5 name="linkedin" size={24} color="#0A66C2" />
+              </Pressable>
+
+              {/* Facebook */}
+              <Pressable
+                style={[styles.businessCardSocialIcon, isMobile && styles.businessCardSocialIconMobile]}
+                onPress={() => Linking.openURL(contactDetails.facebook)}
+              >
+                <FontAwesome5 name="facebook-f" size={24} color="#1877f2" />
+              </Pressable>
+
+              {/* TikTok */}
+              <Pressable
+                style={[styles.businessCardSocialIcon, isMobile && styles.businessCardSocialIconMobile]}
+                onPress={() => Linking.openURL(contactDetails.tiktok)}
+              >
+                <FontAwesome5 name="tiktok" size={24} color="#000000" />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* QR Code */}
+          <View style={[styles.businessCardQRContainer, isMobile && styles.businessCardQRContainerMobile]}>
+            <Text style={[styles.businessCardQRLabel, isMobile && styles.businessCardQRLabelMobile]}>
+              Scan to visit
+            </Text>
+            <View style={[styles.businessCardQRCodeWrapper, isMobile && styles.businessCardQRCodeWrapperMobile]}>
+              {Platform.OS === 'web' ? (
+                <QRCodeSVG value={businessCardUrl} size={200} level="H" includeMargin={true} />
+              ) : (
+                <Text style={styles.qrCodePlaceholder}>{businessCardUrl}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Save Contact Button */}
+          <Pressable
+            style={[styles.businessCardButton, isMobile && styles.businessCardButtonMobile]}
+            onPress={downloadVCard}
+          >
+            <FontAwesome5 name="download" size={16} color="white" style={styles.businessCardButtonIcon} />
+            <Text style={[styles.businessCardButtonText, isMobile && styles.businessCardButtonTextMobile]}>
+              Save Contact
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function WholesaleApplicationForm({ isMobile = false }: { isMobile?: boolean } = {}) {
+  const [businessName, setBusinessName] = useState('');
+  const [businessType, setBusinessType] = useState<'CAFÉ' | 'RESTAURANT' | 'DELI' | 'RETAILER' | 'DISTRIBUTOR' | 'OTHER'>('CAFÉ');
+  const [nzbn, setNzbn] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [estimatedVolume, setEstimatedVolume] = useState('');
+  const [productsOfInterest, setProductsOfInterest] = useState('');
+  const [message, setMessage] = useState('');
+  const [website, setWebsite] = useState(''); // Honeypot field
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitApplication = trpc.wholesale.submitApplication.useMutation();
+
+  const businessTypeOptions = [
+    { label: 'Café', value: 'CAFÉ' },
+    { label: 'Restaurant', value: 'RESTAURANT' },
+    { label: 'Deli', value: 'DELI' },
+    { label: 'Retailer', value: 'RETAILER' },
+    { label: 'Distributor', value: 'DISTRIBUTOR' },
+    { label: 'Other', value: 'OTHER' },
+  ];
+
+  function extractFieldErrors(error: unknown): Record<string, string> {
+    if (!error || typeof error !== 'object') {
+      return {};
+    }
+
+    const anyError = error as any;
+
+    // Handle tRPC validation errors with Zod error details
+    if (anyError.data?.zodError?.fieldErrors) {
+      const result: Record<string, string> = {};
+      const zodErrors = anyError.data.zodError.fieldErrors as Record<string, string[]>;
+
+      for (const [field, messages] of Object.entries(zodErrors)) {
+        if (Array.isArray(messages) && messages.length > 0) {
+          result[field] = messages[0]; // Take the first error message
+        }
+      }
+      return result;
+    }
+
+    return {};
+  }
+
+  function validate(): string | null {
+    if (businessName.trim().length < 1) {
+      return 'Enter your business name.';
+    }
+    if (contactName.trim().length < 1) {
+      return 'Enter a contact name.';
+    }
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+    if (deliveryAddress.trim().length < 1) {
+      return 'Enter your delivery address.';
+    }
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+    if (validationError) {
+      setServerError(validationError);
+      setFieldErrors({});
+      setSubmitted(false);
+      return;
+    }
+
+    setServerError(null);
+    setFieldErrors({});
+
+    try {
+      await submitApplication.mutateAsync({
+        businessName: businessName.trim(),
+        businessType,
+        nzbn: nzbn.trim() || undefined,
+        contactName: contactName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        deliveryAddress: deliveryAddress.trim(),
+        estimatedVolume: estimatedVolume.trim() || undefined,
+        productsOfInterest: productsOfInterest.trim() || undefined,
+        message: message.trim() || undefined,
+        website: website.trim() || undefined,
+      });
+      setSubmitted(true);
+      setBusinessName('');
+      setBusinessType('CAFÉ');
+      setNzbn('');
+      setContactName('');
+      setEmail('');
+      setPhone('');
+      setDeliveryAddress('');
+      setEstimatedVolume('');
+      setProductsOfInterest('');
+      setMessage('');
+      setWebsite('');
+    } catch (error) {
+      setSubmitted(false);
+      const parsedErrors = extractFieldErrors(error);
+
+      if (Object.keys(parsedErrors).length > 0) {
+        setFieldErrors(parsedErrors);
+        setServerError(null);
+      } else {
+        setFieldErrors({});
+        setServerError(getErrorMessage(error));
+      }
+    }
+  }
+
+  return (
+    <View style={styles.inlineCard}>
+      <Text style={styles.inlineCardTitle}>Wholesale Application</Text>
+
+      {/* Generic server error banner */}
+      {serverError && !Object.keys(fieldErrors).length ? (
+        <View style={[styles.fieldWrap, { backgroundColor: '#fee', borderLeftWidth: 4, borderLeftColor: '#c33', paddingLeft: 12 }]}>
+          <Text style={[styles.errorText, { marginBottom: 0 }]}>{serverError}</Text>
+        </View>
+      ) : null}
+
+      <FieldWithError
+        label="Business name"
+        value={businessName}
+        onChangeText={setBusinessName}
+        error={fieldErrors.businessName}
+      />
+
+      <View style={styles.fieldWrap}>
+        <Text style={styles.fieldLabel}>Business type</Text>
+        <SegmentedControl
+          groupLabel="Business type"
+          value={businessType}
+          options={businessTypeOptions}
+          onChange={(value) => setBusinessType(value as typeof businessType)}
+        />
+      </View>
+
+      <FieldWithError
+        label="NZBN (13 digits)"
+        placeholder="9429000000000"
+        value={nzbn}
+        onChangeText={setNzbn}
+        inputMode="numeric"
+        maxLength={17}
+        error={fieldErrors.nzbn}
+      />
+
+      <FieldWithError
+        label="Contact name"
+        value={contactName}
+        onChangeText={setContactName}
+        error={fieldErrors.contactName}
+      />
+
+      <FieldWithError
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        error={fieldErrors.email}
+      />
+
+      <FieldWithError
+        label="Phone (optional)"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        error={fieldErrors.phone}
+      />
+
+      <FieldWithError
+        label="Delivery address"
+        value={deliveryAddress}
+        onChangeText={setDeliveryAddress}
+        multiline
+        error={fieldErrors.deliveryAddress}
+      />
+
+      <FieldWithError
+        label="Estimated volume (optional)"
+        placeholder="e.g. 500 kg per month"
+        value={estimatedVolume}
+        onChangeText={setEstimatedVolume}
+        error={fieldErrors.estimatedVolume}
+      />
+
+      <FieldWithError
+        label="Products of interest (optional)"
+        value={productsOfInterest}
+        onChangeText={setProductsOfInterest}
+        error={fieldErrors.productsOfInterest}
+      />
+
+      <View style={styles.fieldWrap}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={styles.fieldLabel}>Additional notes (optional)</Text>
+          <Text style={[styles.metaText, { fontSize: 12, color: '#666' }]}>{message.length}/1000</Text>
+        </View>
+        <TextInput
+          maxLength={1000}
+          multiline
+          style={[styles.input, styles.inputMultiline, fieldErrors.message && { borderColor: '#c33' }]}
+          value={message}
+          onChangeText={setMessage}
+        />
+        {fieldErrors.message ? (
+          <Text style={styles.errorText} accessibilityLiveRegion="polite">
+            {fieldErrors.message}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Honeypot field - hidden from user */}
+      <View style={{ display: 'none' }}>
+        <Field label="Website" value={website} onChangeText={setWebsite} />
+      </View>
+
+      {submitted ? <Text style={styles.successText}>Thanks — your wholesale application has been received. We'll review it and respond within 1 business day.</Text> : null}
+
+      <Pressable
+        disabled={submitApplication.isPending}
+        style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, submitApplication.isPending && styles.disabledPrimaryButton]}
+        onPress={() => void submit()}
+      >
+        <Text style={styles.primaryButtonLabel}>{submitApplication.isPending ? 'Submitting…' : 'Submit Application'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function WholesaleApplyPage({ onNavigate }: { onNavigate: (page: any) => void }) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
+  return (
+    <SectionShell eyebrow="Wholesale" title="Apply for Wholesale Account" description="Apply for a wholesale account. We'll review your application and respond within 1 business day.">
+      <WholesaleApplicationForm isMobile={isMobile} />
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeTitle, isMobile && styles.noticeTitleMobile]}>Questions?</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>If you have any questions about wholesale pricing, minimum orders, or delivery, please don't hesitate to contact us.</Text>
+        <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('contact')}>
+            <Text style={styles.secondaryButtonLabel}>Contact Us</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function PrivacyPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
+  return (
+    <SectionShell eyebrow="Privacy" title="Privacy" description="A concise overview for the current ordering experience.">
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Grassland Cheese uses account and order details to support sign-in, customer account access, ordering, and order history within the current application experience.</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>More detailed privacy content can be published here without changing the existing customer ordering flow.</Text>
+      </View>
+    </SectionShell>
+  );
+}
+
+function TermsPage() {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
+  return (
+    <SectionShell eyebrow="Terms" title="Terms" description="A simple placeholder for the current web ordering experience.">
+      <View style={[styles.noticeCard, isMobile && styles.noticeCardMobile]}>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Product availability and customer access depend on the live catalog records provided by the existing ordering system.</Text>
+        <Text style={[styles.noticeText, isMobile && styles.noticeTextMobile]}>Recipes and food inspiration remain informational content only and are never treated as orderable products.</Text>
+      </View>
+    </SectionShell>
+  );
+}
+
+function AccountPage({
+  onNavigate,
+  onAuthenticated,
+}: {
+  onNavigate: (page: PublicPage) => void;
+  onAuthenticated: (token: string, user: SessionUser) => Promise<void>;
+}) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
+  return (
+    <SectionShell eyebrow="Customer Account" title="Sign in or create your account" description="Access customer ordering, save your place for future halloumi purchases, and keep wholesale enquiries moving through the existing account flow.">
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
+        <View style={styles.inlineCardColumn}>
+          <View style={[styles.brandPanelCard, isMobile && styles.brandPanelCardMobile]}>
+            <Image source={grasslandLogo} style={[styles.accountLogo, isMobile && styles.accountLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+            <Text style={[styles.brandPanelTitle, isMobile && styles.brandPanelTitleMobile]} numberOfLines={3}>{brandName}</Text>
+            <Text style={[styles.brandPanelSubtitle, isMobile && styles.brandPanelSubtitleMobile]}>Premium New Zealand Halloumi made for grilling, frying and sharing.</Text>
+            <Text style={[styles.brandPanelMeta, isMobile && styles.brandPanelMetaMobile]}>{brandStatement}</Text>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('shop')}>
+              <Text style={styles.secondaryButtonLabel}>Browse Halloumi</Text>
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.inlineCardColumn}>
+          <AuthPanel onAuthenticated={onAuthenticated} />
+        </View>
+      </View>
+    </SectionShell>
+  );
+}
+
+function SignedInAccountPage({
+  session,
+  onNavigate,
+  onSignOut,
+}: {
+  session: SessionState;
+  onNavigate: (page: SignedInPage) => void;
+  onSignOut: () => Promise<void>;
+}) {
+  const ordersQuery = trpc.orders.list.useQuery();
+  const deleteAccountMutation = trpc.auth.deleteAccount.useMutation();
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = React.useState('');
+
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteAccountMutation.mutateAsync({ confirmEmail: deleteConfirmEmail });
+      await onSignOut();
+      alert('Your account has been successfully deleted.');
+    } catch (error) {
+      alert(`Error deleting account: ${getErrorMessage(error)}`);
+    }
+  };
+
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
+  return (
+    <SectionShell eyebrow="Customer Account" title={`Welcome, ${session.user?.name ?? brandName}`} description="Manage your account, review your ordering history, and keep your halloumi shopping connected to the current sales flow.">
+      <View style={[styles.inlineTwoColumnRow, isMobile && styles.inlineTwoColumnRowMobile]}>
+        <View style={styles.inlineCardColumn}>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Account details</Text>
+            <Text style={styles.metaText}>{session.user?.email}</Text>
+            <Text style={styles.metaText}>{session.user?.kind === 'staff' ? 'Admin access' : `${session.user?.type} customer access`}</Text>
+            {session.user?.kind === 'customer' && session.user.contact ? <Text style={styles.metaText}>{session.user.contact}</Text> : null}
+            <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+              <Pressable style={[styles.primaryButton, isMobile && styles.primaryButtonMobile]} onPress={() => onNavigate('shop')}>
+                <Text style={styles.primaryButtonLabel}>Shop Halloumi</Text>
+              </Pressable>
+              <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => void onSignOut()}>
+                <Text style={styles.secondaryButtonLabel}>Sign out</Text>
+              </Pressable>
+            </View>
+            {session.user?.kind === 'customer' && (
+              <>
+                <Text style={[styles.metaText, { marginTop: 16, marginBottom: 8, fontWeight: '600', color: '#999' }]}>Danger zone</Text>
+                <Pressable
+                  style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile, { borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)' }]}
+                  onPress={() => setShowDeleteConfirm(true)}
+                  disabled={deleteAccountMutation.isPending}
+                >
+                  <Text style={[styles.secondaryButtonLabel, { color: '#dc3545' }]}>
+                    {deleteAccountMutation.isPending ? 'Deleting...' : 'Delete Account'}
+                  </Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+        <View style={styles.inlineCardColumn}>
+          <View style={[styles.inlineCard, isMobile && styles.inlineCardMobile]}>
+            <Text style={[styles.inlineCardTitle, isMobile && styles.inlineCardTitleMobile]}>Order history</Text>
+            {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
+            {(ordersQuery.data ?? []).slice(0, 3).map((order) => (
+              <View key={order.id} style={styles.accountOrderRow}>
+                <Text style={styles.cartLineTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+                <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()} • {order.status} • {formatMoney(order.total)}</Text>
+              </View>
+            ))}
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('orders')}>
+              <Text style={styles.secondaryButtonLabel}>View All Orders</Text>
+            </Pressable>
+            <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => onNavigate('cart')}>
+              <Text style={styles.secondaryButtonLabel}>Open Cart & Checkout</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+      {showDeleteConfirm && (
+        <View style={[styles.inlineCard, { marginTop: 24, borderColor: '#dc3545', borderWidth: 2, backgroundColor: 'rgba(220, 53, 69, 0.05)' }]}>
+          <Text style={[styles.inlineCardTitle, { color: '#dc3545' }]}>Confirm Account Deletion</Text>
+          <Text style={[styles.metaText, { marginBottom: 12 }]}>
+            This action cannot be undone. All your orders and account data will be permanently deleted.
+          </Text>
+          <Text style={[styles.metaText, { marginBottom: 8, fontWeight: '600' }]}>
+            Please type your email address to confirm:
+          </Text>
+          <TextInput
+            style={[styles.input, { marginBottom: 12 }]}
+            placeholder="Enter your email to confirm"
+            value={deleteConfirmEmail}
+            onChangeText={setDeleteConfirmEmail}
+            editable={!deleteAccountMutation.isPending}
+          />
+          <View style={[styles.heroActionRow, isMobile && styles.heroActionRowMobile]}>
+            <Pressable
+              style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, { backgroundColor: '#dc3545' }]}
+              onPress={() => void handleDeleteAccount()}
+              disabled={deleteConfirmEmail !== session.user?.email || deleteAccountMutation.isPending}
+            >
+              <Text style={styles.primaryButtonLabel}>
+                {deleteAccountMutation.isPending ? 'Deleting...' : 'Permanently Delete'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]}
+              onPress={() => {
+                setShowDeleteConfirm(false);
+                setDeleteConfirmEmail('');
+              }}
+              disabled={deleteAccountMutation.isPending}
+            >
+              <Text style={styles.secondaryButtonLabel}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </SectionShell>
+  );
+}
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Reads a `?token=` query param from the current web URL (used for password reset links). Native platforms never have a URL to read, so this always returns null there. */
+function getResetTokenFromWebLocation(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get('token');
+}
+
+function AuthPanel({ onAuthenticated }: { onAuthenticated: (token: string, user: SessionUser) => Promise<void> }) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  const initialResetToken = useMemo(() => getResetTokenFromWebLocation(), []);
+  const [mode, setMode] = useState<AuthMode>(initialResetToken ? 'customer-reset-password' : 'customer-login');
+  const [resetToken] = useState<string | null>(initialResetToken);
+  const [name, setName] = useState('');
+  const [contact, setContact] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  const customerLogin = trpc.auth.customerLogin.useMutation();
+  const staffLogin = trpc.auth.staffLogin.useMutation();
+  const customerRegister = trpc.auth.customerRegister.useMutation();
+  const requestPasswordReset = trpc.auth.requestPasswordReset.useMutation();
+  const resetPassword = trpc.auth.resetPassword.useMutation();
+
+  const loading =
+    customerLogin.isPending ||
+    staffLogin.isPending ||
+    customerRegister.isPending ||
+    requestPasswordReset.isPending ||
+    resetPassword.isPending;
+
+  function changeMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setFormError(null);
+    setInfoMessage(null);
+  }
+
+  function validate(): string | null {
+    if (mode === 'customer-forgot-password') {
+      if (!emailPattern.test(email.trim())) {
+        return 'Enter a valid email address.';
+      }
+      return null;
+    }
+
+    if (mode === 'customer-reset-password') {
+      if (password.length < 8) {
+        return 'Password must be at least 8 characters.';
+      }
+      if (confirmPassword !== password) {
+        return 'Passwords do not match.';
+      }
+      return null;
+    }
+
+    if (!emailPattern.test(email.trim())) {
+      return 'Enter a valid email address.';
+    }
+
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters.';
+    }
+
+    if (mode === 'customer-register') {
+      if (name.trim().length < 2) {
+        return 'Enter your full name.';
+      }
+
+      if (emailPattern.test(name.trim())) {
+        return 'Enter your full name, not your email address.';
+      }
+
+      if (contact.trim().length < 6) {
+        return 'Enter a valid mobile number.';
+      }
+
+      if (confirmPassword !== password) {
+        return 'Passwords do not match.';
+      }
+    }
+
+    return null;
+  }
+
+  async function submit() {
+    const validationError = validate();
+
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setFormError(null);
+
+    try {
+      if (mode === 'customer-register') {
+        const result = await customerRegister.mutateAsync({
+          name: name.trim(),
+          contact: contact.trim(),
+          email: email.trim(),
+          password,
+        });
+        await onAuthenticated(result.token, result.user as SessionUser);
+      } else if (mode === 'customer-forgot-password') {
+        await requestPasswordReset.mutateAsync({ email: email.trim() });
+        setInfoMessage("If an account exists for that email, we've sent a password reset link. Check your inbox.");
+      } else if (mode === 'customer-reset-password') {
+        if (!resetToken) {
+          setFormError('This password reset link is invalid or has expired.');
+          return;
+        }
+        await resetPassword.mutateAsync({ token: resetToken, password });
+        setPassword('');
+        setConfirmPassword('');
+        setInfoMessage('Your password has been reset. You can now sign in with your new password.');
+        changeMode('customer-login');
+      } else if (mode === 'customer-login') {
+        const result = await customerLogin.mutateAsync({ email: email.trim(), password });
+        await onAuthenticated(result.token, result.user as SessionUser);
+      } else {
+        const result = await staffLogin.mutateAsync({ email: email.trim(), password });
+        await onAuthenticated(result.token, result.user as SessionUser);
+      }
+    } catch (error) {
+      setFormError(getErrorMessage(error));
+    }
+  }
+
+  if (mode === 'admin-login') {
+    return (
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Admin Login</Text>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Sign in'}</Text>
+        </Pressable>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (mode === 'customer-forgot-password') {
+    return (
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Reset your password</Text>
+        <Text style={[styles.authPanelSubtitle, isMobile && styles.authPanelSubtitleMobile]}>Enter your account email and we'll send you a link to set a new password.</Text>
+        <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+        {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+          <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Send reset link'}</Text>
+        </Pressable>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (mode === 'customer-reset-password') {
+    return (
+      <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+        <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Set a new password</Text>
+        {!resetToken ? (
+          <Text style={styles.errorText}>This password reset link is invalid or has expired. Request a new one below.</Text>
+        ) : (
+          <>
+            <Field label="New password" value={password} onChangeText={setPassword} secureTextEntry />
+            <Field label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+          </>
+        )}
+        {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+        {resetToken ? (
+          <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+            <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : 'Reset password'}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-forgot-password')}>
+          <Text style={styles.secondaryButtonLabel}>Request a new reset link</Text>
+        </Pressable>
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.authPanel, isMobile && styles.authPanelMobile]}>
+      <Text style={[styles.authPanelTitle, isMobile && styles.authPanelTitleMobile]}>Welcome to {brandName}</Text>
+      <Text style={[styles.authPanelSubtitle, isMobile && styles.authPanelSubtitleMobile]}>{mode === 'customer-register' ? 'Create Customer Account' : 'Customer Account'}</Text>
+      {mode === 'customer-register' ? (
+        <>
+          <Field label="Full name" value={name} onChangeText={setName} />
+          <Field label="Mobile number" value={contact} onChangeText={setContact} keyboardType="default" />
+        </>
+      ) : null}
+      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      {mode === 'customer-register' ? (
+        <Field label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+      ) : null}
+      {mode === 'customer-login' ? (
+        <Pressable onPress={() => changeMode('customer-forgot-password')}>
+          <Text style={styles.adminAccessLink}>Forgot your password?</Text>
+        </Pressable>
+      ) : null}
+      {infoMessage ? <Text style={styles.metaText}>{infoMessage}</Text> : null}
+      {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+      <Pressable disabled={loading} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, loading && styles.disabledPrimaryButton]} onPress={() => void submit()}>
+        <Text style={styles.primaryButtonLabel}>{loading ? 'Please wait…' : mode === 'customer-register' ? 'Create account' : 'Sign in'}</Text>
+      </Pressable>
+      {mode === 'customer-login' ? (
+        <>
+          <Text style={styles.metaText}>Don&apos;t have an account?</Text>
+          <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-register')}>
+            <Text style={styles.secondaryButtonLabel}>Create a customer account</Text>
+          </Pressable>
+        </>
+      ) : (
+        <Pressable style={[styles.secondaryButton, isMobile && styles.secondaryButtonMobile]} onPress={() => changeMode('customer-login')}>
+          <Text style={styles.secondaryButtonLabel}>Back to Customer Login</Text>
+        </Pressable>
+      )}
+      <View style={styles.adminAccessSection}>
+        <Text style={styles.adminAccessLabel}>Admin Access</Text>
+        <Pressable onPress={() => changeMode('admin-login')}>
+          <Text style={styles.adminAccessLink}>Admin Login</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function OrdersPage({ title, description }: { title: string; description: string }) {
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'ALL'>('ALL');
+  const ordersQuery = trpc.orders.list.useQuery(statusFilter === 'ALL' ? undefined : { paymentStatus: statusFilter });
+
+  return (
+    <SectionShell eyebrow="Orders" title={title} description={description}>
+      <View style={styles.inlineCard}>
+        <Text style={styles.inlineCardTitle}>Payment status</Text>
+        <SegmentedControl
+          groupLabel="Payment status filter"
+          value={statusFilter}
+          options={paymentStatusOptions.map((status) => ({ label: status.replace('_', ' '), value: status }))}
+          onChange={(value) => setStatusFilter(value as PaymentStatus | 'ALL')}
+        />
+      </View>
+      {ordersQuery.isLoading ? <Text style={styles.metaText}>Loading orders…</Text> : null}
+      {(ordersQuery.data ?? []).map((order) => (
+        <View key={order.id} style={styles.inlineCard}>
+          <Text style={styles.inlineCardTitle}>Order {order.orderNumber ?? `#${order.id}`}</Text>
+          <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleString()} • Status: {order.status}</Text>
+          <Text style={styles.metaText}>{order.customer.name} • {order.paymentStatus} • ${order.total.toFixed(2)}</Text>
+          <Text style={styles.metaText}>{order.paymentTerm === PaymentTerm.PAY_NOW ? 'Pay now' : 'Pay in 30'} • {order.paymentMethod}</Text>
+          {order.subtotal !== null ? <Text style={styles.metaText}>Subtotal: {formatMoney(order.subtotal)} • Shipping: {order.deliveryCharge > 0 ? formatMoney(order.deliveryCharge) : 'Free'}</Text> : null}
+          {order.staff ? <Text style={styles.metaText}>Created by {order.staff.name}</Text> : null}
+          {order.dueDate ? <Text style={styles.metaText}>Due {new Date(order.dueDate).toLocaleDateString()}</Text> : null}
+          {order.deliveryAddress ? <Text style={styles.metaText}>Deliver to: {order.deliveryAddress}</Text> : null}
+          {order.orderNotes ? <Text style={styles.metaText}>Notes: {order.orderNotes}</Text> : null}
+          {order.items.map((item) => (
+            <Text key={item.id} style={styles.orderItemText}>{item.qty} × {item.product.name} @ {formatMoney(item.unitPrice)}</Text>
+          ))}
+        </View>
+      ))}
+    </SectionShell>
+  );
+}
+
+function CustomersScreen() {
+  const utils = trpc.useUtils();
+  const customersQuery = trpc.staff.listCustomers.useQuery();
+  const updateCustomerType = trpc.staff.updateCustomerType.useMutation({
+    onSuccess: async () => {
+      await utils.staff.listCustomers.invalidate();
+    },
+  });
+
+  async function toggleTier(customerId: number, nextType: 'WHOLESALE' | 'RETAIL') {
+    try {
+      await updateCustomerType.mutateAsync({ customerId, type: nextType });
+    } catch (error) {
+      Alert.alert('Unable to update tier', getErrorMessage(error));
+    }
+  }
+
+  return (
+    <SectionShell eyebrow="Customer Management" title="Customer accounts" description="Admins manage each customer's Retail/Wholesale tier. Customers manage their own account details and password.">
+      {customersQuery.isLoading ? <Text style={styles.metaText}>Loading customers…</Text> : null}
+      {(customersQuery.data ?? []).map((customer) => (
+        <View key={customer.id} style={styles.inlineCard}>
+          <Text style={styles.inlineCardTitle}>{customer.name}</Text>
+          <Text style={styles.metaText}>{customer.email}</Text>
+          <Text style={styles.metaText}>{customer.type} • {customer.accountSource.replace('_', ' ')}</Text>
+          <Text style={styles.metaText}>{customer.contact || 'No contact recorded'}</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => void toggleTier(customer.id, customer.type === 'WHOLESALE' ? 'RETAIL' : 'WHOLESALE')}>
+            <Text style={styles.secondaryButtonLabel}>Set {customer.type === 'WHOLESALE' ? 'retail' : 'wholesale'}</Text>
+          </Pressable>
+        </View>
+      ))}
+    </SectionShell>
+  );
+}
+
+function SectionShell({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: ReactNode }) {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+  
+  return (
+    <View style={[styles.sectionShell, isMobile && styles.sectionShellMobile]}>
+      <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
+      <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]} numberOfLines={3}>{title}</Text>
+      <Text style={[styles.sectionDescription, isMobile && styles.sectionDescriptionMobile]}>{description}</Text>
+      {children}
+    </View>
+  );
+}
+
+function Field(props: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  autoCapitalize?: 'none' | 'sentences';
+  editable?: boolean;
+  multiline?: boolean;
+}) {
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{props.label}</Text>
+      <TextInput
+        autoCapitalize={props.autoCapitalize ?? 'sentences'}
+        keyboardType={props.keyboardType ?? 'default'}
+        secureTextEntry={props.secureTextEntry}
+        editable={props.editable ?? true}
+        multiline={props.multiline}
+        style={[styles.input, props.multiline && styles.inputMultiline]}
+        value={props.value}
+        onChangeText={props.onChangeText}
+      />
+    </View>
+  );
+}
+
+function FieldWithError(props: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  error?: string;
+  secureTextEntry?: boolean;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  autoCapitalize?: 'none' | 'sentences';
+  editable?: boolean;
+  multiline?: boolean;
+  placeholder?: string;
+  inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search';
+  maxLength?: number;
+}) {
+  const errorId = props.error ? `${props.label}-error` : undefined;
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{props.label}</Text>
+      <TextInput
+        autoCapitalize={props.autoCapitalize ?? 'sentences'}
+        keyboardType={props.keyboardType ?? 'default'}
+        inputMode={props.inputMode}
+        maxLength={props.maxLength}
+        secureTextEntry={props.secureTextEntry}
+        editable={props.editable ?? true}
+        multiline={props.multiline}
+        placeholder={props.placeholder}
+        style={[
+          styles.input,
+          props.multiline && styles.inputMultiline,
+          props.error && { borderColor: '#c33', borderWidth: 1 },
+        ]}
+        value={props.value}
+        onChangeText={props.onChangeText}
+        accessibilityDescribedBy={errorId}
+      />
+      {props.error ? (
+        <Text
+          style={styles.errorText}
+          nativeID={errorId}
+          accessibilityLiveRegion="polite"
+          role="alert"
+        >
+          {props.error}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function SegmentedControl({
+  groupLabel,
+  options,
+  value,
+  onChange,
+}: {
+  groupLabel: string;
+  options: Array<{ label: string; value: string; disabled?: boolean }>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <View accessibilityLabel={groupLabel} accessibilityRole="radiogroup" style={styles.segmentedControl}>
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            disabled={option.disabled}
+            accessibilityLabel={option.label}
+            accessibilityRole="radio"
+            accessibilityState={{ selected, disabled: option.disabled }}
+            style={[styles.segment, selected && styles.segmentSelected, option.disabled && styles.disabledButton]}
+            onPress={() => {
+              if (option.disabled) {
+                return;
+              }
+              onChange(option.value);
+            }}
+          >
+            <Text style={[styles.segmentLabel, selected && styles.segmentLabelSelected]}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export default function App() {
+  const [queryClient] = useState(() => new QueryClient());
+  const [session, setSession] = useState<SessionState>({ token: null, user: null });
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const token = await getStoredToken();
+      setSession((current) => ({ ...current, token }));
+      setHydrated(true);
+    })();
+  }, []);
+
+  // Initialize Tawk.to Chat on web platform
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    const propertyId = process.env.EXPO_PUBLIC_TAWK_TO_PROPERTY_ID;
+    const widgetId = process.env.EXPO_PUBLIC_TAWK_TO_WIDGET_ID || 'default';
+    if (propertyId) {
+      initializeTawkToChat(propertyId, widgetId);
+    } else {
+      console.warn('[Tawk.to Chat] EXPO_PUBLIC_TAWK_TO_PROPERTY_ID environment variable not set');
+    }
+  }, []);
+
+  const trpcClient = useMemo(() => createApiClient(() => session.token), [session.token]);
+
+  return (
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <AppContent hydrated={hydrated} queryClient={queryClient} session={session} setSession={setSession} />
+      </QueryClientProvider>
+    </trpc.Provider>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f7f3eb',
+  },
+  centeredScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f7f3eb',
+  },
+  siteScroll: {
+    flex: 1,
+  },
+  siteContent: {
+    paddingBottom: 32,
+  },
+  siteInner: {
+    width: '100%',
+    maxWidth: 1260,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 24,
+  },
+  pageContentWrap: {
+    gap: 24,
+  },
+  headerShell: {
+    backgroundColor: '#fffdf8',
+    borderRadius: 28,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 10,
+  },
+  headerShellCompact: {
+    paddingHorizontal: 12,
+  },
+  brandLockup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  headerLogo: {
+    width: 90,
+    height: 38,
+  },
+  headerLogoMobile: {
+    width: 75,
+    height: 32,
+  },
+  brandCopyWrap: {
+    flexShrink: 1,
+  },
+  brandName: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  brandTagline: {
+    color: '#8a6b2f',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  navRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    alignItems: 'center',
+  },
+  navRowCompact: {
+    justifyContent: 'flex-start',
+  },
+  navRowMobile: {
+    gap: 6,
+  },
+  navButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#f2ead9',
+  },
+  navButtonMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  navButtonActive: {
+    backgroundColor: '#1f5c43',
+  },
+  navButtonText: {
+    color: '#224232',
+    fontWeight: '600',
+  },
+  navButtonTextMobile: {
+    fontSize: 13,
+  },
+  navButtonTextActive: {
+    color: '#fffef8',
+  },
+  signOutButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#1f5c43',
+  },
+  signOutButtonMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  signOutButtonText: {
+    color: '#1f5c43',
+    fontWeight: '700',
+  },
+  signOutButtonTextMobile: {
+    fontSize: 13,
+  },
+  heroShell: {
+    borderRadius: 32,
+    overflow: 'hidden',
+  },
+  heroBackground: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  heroWebImageWrapper: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroImage: {
+    borderRadius: 32,
+  },
+  heroImageMobile: {
+    objectPosition: 'center 85%',
+  },
+  heroImageTablet: {
+    objectPosition: 'center 85%',
+  },
+  heroImageDesktop: {
+    objectPosition: 'center 85%',
+  },
+  heroOverlay: {
+    backgroundColor: 'rgba(15, 29, 20, 0.45)',
+    padding: 28,
+    gap: 16,
+  },
+  heroOverlayMobile: {
+    padding: 20,
+    gap: 12,
+  },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#f5e7b2',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  heroBadgeText: {
+    color: '#6d5216',
+    fontWeight: '700',
+  },
+  heroTitle: {
+    fontSize: 31,
+    lineHeight: 38,
+    fontWeight: '800',
+    color: '#fffdf8',
+    maxWidth: 560,
+  },
+  heroTitleMobile: {
+    fontSize: 24,
+    lineHeight: 32,
+  },
+  heroSubtitle: {
+    fontSize: 18,
+    lineHeight: 28,
+    color: '#f5f2ea',
+    maxWidth: 520,
+  },
+  heroSubtitleMobile: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  heroActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  heroActionRowMobile: {
+    gap: 10,
+  },
+  sectionShell: {
+    gap: 16,
+    marginVertical: 24,
+  },
+  sectionShellMobile: {
+    gap: 12,
+    marginVertical: 16,
+  },
+  sectionEyebrow: {
+    color: '#8a6b2f',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  sectionTitle: {
+    fontSize: 25,
+    lineHeight: 30,
+    fontWeight: '800',
+    color: '#123524',
+  },
+  sectionTitleMobile: {
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  sectionDescription: {
+    fontSize: 17,
+    lineHeight: 27,
+    color: '#4d5c54',
+    maxWidth: 760,
+  },
+  sectionDescriptionMobile: {
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  productGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 24,
+  },
+  productGridMobile: {
+    gap: 16,
+  },
+  productCard: {
+    flexBasis: 280,
+    flexGrow: 1,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 12,
+  },
+  productCardMobile: {
+    flexBasis: 240,
+    padding: 12,
+    borderRadius: 20,
+    gap: 10,
+  },
+  productLogoPanel: {
+    backgroundColor: '#f5efe0',
+    borderRadius: 18,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 360,
+  },
+  productLogoPanelMobile: {
+    height: 240,
+    padding: 10,
+    borderRadius: 14,
+  },
+  productLogo: {
+    width: '100%',
+    height: '100%',
+  },
+  productCardName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  productCardNameMobile: {
+    fontSize: 16,
+  },
+  productCardSize: {
+    fontSize: 15,
+    color: '#7d6744',
+    fontWeight: '700',
+  },
+  productCardDescription: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#4d5c54',
+  },
+  productCardDescriptionMobile: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  productCardPrice: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1f5c43',
+  },
+  productActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailsButton: {
+    paddingVertical: 4,
+  },
+  detailsButtonLabel: {
+    color: '#8a6b2f',
+    fontWeight: '700',
+  },
+  quantityPanel: {
+    gap: 8,
+  },
+  quantityPanelLabel: {
+    color: '#4d5c54',
+    fontWeight: '600',
+  },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  quantityButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#d6e6db',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButtonMobile: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  disabledButton: {
+    opacity: 0.45,
+  },
+  quantityLabel: {
+    fontSize: 20,
+    color: '#123524',
+    fontWeight: '700',
+  },
+  quantityLabelMobile: {
+    fontSize: 18,
+  },
+  quantityValue: {
+    minWidth: 20,
+    textAlign: 'center',
+    fontWeight: '700',
+    color: '#123524',
+    fontSize: 16,
+  },
+  primaryButton: {
+    backgroundColor: '#1f5c43',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  primaryButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  disabledPrimaryButton: {
+    opacity: 0.55,
+  },
+  primaryButtonLabel: {
+    color: '#fffef8',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  secondaryButton: {
+    borderColor: '#1f5c43',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  secondaryButtonMobile: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  secondaryButtonLabel: {
+    color: '#1f5c43',
+    fontWeight: '700',
+  },
+  secondaryHeroButton: {
+    borderColor: '#fffef8',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  secondaryHeroButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  secondaryHeroButtonLabel: {
+    color: '#fffef8',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  primaryHeroButton: {
+    backgroundColor: '#D4AF37',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  primaryHeroButtonMobile: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  primaryHeroButtonLabel: {
+    color: '#1f5c43',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  qualitySection: {
+    gap: 16,
+  },
+  qualitySectionHeading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  qualityDocGridMobile: {
+    gap: 12,
+  },
+  qualityDocCard: {
+    flexBasis: 320,
+    flexGrow: 1,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 12,
+  },
+  qualityDocCardMobile: {
+    flexBasis: 260,
+    padding: 12,
+    borderRadius: 20,
+    gap: 10,
+  },
+  qualityDocTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  qualityDocTitleMobile: {
+    fontSize: 17,
+  },
+  qualityDocDescription: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#4d5c54',
+  },
+  qualityDocMetaList: {
+    gap: 6,
+  },
+  qualityDocMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  qualityDocMetaLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7d6744',
+  },
+  qualityDocMetaValue: {
+    fontSize: 14,
+    color: '#4d5c54',
+    flexShrink: 1,
+  },
+  noticeCard: {
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    padding: 20,
+    gap: 12,
+  },
+  noticeCardMobile: {
+    borderRadius: 20,
+    padding: 12,
+    gap: 10,
+  },
+  noticeTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  noticeTitleMobile: {
+    fontSize: 17,
+  },
+  noticeText: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#4d5c54',
+  },
+  noticeTextMobile: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  valueGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  valueGridMobile: {
+    gap: 12,
+  },
+  valueCard: {
+    flexBasis: 240,
+    flexGrow: 1,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 10,
+  },
+  valueCardMobile: {
+    flexBasis: 200,
+    padding: 12,
+    borderRadius: 20,
+    gap: 8,
+  },
+  valueCardTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  valueCardTitleMobile: {
+    fontSize: 16,
+  },
+  valueCardDescription: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#4d5c54',
+  },
+  valueCardDescriptionMobile: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  recipeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  recipeGridMobile: {
+    gap: 12,
+  },
+  recipeCard: {
+    flexBasis: 300,
+    flexGrow: 1,
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+  },
+  recipeCardMobile: {
+    flexBasis: 260,
+    borderRadius: 20,
+  },
+  recipeCardImage: {
+    width: '100%',
+    height: 220,
+  },
+  recipeCardImageMobile: {
+    height: 160,
+  },
+  recipeCardTitle: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  recipeCardTitleMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    fontSize: 16,
+  },
+  recipeCardDescription: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 18,
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#4d5c54',
+  },
+  recipeCardDescriptionMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 12,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  storyCard: {
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    padding: 22,
+    gap: 12,
+  },
+  storyCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
+  storyParagraph: {
+    color: '#4d5c54',
+    fontSize: 16,
+    lineHeight: 27,
+  },
+  storyParagraphMobile: {
+    fontSize: 14,
+    lineHeight: 23,
+  },
+  ourStoryPage: {
+    gap: 32,
+  },
+  storyHeroShell: {
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+  },
+  storyHeroBackground: {
+    justifyContent: 'flex-end',
+    flex: 1,
+  },
+  storyHeroImage: {
+    borderRadius: 32,
+  },
+  storyHeroOverlay: {
+    backgroundColor: 'rgba(18, 53, 36, 0.48)',
+    paddingVertical: 34,
+    paddingHorizontal: 28,
+    gap: 14,
+  },
+  storyHeroBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: '#f5e7b2',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  storyHeroBadgeText: {
+    color: '#6d5216',
+    fontWeight: '700',
+  },
+  storyHeroTitle: {
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '800',
+    color: '#fffdf8',
+    maxWidth: 700,
+  },
+  storyHeroTitleMobile: {
+    fontSize: 25,
+    lineHeight: 30,
+  },
+  storyHeroSubtitle: {
+    fontSize: 18,
+    lineHeight: 28,
+    color: '#f5f2ea',
+    maxWidth: 620,
+  },
+  storyHeroSubtitleMobile: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  storyJourneyShell: {
+    gap: 24,
+  },
+  storyJourneyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    backgroundColor: '#fffdf8',
+    overflow: 'hidden',
+  },
+  storyJourneyRowReverse: {
+    flexDirection: 'row-reverse',
+  },
+  storyJourneyImageColumn: {
+    flexBasis: 360,
+    flexGrow: 1,
+    minHeight: 280,
+  },
+  storyJourneyImage: {
+    width: '100%',
+    height: '100%',
+    minHeight: 280,
+  },
+  storyJourneyTextColumn: {
+    flexBasis: 320,
+    flexGrow: 1,
+    paddingVertical: 24,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    gap: 12,
+    position: 'relative',
+  },
+  storyJourneyDecorativeLeaf: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    top: -34,
+    right: -36,
+    backgroundColor: 'rgba(198, 220, 194, 0.28)',
+  },
+  storyJourneyNumberCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#1f5c43',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyJourneyNumberText: {
+    color: '#fffdf8',
+    fontWeight: '800',
+    fontSize: 17,
+    letterSpacing: 0.4,
+  },
+  storyJourneyTitle: {
+    color: '#123524',
+    fontWeight: '800',
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  storyJourneyTitleMobile: {
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  storyJourneyDescription: {
+    color: '#4d5c54',
+    fontSize: 16,
+    lineHeight: 26,
+    maxWidth: 520,
+  },
+  storyJourneyDescriptionMobile: {
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  storyFamilySection: {
+    gap: 16,
+  },
+  storyFarmToTableSection: {
+    gap: 16,
+  },
+  storyBrandStatementCard: {
+    backgroundColor: '#1f5c43',
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    gap: 10,
+    alignItems: 'center',
+  },
+  storyBrandStatement: {
+    color: '#fffdf8',
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    maxWidth: 640,
+  },
+  storyBrandClosingLine: {
+    color: '#f5e7b2',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  storyBulletList: {
+    gap: 10,
+  },
+  storyBulletItem: {
+    color: '#4d5c54',
+    fontSize: 16,
+    lineHeight: 26,
+  },
+  wholesaleCard: {
+    backgroundColor: '#123524',
+    borderRadius: 28,
+    padding: 24,
+    gap: 16,
+  },
+  wholesaleCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
+  wholesaleBody: {
+    color: '#f9f5ea',
+    fontSize: 17,
+    lineHeight: 27,
+    maxWidth: 620,
+  },
+  wholesaleBodyMobile: {
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  wholesaleContactButton: {
+    borderColor: '#f9f5ea',
+  },
+  wholesaleContactButtonLabel: {
+    color: '#f9f5ea',
+  },
+  authPanel: {
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 14,
+  },
+  authPanelMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
+  authPanelTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  authPanelTitleMobile: {
+    fontSize: 22,
+  },
+  authPanelSubtitle: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#4d5c54',
+  },
+  authPanelSubtitleMobile: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  adminAccessSection: {
+    marginTop: 12,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#e7ddc9',
+    alignItems: 'center',
+    gap: 4,
+  },
+  adminAccessLabel: {
+    fontSize: 12,
+    color: '#8a8375',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  adminAccessLink: {
+    fontSize: 13,
+    color: '#4d5c54',
+    textDecorationLine: 'underline',
+  },
+  inlineTwoColumnRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  inlineTwoColumnRowMobile: {
+    gap: 12,
+  },
+  inlineCardColumn: {
+    flexBasis: 320,
+    flexGrow: 1,
+  },
+  inlineCard: {
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 12,
+  },
+  inlineCardMobile: {
+    borderRadius: 20,
+    padding: 12,
+    gap: 10,
+  },
+  inlineCardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  inlineCardTitleMobile: {
+    fontSize: 17,
+  },
+  metaText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#4d5c54',
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#b3261e',
+    fontWeight: '600',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  segment: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d7ceb9',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#fffef8',
+  },
+  segmentSelected: {
+    backgroundColor: '#1f5c43',
+    borderColor: '#1f5c43',
+  },
+  segmentLabel: {
+    color: '#224232',
+    fontWeight: '600',
+  },
+  segmentLabelSelected: {
+    color: '#fffef8',
+  },
+  fieldWrap: {
+    gap: 8,
+  },
+  fieldLabel: {
+    fontWeight: '600',
+    color: '#224232',
+  },
+  input: {
+    backgroundColor: '#fffef8',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#d7ceb9',
+  },
+  inputMultiline: {
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  successText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#1f5c43',
+    fontWeight: '600',
+  },
+  brandPanelCard: {
+    backgroundColor: '#123524',
+    borderRadius: 24,
+    padding: 24,
+    gap: 16,
+    minHeight: 320,
+    justifyContent: 'center',
+  },
+  brandPanelCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    minHeight: 280,
+  },
+  accountLogo: {
+    width: '100%',
+    height: 90,
+    alignSelf: 'center',
+  },
+  accountLogoMobile: {
+    height: 70,
+  },
+  brandPanelTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fffef8',
+  },
+  brandPanelTitleMobile: {
+    fontSize: 18,
+  },
+  brandPanelSubtitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#edf5ee',
+  },
+  brandPanelSubtitleMobile: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  brandPanelMeta: {
+    color: '#f2d77e',
+    fontWeight: '700',
+  },
+  brandPanelMetaMobile: {
+    fontSize: 13,
+  },
+  accountOrderRow: {
+    paddingVertical: 4,
+    gap: 4,
+  },
+  cartLineItem: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  cartLineTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  cartLineTotal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#123524',
+  },
+  summaryLine: {
+    color: '#4d5c54',
+    fontSize: 15,
+  },
+  summaryTotal: {
+    color: '#123524',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  productDetailCard: {
+    backgroundColor: '#fffdf8',
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: '#e7ddc9',
+    gap: 14,
+  },
+  productDetailCardMobile: {
+    borderRadius: 20,
+    padding: 16,
+  },
+  productDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  productDetailBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    flexShrink: 1,
+  },
+  productDetailLogo: {
+    width: 120,
+    height: 56,
+  },
+  productDetailLogoMobile: {
+    width: 90,
+    height: 42,
+  },
+  productDetailTitle: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
+    color: '#123524',
+  },
+  productDetailTitleMobile: {
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  orderItemText: {
+    color: '#4d5c54',
+  },
+  footerShell: {
+    backgroundColor: '#123524',
+    borderRadius: 28,
+    padding: 24,
+    gap: 16,
+  },
+  footerShellMobile: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+  footerBrandRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    alignItems: 'center',
+  },
+  footerBrandRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  footerLogo: {
+    width: 150,
+    height: 64,
+    backgroundColor: 'transparent',
+  },
+  footerLogoMobile: {
+    width: 110,
+    height: 48,
+  },
+  footerBrandCopy: {
+    gap: 4,
+  },
+  footerBrandCopyMobile: {
+    gap: 2,
+  },
+  footerBrandName: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fffef8',
+  },
+  footerBrandNameMobile: {
+    fontSize: 18,
+  },
+  footerBrandTagline: {
+    color: '#f0e7d2',
+    fontSize: 14,
+  },
+  footerBrandTaglineMobile: {
+    fontSize: 12,
+  },
+  footerStatement: {
+    color: '#f2d77e',
+    fontWeight: '700',
+  },
+  footerStatementMobile: {
+    fontSize: 12,
+  },
+  footerLinksWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  footerLinksWrapMobile: {
+    gap: 8,
+  },
+  footerLinkButton: {
+    paddingVertical: 4,
+    paddingRight: 8,
+  },
+  footerLinkButtonMobile: {
+    paddingVertical: 2,
+    paddingRight: 6,
+  },
+  footerLinkText: {
+    color: '#f0e7d2',
+    fontWeight: '600',
+  },
+  footerLinkTextMobile: {
+    fontSize: 13,
+  },
+  footerLinkTextActive: {
+    color: '#f2d77e',
+  },
+  footerSocialSection: {
+    gap: 12,
+  },
+  footerSectionLabel: {
+    color: '#fffef8',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footerSectionLabelMobile: {
+    fontSize: 14,
+  },
+  footerSocialRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  footerSocialButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerSocialButtonMobile: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  footerSocialButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#f2d77e',
+  },
+  footerMeta: {
+    color: '#d7ddda',
+    lineHeight: 22,
+  },
+  footerMetaMobile: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  // Business Card Styles
+  businessCardHeader: {
+   paddingVertical: 24,
+   paddingHorizontal: 32,
+   alignItems: 'center',
+   backgroundColor: '#f9f7f4',
+   borderBottomWidth: 1,
+   borderBottomColor: '#e5ddd2',
+  },
+  businessCardHeaderMobile: {
+   paddingVertical: 16,
+   paddingHorizontal: 16,
+  },
+  businessCardTitle: {
+   fontSize: 32,
+   fontWeight: '700',
+   color: '#1F2937',
+   marginBottom: 8,
+  },
+  businessCardTitleMobile: {
+   fontSize: 24,
+  },
+  businessCardSubtitle: {
+   fontSize: 14,
+   color: '#6B7280',
+   fontWeight: '500',
+  },
+  businessCardSubtitleMobile: {
+   fontSize: 12,
+  },
+  businessCardContainer: {
+   marginHorizontal: 'auto' as any,
+   marginVertical: 32,
+   paddingHorizontal: 32,
+   paddingVertical: 40,
+   maxWidth: 600,
+   backgroundColor: 'white',
+   borderRadius: 12,
+   shadowColor: '#000000',
+   shadowOffset: { width: 0, height: 4 },
+   shadowOpacity: 0.08,
+   shadowRadius: 12,
+   elevation: 3,
+  },
+  businessCardContainerMobile: {
+   marginHorizontal: 16,
+   paddingHorizontal: 20,
+   paddingVertical: 24,
+  },
+  businessCardLogo: {
+   width: '100%',
+   height: 80,
+   marginBottom: 32,
+  },
+  businessCardLogoMobile: {
+   height: 60,
+   marginBottom: 24,
+  },
+  businessCardSection: {
+   marginBottom: 28,
+   paddingBottom: 28,
+   borderBottomWidth: 1,
+   borderBottomColor: '#e5ddd2',
+  },
+  businessCardSectionMobile: {
+   marginBottom: 20,
+   paddingBottom: 20,
+  },
+  businessCardSectionTitle: {
+   fontSize: 14,
+   fontWeight: '700',
+   color: '#8B7355',
+   textTransform: 'uppercase' as any,
+   letterSpacing: 0.5,
+   marginBottom: 16,
+  },
+  businessCardSectionTitleMobile: {
+   fontSize: 12,
+   marginBottom: 12,
+  },
+  businessCardContactRow: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   marginBottom: 12,
+   paddingVertical: 8,
+  },
+  businessCardContactRowMobile: {
+   marginBottom: 10,
+   paddingVertical: 6,
+  },
+  businessCardIcon: {
+   marginRight: 12,
+  },
+  businessCardContactLink: {
+   fontSize: 14,
+   color: '#1F2937',
+   fontWeight: '500',
+   textDecorationLine: 'underline' as any,
+  },
+  businessCardContactLinkMobile: {
+   fontSize: 13,
+  },
+  businessCardSocialRow: {
+   flexDirection: 'row',
+   justifyContent: 'flex-start',
+   gap: 16,
+  },
+  businessCardSocialRowMobile: {
+   gap: 12,
+  },
+  businessCardSocialIcon: {
+   width: 48,
+   height: 48,
+   borderRadius: 24,
+   backgroundColor: '#f3f0ed',
+   alignItems: 'center',
+   justifyContent: 'center',
+  },
+  businessCardSocialIconMobile: {
+   width: 40,
+   height: 40,
+   borderRadius: 20,
+  },
+  businessCardQRContainer: {
+   alignItems: 'center',
+   marginBottom: 28,
+   paddingBottom: 28,
+   borderBottomWidth: 1,
+   borderBottomColor: '#e5ddd2',
+  },
+  businessCardQRContainerMobile: {
+   marginBottom: 20,
+   paddingBottom: 20,
+  },
+  businessCardQRLabel: {
+   fontSize: 14,
+   fontWeight: '700',
+   color: '#8B7355',
+   textTransform: 'uppercase' as any,
+   letterSpacing: 0.5,
+   marginBottom: 16,
+  },
+  businessCardQRLabelMobile: {
+   fontSize: 12,
+   marginBottom: 12,
+  },
+  businessCardQRCodeWrapper: {
+   padding: 12,
+   backgroundColor: '#f9f7f4',
+   borderRadius: 8,
+  },
+  businessCardQRCodeWrapperMobile: {
+   padding: 8,
+  },
+  qrCodePlaceholder: {
+   fontSize: 12,
+   color: '#6B7280',
+  },
+  businessCardButton: {
+   flexDirection: 'row',
+   paddingVertical: 14,
+   paddingHorizontal: 24,
+   backgroundColor: '#8B7355',
+   borderRadius: 8,
+   alignItems: 'center',
+   justifyContent: 'center',
+   gap: 8,
+  },
+  businessCardButtonMobile: {
+   paddingVertical: 12,
+   paddingHorizontal: 20,
+  },
+  businessCardButtonIcon: {
+   marginRight: 4,
+  },
+  businessCardButtonText: {
+   fontSize: 14,
+   fontWeight: '700',
+   color: 'white',
+  },
+  businessCardButtonTextMobile: {
+   fontSize: 13,
+  },
+});

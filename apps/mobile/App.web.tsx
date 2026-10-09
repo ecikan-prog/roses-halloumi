@@ -26,7 +26,8 @@ import { clearStoredToken, getStoredToken, setStoredToken } from './src/lib/sess
 import { clearStoredCart, getStoredCart, setStoredCart } from './src/lib/cart';
 import { SOCIAL_LINKS } from './src/lib/constants';
 import { initializeTawkToChat } from './src/lib/crispChat';
-import AdminDashboardScreen from './src/admin/AdminDashboard';
+import type { SessionState, SessionUser } from './src/lib/sessionTypes';
+import AdminDashboardScreen from './src/admin/AdminDashboard.web';
 
 const grasslandLogo = require('./assets/grassland-cheese-logo.png');
 const heroImage = require('./assets/grassland/grassland-cows-pasture-hero.jpeg(1).jpg');
@@ -77,24 +78,6 @@ const PaymentStatus = {
 
 type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
 
-type CustomerUser = {
-  kind: 'customer';
-  id: number;
-  name: string;
-  email: string;
-  type: 'WHOLESALE' | 'RETAIL';
-  contact: string | null;
-};
-
-type StaffUser = {
-  kind: 'staff';
-  id: number;
-  name: string;
-  email: string;
-  role: 'STAFF' | 'ADMIN';
-};
-
-type SessionUser = CustomerUser | StaffUser;
 type AuthMode = 'customer-login' | 'admin-login' | 'customer-register' | 'customer-forgot-password' | 'customer-reset-password';
 type PublicPage = 'home' | 'shop' | 'recipes' | 'wholesale' | 'wholesale-apply' | 'about' | 'quality-compliance' | 'cart' | 'account' | 'contact' | 'privacy' | 'terms' | 'business-card';
 type SignedInPage = PublicPage | 'orders' | 'customers' | 'order-confirmation';
@@ -136,11 +119,6 @@ function getPaymentStatusLabel(status: PaymentStatus) {
       return 'Deferred / unpaid';
   }
 }
-
-export type SessionState = {
-  token: string | null;
-  user: SessionUser | null;
-};
 
 type ProductRecord = {
   id: number;

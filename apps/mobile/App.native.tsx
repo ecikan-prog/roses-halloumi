@@ -1004,7 +1004,7 @@ function SiteScreen({
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <ScrollView style={styles.siteScroll} contentContainerStyle={styles.siteContent}>
-        <View style={styles.siteInner}>
+        <View style={[styles.siteInner, shouldUseMobileStyles(width) && styles.siteInnerMobile]}>
           <SiteHeader
             currentPage={currentPage}
             onNavigate={onNavigate}
@@ -1013,7 +1013,7 @@ function SiteScreen({
             cartCount={cartCount}
             isCompact={isCompact}
           />
-          <View style={styles.pageContentWrap}>{children}</View>
+          <View style={[styles.pageContentWrap, shouldUseMobileStyles(width) && styles.pageContentWrapMobile]}>{children}</View>
           <SiteFooter currentPage={currentPage} onNavigate={onNavigate} session={session} />
         </View>
       </ScrollView>
@@ -1218,7 +1218,7 @@ function resolveWebImageUri(source: ImageSourcePropType): string | null {
 function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSecondary: () => void }) {
   const { width } = useWindowDimensions();
   const isMobile = shouldUseMobileStyles(width);
-  const heroHeight = width < 640 ? 420 : width < 1024 ? 520 : 620;
+  const heroHeight = width < 640 ? 340 : width < 1024 ? 520 : 620;
   const heroImageStyle = width < 640 ? styles.heroImageMobile : width < 1024 ? styles.heroImageTablet : styles.heroImageDesktop;
 
   const heroOverlayContent = (
@@ -1267,8 +1267,8 @@ function HeroSection({ onPrimary, onSecondary }: { onPrimary: () => void; onSeco
   }
 
   return (
-    <View style={[styles.heroShell, { minHeight: heroHeight }]}> 
-      <ImageBackground source={heroImage} style={styles.heroBackground} imageStyle={[styles.heroImage, heroImageStyle]} resizeMode="cover">
+    <View style={[styles.heroShell, isMobile && styles.heroShellMobile, { minHeight: heroHeight }]}>
+      <ImageBackground source={heroImage} style={styles.heroBackground} imageStyle={[styles.heroImage, isMobile && styles.heroImageMobileRadius, heroImageStyle]} resizeMode="cover">
         {heroOverlayContent}
       </ImageBackground>
     </View>
@@ -1585,9 +1585,9 @@ function ProductCard({
       <View style={[styles.productLogoPanel, isMobile && styles.productLogoPanelMobile]}>
         <Image source={product.image} style={styles.productLogo} resizeMode="contain" accessibilityLabel={`${product.name} product photo`} />
       </View>
-      <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={3}>{product.name}</Text>
-      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.description}</Text>
-      <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
+      <Text style={[styles.productCardName, isMobile && styles.productCardNameMobile]} numberOfLines={isMobile ? 2 : 3}>{product.name}</Text>
+      <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]} numberOfLines={isMobile ? 2 : undefined}>{product.description}</Text>
+      <Text style={[styles.productCardPrice, isMobile && styles.productCardPriceMobile]}>{formatPrice(product.product)}</Text>
       <View style={styles.productActionsRow}>
         <Pressable style={styles.detailsButton} onPress={onOpenDetails}>
           <Text style={styles.detailsButtonLabel}>Product details</Text>
@@ -1606,7 +1606,7 @@ function ProductCard({
         </View>
       </View>
       <Pressable disabled={disabled || quantity === 0} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, (disabled || quantity === 0) && styles.disabledPrimaryButton]} onPress={onAdd}>
-        <Text style={styles.primaryButtonLabel}>{ctaLabel}</Text>
+        <Text style={[styles.primaryButtonLabel, isMobile && styles.primaryButtonLabelMobile]}>{ctaLabel}</Text>
       </Pressable>
     </View>
   );
@@ -1647,7 +1647,7 @@ function ProductDetailCard({
       </View>
       <Text style={styles.productCardSize}>{product.size}</Text>
       <Text style={[styles.productCardDescription, isMobile && styles.productCardDescriptionMobile]}>{product.detail}</Text>
-      <Text style={styles.productCardPrice}>{formatPrice(product.product)}</Text>
+      <Text style={[styles.productCardPrice, isMobile && styles.productCardPriceMobile]}>{formatPrice(product.product)}</Text>
       <View style={styles.quantityRow}>
         <Pressable disabled={!isAvailable} style={[styles.quantityButton, isMobile && styles.quantityButtonMobile, !isAvailable && styles.disabledButton]} onPress={onDecrease}>
           <Text style={[styles.quantityLabel, isMobile && styles.quantityLabelMobile]}>-</Text>
@@ -1658,7 +1658,7 @@ function ProductDetailCard({
         </Pressable>
       </View>
       <Pressable disabled={!isAvailable} style={[styles.primaryButton, isMobile && styles.primaryButtonMobile, !isAvailable && styles.disabledPrimaryButton]} onPress={onAdd}>
-        <Text style={styles.primaryButtonLabel}>{isAvailable ? 'Add to Cart' : 'Available Soon'}</Text>
+        <Text style={[styles.primaryButtonLabel, isMobile && styles.primaryButtonLabelMobile]}>{isAvailable ? 'Add to Cart' : 'Available Soon'}</Text>
       </Pressable>
     </View>
   );
@@ -1972,7 +1972,7 @@ function RecipesSection({ onNavigate }: { onNavigate?: (page: any) => void } = {
           <View key={recipe.title} style={[styles.recipeCard, isMobile && styles.recipeCardMobile]}>
             <Image source={recipe.image} style={[styles.recipeCardImage, isMobile && styles.recipeCardImageMobile]} resizeMode="cover" accessibilityLabel={`${recipe.title} inspiration image`} />
             <Text style={[styles.recipeCardTitle, isMobile && styles.recipeCardTitleMobile]}>{recipe.title}</Text>
-            <Text style={[styles.recipeCardDescription, isMobile && styles.recipeCardDescriptionMobile]}>{recipe.description}</Text>
+            <Text style={[styles.recipeCardDescription, isMobile && styles.recipeCardDescriptionMobile]} numberOfLines={isMobile ? 3 : undefined}>{recipe.description}</Text>
           </View>
         ))}
       </View>
@@ -2004,12 +2004,15 @@ function WhyGrasslandSection() {
 }
 
 function StorySection() {
+  const { width } = useWindowDimensions();
+  const isMobile = shouldUseMobileStyles(width);
+
   return (
     <SectionShell eyebrow="Our Story" title="From New Zealand Pastures to Your Plate" description="Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.">
-      <View style={styles.storyCard}>
-        <Text style={styles.storyParagraph}>Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.</Text>
-        <Text style={styles.storyParagraph}>We focus on one thing: producing the best halloumi for your table. Slice it, grill it, share it.</Text>
-        <Text style={styles.storyParagraph}>From weeknight dinners to special occasions, Grassland Cheese is halloumi the way it should be.</Text>
+      <View style={[styles.storyCard, isMobile && styles.storyCardMobile]}>
+        <Text style={[styles.storyParagraph, isMobile && styles.storyParagraphMobile]}>Grassland Cheese is premium halloumi from New Zealand, made on a family farm since 2010.</Text>
+        <Text style={[styles.storyParagraph, isMobile && styles.storyParagraphMobile]}>We focus on one thing: producing the best halloumi for your table. Slice it, grill it, share it.</Text>
+        <Text style={[styles.storyParagraph, isMobile && styles.storyParagraphMobile]}>From weeknight dinners to special occasions, Grassland Cheese is halloumi the way it should be.</Text>
       </View>
     </SectionShell>
   );
@@ -2019,7 +2022,7 @@ function OurStoryPageSection() {
   const { width } = useWindowDimensions();
   const isMobile = width < 900;
   const isSmallMobile = width < 640;
-  const heroHeight = width < 640 ? 340 : width < 1024 ? 430 : 520;
+  const heroHeight = width < 640 ? 270 : width < 1024 ? 430 : 520;
 
   return (
     <View style={styles.ourStoryPage}>
@@ -3433,7 +3436,7 @@ function SectionShell({ eyebrow, title, description, children }: { eyebrow: stri
   
   return (
     <View style={[styles.sectionShell, isMobile && styles.sectionShellMobile]}>
-      <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
+      <Text style={[styles.sectionEyebrow, isMobile && styles.sectionEyebrowMobile]}>{eyebrow}</Text>
       <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]} numberOfLines={3}>{title}</Text>
       <Text style={[styles.sectionDescription, isMobile && styles.sectionDescriptionMobile]}>{description}</Text>
       {children}
@@ -3620,8 +3623,16 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     gap: 24,
   },
+  siteInnerMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    gap: 14,
+  },
   pageContentWrap: {
     gap: 24,
+  },
+  pageContentWrapMobile: {
+    gap: 14,
   },
   headerShell: {
     backgroundColor: '#fffdf8',
@@ -3672,7 +3683,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   navRowMobile: {
-    gap: 6,
+    flexWrap: 'nowrap',
+    gap: 4,
+    justifyContent: 'space-between',
   },
   navButton: {
     borderRadius: 999,
@@ -3681,7 +3694,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2ead9',
   },
   navButtonMobile: {
-    paddingHorizontal: 10,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    paddingHorizontal: 6,
     paddingVertical: 8,
   },
   navButtonActive: {
@@ -3692,7 +3709,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   navButtonTextMobile: {
-    fontSize: 13,
+    fontSize: 12,
+    flexShrink: 1,
   },
   navButtonTextActive: {
     color: '#fffef8',
@@ -3705,7 +3723,7 @@ const styles = StyleSheet.create({
     borderColor: '#1f5c43',
   },
   signOutButtonMobile: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 8,
   },
   signOutButtonText: {
@@ -3719,6 +3737,9 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     overflow: 'hidden',
   },
+  heroShellMobile: {
+    borderRadius: 22,
+  },
   heroBackground: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -3729,6 +3750,9 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     borderRadius: 32,
+  },
+  heroImageMobileRadius: {
+    borderRadius: 22,
   },
   heroImageMobile: {
     objectPosition: 'center 85%',
@@ -3745,8 +3769,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   heroOverlayMobile: {
-    padding: 20,
-    gap: 12,
+    padding: 16,
+    gap: 10,
   },
   heroBadge: {
     alignSelf: 'flex-start',
@@ -3767,8 +3791,8 @@ const styles = StyleSheet.create({
     maxWidth: 560,
   },
   heroTitleMobile: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 28,
   },
   heroSubtitle: {
     fontSize: 18,
@@ -3777,8 +3801,8 @@ const styles = StyleSheet.create({
     maxWidth: 520,
   },
   heroSubtitleMobile: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 20,
   },
   heroActionRow: {
     flexDirection: 'row',
@@ -3786,15 +3810,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heroActionRowMobile: {
-    gap: 10,
+    gap: 8,
   },
   sectionShell: {
     gap: 16,
     marginVertical: 24,
   },
   sectionShellMobile: {
-    gap: 12,
-    marginVertical: 16,
+    gap: 9,
+    marginVertical: 10,
   },
   sectionEyebrow: {
     color: '#8a6b2f',
@@ -3803,6 +3827,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
+  sectionEyebrowMobile: {
+    fontSize: 11,
+    letterSpacing: 0.9,
+  },
   sectionTitle: {
     fontSize: 25,
     lineHeight: 30,
@@ -3810,8 +3838,8 @@ const styles = StyleSheet.create({
     color: '#123524',
   },
   sectionTitleMobile: {
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 19,
+    lineHeight: 24,
   },
   sectionDescription: {
     fontSize: 17,
@@ -3820,8 +3848,8 @@ const styles = StyleSheet.create({
     maxWidth: 760,
   },
   sectionDescriptionMobile: {
-    fontSize: 15,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 20,
   },
   productGrid: {
     flexDirection: 'row',
@@ -3829,7 +3857,7 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   productGridMobile: {
-    gap: 16,
+    gap: 12,
   },
   productCard: {
     flexBasis: 280,
@@ -3842,10 +3870,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   productCardMobile: {
-    flexBasis: 240,
-    padding: 12,
-    borderRadius: 20,
-    gap: 10,
+    flexBasis: 300,
+    padding: 10,
+    borderRadius: 18,
+    gap: 8,
   },
   productLogoPanel: {
     backgroundColor: '#f5efe0',
@@ -3856,9 +3884,9 @@ const styles = StyleSheet.create({
     height: 360,
   },
   productLogoPanelMobile: {
-    height: 240,
-    padding: 10,
-    borderRadius: 14,
+    height: 150,
+    padding: 8,
+    borderRadius: 12,
   },
   productLogo: {
     width: '100%',
@@ -3871,6 +3899,7 @@ const styles = StyleSheet.create({
   },
   productCardNameMobile: {
     fontSize: 16,
+    lineHeight: 20,
   },
   productCardSize: {
     fontSize: 15,
@@ -3883,13 +3912,16 @@ const styles = StyleSheet.create({
     color: '#4d5c54',
   },
   productCardDescriptionMobile: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
   },
   productCardPrice: {
     fontSize: 24,
     fontWeight: '800',
     color: '#1f5c43',
+  },
+  productCardPriceMobile: {
+    fontSize: 20,
   },
   productActionsRow: {
     flexDirection: 'row',
@@ -3954,8 +3986,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonMobile: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   disabledPrimaryButton: {
     opacity: 0.55,
@@ -3964,6 +3996,9 @@ const styles = StyleSheet.create({
     color: '#fffef8',
     fontWeight: '700',
     fontSize: 16,
+  },
+  primaryButtonLabelMobile: {
+    fontSize: 14,
   },
   secondaryButton: {
     borderColor: '#1f5c43',
@@ -4154,7 +4189,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   recipeGridMobile: {
-    gap: 12,
+    gap: 10,
   },
   recipeCard: {
     flexBasis: 300,
@@ -4166,15 +4201,15 @@ const styles = StyleSheet.create({
     borderColor: '#e7ddc9',
   },
   recipeCardMobile: {
-    flexBasis: 260,
-    borderRadius: 20,
+    flexBasis: 300,
+    borderRadius: 18,
   },
   recipeCardImage: {
     width: '100%',
     height: 220,
   },
   recipeCardImageMobile: {
-    height: 160,
+    height: 132,
   },
   recipeCardTitle: {
     paddingHorizontal: 18,
@@ -4185,8 +4220,8 @@ const styles = StyleSheet.create({
   },
   recipeCardTitleMobile: {
     paddingHorizontal: 12,
-    paddingTop: 10,
-    fontSize: 16,
+    paddingTop: 9,
+    fontSize: 15,
   },
   recipeCardDescription: {
     paddingHorizontal: 18,
@@ -4198,10 +4233,10 @@ const styles = StyleSheet.create({
   },
   recipeCardDescriptionMobile: {
     paddingHorizontal: 12,
-    paddingTop: 4,
-    paddingBottom: 12,
-    fontSize: 13,
-    lineHeight: 19,
+    paddingTop: 3,
+    paddingBottom: 10,
+    fontSize: 12,
+    lineHeight: 17,
   },
   storyCard: {
     backgroundColor: '#fffdf8',
@@ -4212,8 +4247,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   storyCardMobile: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 18,
+    padding: 12,
+    gap: 8,
   },
   storyParagraph: {
     color: '#4d5c54',
@@ -4221,8 +4257,8 @@ const styles = StyleSheet.create({
     lineHeight: 27,
   },
   storyParagraphMobile: {
-    fontSize: 14,
-    lineHeight: 23,
+    fontSize: 13,
+    lineHeight: 19,
   },
   ourStoryPage: {
     gap: 32,

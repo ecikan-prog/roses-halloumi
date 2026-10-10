@@ -1036,35 +1036,41 @@ function SiteHeader({
   cartCount: number;
   isCompact: boolean;
 }) {
-  const { width } = useWindowDimensions();
-  const isMobile = shouldUseMobileStyles(width);
   const isStaff = session?.user?.kind === 'staff';
-  
-  // Mobile and desktop navigation items
-  const mainNavItems: Array<{ label: string; page: SignedInPage | PublicPage; shortLabel?: string }> = [
-    { label: 'Shop', page: 'shop', shortLabel: 'Shop' },
-    { label: 'Recipes', page: 'recipes', shortLabel: 'Recipes' },
-    { label: session ? 'Account' : 'Login', page: 'account', shortLabel: session ? 'Account' : 'Login' },
-    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart', shortLabel: cartCount > 0 ? `Cart (${cartCount})` : 'Cart' },
+
+  const navItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
+    { label: 'Home', page: 'home' },
+    { label: 'Shop Halloumi', page: 'shop' },
+    { label: 'Recipes', page: 'recipes' },
+    { label: 'Wholesale', page: 'wholesale' },
+    { label: 'Our Story', page: 'about' },
+    { label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart', page: 'cart' },
+    { label: session ? 'Customer Account' : 'Login', page: 'account' },
+    ...(session && !isStaff ? [{ label: 'My Orders', page: 'orders' as const }] : []),
+    ...(isStaff ? [{ label: 'Orders', page: 'orders' as const }, { label: 'Customers', page: 'customers' as const }] : []),
   ];
 
   return (
     <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
       <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
-        <Image source={grasslandLogo} style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <Image source={grasslandLogo} style={styles.headerLogo} resizeMode="contain" accessibilityLabel="Grassland Cheese logo" />
+        <View style={styles.brandCopyWrap}>
+          <Text style={styles.brandName}>{brandName}</Text>
+          <Text style={styles.brandTagline}>{brandTagline}</Text>
+        </View>
       </Pressable>
-      <View style={[styles.navRow, isMobile && styles.navRowMobile]}>
-        {mainNavItems.map((item) => {
+      <View style={[styles.navRow, isCompact && styles.navRowCompact]}>
+        {navItems.map((item) => {
           const selected = item.page === currentPage;
           return (
-            <Pressable key={item.page} style={[styles.navButton, isMobile && styles.navButtonMobile, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
-              <Text style={[styles.navButtonText, isMobile && styles.navButtonTextMobile, selected && styles.navButtonTextActive]} numberOfLines={1}>{item.label}</Text>
+            <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
+              <Text style={[styles.navButtonText, selected && styles.navButtonTextActive]}>{item.label}</Text>
             </Pressable>
           );
         })}
         {session && onSignOut ? (
-          <Pressable style={[styles.signOutButton, isMobile && styles.signOutButtonMobile]} onPress={() => void onSignOut()}>
-            <Text style={[styles.signOutButtonText, isMobile && styles.signOutButtonTextMobile]}>Sign out</Text>
+          <Pressable style={styles.signOutButton} onPress={() => void onSignOut()}>
+            <Text style={styles.signOutButtonText}>Sign out</Text>
           </Pressable>
         ) : null}
       </View>
@@ -3626,14 +3632,14 @@ const styles = StyleSheet.create({
   headerShell: {
     backgroundColor: '#fffdf8',
     borderRadius: 28,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     borderWidth: 1,
     borderColor: '#e7ddc9',
-    gap: 10,
+    gap: 16,
   },
   headerShellCompact: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
   brandLockup: {
     flexDirection: 'row',
@@ -3641,8 +3647,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   headerLogo: {
-    width: 90,
-    height: 38,
+    width: 150,
+    height: 64,
   },
   headerLogoMobile: {
     width: 75,

@@ -1036,6 +1036,8 @@ function SiteHeader({
   cartCount: number;
   isCompact: boolean;
 }) {
+  const { width } = useWindowDimensions();
+  const isNarrowWeb = Platform.OS === 'web' && width < 640;
   const isStaff = session?.user?.kind === 'staff';
 
   const navItems: Array<{ label: string; page: SignedInPage | PublicPage }> = [
@@ -1050,6 +1052,30 @@ function SiteHeader({
     ...(isStaff ? [{ label: 'Orders', page: 'orders' as const }, { label: 'Customers', page: 'customers' as const }] : []),
   ];
 
+  const revealFocusedLink = (event: { currentTarget: unknown }) => {
+    if (isNarrowWeb && event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  };
+
+  const navigation = (
+    <View style={[styles.navRow, isCompact && styles.navRowCompact, isNarrowWeb && styles.navRowNarrowWeb]}>
+      {navItems.map((item) => {
+        const selected = item.page === currentPage;
+        return (
+          <Pressable key={item.page} style={[styles.navButton, isNarrowWeb && styles.navButtonNarrowWeb, selected && styles.navButtonActive]} onFocus={revealFocusedLink} onPress={() => onNavigate(item.page)}>
+            <Text style={[styles.navButtonText, selected && styles.navButtonTextActive]}>{item.label}</Text>
+          </Pressable>
+        );
+      })}
+      {session && onSignOut ? (
+        <Pressable style={[styles.signOutButton, isNarrowWeb && styles.navButtonNarrowWeb]} onFocus={revealFocusedLink} onPress={() => void onSignOut()}>
+          <Text style={styles.signOutButtonText}>Sign out</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
   return (
     <View style={[styles.headerShell, isCompact && styles.headerShellCompact]}>
       <Pressable style={styles.brandLockup} onPress={() => onNavigate('home')}>
@@ -1059,21 +1085,14 @@ function SiteHeader({
           <Text style={styles.brandTagline}>{brandTagline}</Text>
         </View>
       </Pressable>
-      <View style={[styles.navRow, isCompact && styles.navRowCompact]}>
-        {navItems.map((item) => {
-          const selected = item.page === currentPage;
-          return (
-            <Pressable key={item.page} style={[styles.navButton, selected && styles.navButtonActive]} onPress={() => onNavigate(item.page)}>
-              <Text style={[styles.navButtonText, selected && styles.navButtonTextActive]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-        {session && onSignOut ? (
-          <Pressable style={styles.signOutButton} onPress={() => void onSignOut()}>
-            <Text style={styles.signOutButtonText}>Sign out</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      {isNarrowWeb ? (
+        <View>
+          <ScrollView horizontal showsHorizontalScrollIndicator style={styles.navScrollNarrowWeb}>
+            {navigation}
+          </ScrollView>
+          <Text style={styles.navScrollHint}>Scroll horizontally for more links ↔</Text>
+        </View>
+      ) : navigation}
     </View>
   );
 }
@@ -3676,6 +3695,21 @@ const styles = StyleSheet.create({
   },
   navRowCompact: {
     justifyContent: 'flex-start',
+  },
+  navRowNarrowWeb: {
+    flexWrap: 'nowrap',
+    paddingVertical: 4,
+  },
+  navButtonNarrowWeb: {
+    flexShrink: 0,
+  },
+  navScrollNarrowWeb: {
+    flexGrow: 0,
+  },
+  navScrollHint: {
+    color: '#4d5c54',
+    fontSize: 12,
+    marginTop: 4,
   },
   navRowMobile: {
     gap: 6,
